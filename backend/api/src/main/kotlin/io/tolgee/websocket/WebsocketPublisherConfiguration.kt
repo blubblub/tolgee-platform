@@ -1,5 +1,6 @@
 package io.tolgee.websocket
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.tolgee.configuration.tolgee.WebsocketProperties
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
@@ -15,7 +16,10 @@ class WebsocketPublisherConfiguration(
   @Bean
   fun websocketEventPublisher(): WebsocketEventPublisher {
     if (websocketProperties.useRedis) {
-      return RedisWebsocketEventPublisher(applicationContext.getBean(StringRedisTemplate::class.java))
+      return RedisWebsocketEventPublisher(
+        applicationContext.getBean(StringRedisTemplate::class.java),
+        applicationContext.getBean(ObjectMapper::class.java),
+      )
     }
     return SimpleWebsocketEventPublisher(applicationContext.getBean(SimpMessagingTemplate::class.java))
   }

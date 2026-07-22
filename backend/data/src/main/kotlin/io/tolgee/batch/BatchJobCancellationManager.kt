@@ -1,6 +1,6 @@
 package io.tolgee.batch
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.tolgee.activity.ActivityHolder
 import io.tolgee.batch.cleaning.BatchJobStatusProvider
 import io.tolgee.batch.events.JobCancelEvent
@@ -36,6 +36,7 @@ class BatchJobCancellationManager(
   private val batchJobChunkExecutionQueue: BatchJobChunkExecutionQueue,
   private val concurrentExecutionLauncher: BatchJobConcurrentLauncher,
   private val batchProperties: io.tolgee.configuration.tolgee.BatchProperties,
+  private val objectMapper: ObjectMapper,
 ) : Logging {
   @Transactional
   fun cancel(id: Long) {
@@ -63,7 +64,7 @@ class BatchJobCancellationManager(
     if (usingRedisProvider.areWeUsingRedis) {
       redisTemplate.convertAndSend(
         RedisPubSubReceiverConfiguration.JOB_CANCEL_TOPIC,
-        jacksonObjectMapper().writeValueAsString(id),
+        objectMapper.writeValueAsString(id),
       )
     }
     cancelLocalJob(id)

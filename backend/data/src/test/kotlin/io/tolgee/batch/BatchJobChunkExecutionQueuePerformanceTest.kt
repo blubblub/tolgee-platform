@@ -1,5 +1,6 @@
 package io.tolgee.batch
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.tolgee.Metrics
 import io.tolgee.batch.data.BatchJobType
@@ -39,6 +40,7 @@ class BatchJobChunkExecutionQueuePerformanceTest {
         usingRedisProvider = mock<UsingRedisProvider>(),
         redisTemplate = mock<StringRedisTemplate>(),
         metrics = Metrics(SimpleMeterRegistry()),
+        objectMapper = jacksonObjectMapper(),
       )
     // The internal structures live in the companion object (static), clear between tests
     executionQueue.clear()

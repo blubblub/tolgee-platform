@@ -1,6 +1,6 @@
 package io.tolgee.batch
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.tolgee.Metrics
 import io.tolgee.batch.data.BatchJobChunkExecutionDto
 import io.tolgee.batch.data.BatchJobType
@@ -35,6 +35,7 @@ class BatchJobChunkExecutionQueue(
   @Lazy
   private val redisTemplate: StringRedisTemplate,
   private val metrics: Metrics,
+  private val objectMapper: ObjectMapper,
 ) : Logging,
   InitializingBean {
   companion object {
@@ -222,7 +223,7 @@ class BatchJobChunkExecutionQueue(
         val event = JobQueueItemsEvent(batch, QueueEventType.ADD)
         redisTemplate.convertAndSend(
           RedisPubSubReceiverConfiguration.JOB_QUEUE_TOPIC,
-          jacksonObjectMapper().writeValueAsString(event),
+          objectMapper.writeValueAsString(event),
         )
       }
       return
