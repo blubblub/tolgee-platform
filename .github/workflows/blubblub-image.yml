@@ -1,0 +1,25 @@
+name: Publish Blub Blub image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  DOCKER_IMAGE: ghcr.io/blubblub/tolgee-platform
+  VERSION: v3.215.0-blubblub.1
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-env
+        with:
+          docker: "true"
+          docker-ghcr: "true"
+
+      - run: ./gradlew dockerPublish
