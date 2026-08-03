@@ -1,6 +1,8 @@
 package io.tolgee.service.projectExportImport
 
 import io.tolgee.model.Language
+import io.tolgee.model.binaryAsset.BinaryAsset
+import io.tolgee.model.binaryAsset.BinaryAssetTranslation
 import io.tolgee.model.Project
 import io.tolgee.model.Screenshot
 import io.tolgee.model.TranslationSuggestion
@@ -27,6 +29,7 @@ import io.tolgee.repository.ProjectRepository
 import io.tolgee.repository.qa.ProjectQaConfigRepository
 import io.tolgee.service.AiPlaygroundResultService
 import io.tolgee.service.bigMeta.BigMetaService
+import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.branching.BranchService
 import io.tolgee.service.dataImport.ImportService
 import io.tolgee.service.dataImport.ImportSettingsService
@@ -68,10 +71,12 @@ class ProjectContentClearer(
   private val bigMetaService: BigMetaService,
   private val branchService: BranchService,
   private val projectQaConfigRepository: ProjectQaConfigRepository,
+  private val binaryAssetService: BinaryAssetService,
 ) : Logging {
   fun clear(project: Project) {
     val projectId = project.id
 
+    binaryAssetService.deleteAllByProject(projectId)
     clearTasks(projectId)
     // branch_merge_change FKs key (no cascade) — must go before keys, and before its branch_merge parent.
     deleteBranchMergeChanges(projectId)
@@ -232,6 +237,8 @@ class ProjectContentClearer(
         Label::class,
         Screenshot::class,
         KeyScreenshotReference::class,
+        BinaryAsset::class,
+        BinaryAssetTranslation::class,
         Branch::class,
         Task::class,
         TaskKey::class,

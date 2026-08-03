@@ -182,6 +182,15 @@ export class ApiHttpService {
     );
   }
 
+  async putMultipart<T>(url: string, data: FormData): Promise<T> {
+    return ApiHttpService.getResObject(
+      await this.fetch(url, {
+        method: 'PUT',
+        body: data,
+      })
+    );
+  }
+
   postNoJson(input: RequestInfo, body: any): Promise<Response> {
     return this.fetch(input, {
       body: JSON.stringify(body),

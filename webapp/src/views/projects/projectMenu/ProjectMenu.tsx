@@ -65,6 +65,15 @@ export const ProjectMenu = () => {
       quickStart: { itemKey: 'menu_translations' },
     },
     {
+      id: 'assets',
+      condition: ({ satisfiesPermission }) => satisfiesPermission('keys.view'),
+      link: LINKS.PROJECT_ASSETS,
+      icon: UploadCloud02,
+      text: t('project_menu_assets', 'Assets'),
+      dataCy: 'project-menu-item-assets',
+      matchAsPrefix: true,
+    },
+    {
       id: 'languages',
       condition: ({ satisfiesPermission }) =>
         satisfiesPermission('languages.edit'),

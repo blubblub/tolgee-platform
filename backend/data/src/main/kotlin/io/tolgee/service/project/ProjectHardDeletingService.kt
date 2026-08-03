@@ -18,6 +18,7 @@ import io.tolgee.service.branching.BranchService
 import io.tolgee.service.dataImport.ImportService
 import io.tolgee.service.dataImport.ImportSettingsService
 import io.tolgee.service.key.KeyService
+import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.key.ScreenshotService
 import io.tolgee.service.label.LabelService
 import io.tolgee.service.language.LanguageService
@@ -47,6 +48,7 @@ class ProjectHardDeletingService(
   private val languageService: LanguageService,
   private val keyService: KeyService,
   private val screenshotService: ScreenshotService,
+  private val binaryAssetService: BinaryAssetService,
   private val avatarService: AvatarService,
   private val batchJobService: BatchJobService,
   private val bigMetaService: BigMetaService,
@@ -107,6 +109,10 @@ class ProjectHardDeletingService(
 
       traceLogMeasureTime("deleteProject: delete screenshots") {
         screenshotService.deleteAllByProject(projectId)
+      }
+
+      traceLogMeasureTime("deleteProject: delete binary assets") {
+        binaryAssetService.deleteAllByProject(projectId)
       }
 
       mtServiceConfigService.deleteAllByProjectId(projectId)

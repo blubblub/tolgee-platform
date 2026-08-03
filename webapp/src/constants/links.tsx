@@ -52,6 +52,7 @@ export enum PARAMS {
   ENCODED_EMAIL_AND_CODE = 'email_and_code',
   SERVICE_TYPE = 'serviceType',
   PROJECT_ID = 'projectId',
+  ASSET_ID = 'assetId',
   LANGUAGE_ID = 'languageId',
   API_KEY_ID = 'apiKeyId',
   PAT_ID = 'patId',
@@ -310,6 +311,10 @@ export class LINKS {
   static PROJECT_ADD = Link.ofParent(LINKS.PROJECTS, 'add');
 
   static PROJECT_TRANSLATIONS = Link.ofParent(LINKS.PROJECT, 'translations');
+
+  static PROJECT_ASSETS = Link.ofParent(LINKS.PROJECT, 'assets');
+
+  static PROJECT_ASSET = Link.ofParent(LINKS.PROJECT_ASSETS, p(PARAMS.ASSET_ID));
 
   static PROJECT_TRANSLATIONS_WITH_BRANCH = Link.ofParent(
     LINKS.PROJECT_TRANSLATIONS,

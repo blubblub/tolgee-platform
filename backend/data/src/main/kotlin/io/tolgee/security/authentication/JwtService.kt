@@ -325,5 +325,6 @@ class JwtService(
   enum class TicketType {
     AUTH_MFA,
     IMG_ACCESS,
+    BINARY_ASSET_ACCESS,
   }
 }

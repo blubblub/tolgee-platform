@@ -171,6 +171,7 @@ class WebSecurityConfig(
         "/v3/api-docs/**",
         "/screenshots/**",
         "/uploaded-images/**",
+        "/v2/binary-assets/download",
       )
     private val ADMIN_ENDPOINTS = arrayOf("/v2/administration/**", "/v2/ee-license/**")
     private val INTERNAL_ENDPOINTS = arrayOf("/internal/**")

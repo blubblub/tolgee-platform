@@ -7,11 +7,17 @@ import io.tolgee.constants.Message
 import io.tolgee.exceptions.BadRequestException
 import io.tolgee.model.Project
 import io.tolgee.model.Screenshot
+import io.tolgee.model.binaryAsset.BinaryAsset
+import io.tolgee.model.binaryAsset.BinaryAssetTranslation
 import io.tolgee.model.UserAccount
 import io.tolgee.service.AvatarService
+import io.tolgee.component.fileStorage.FileStorage
+import io.tolgee.service.binaryAsset.BinaryAssetStoragePaths
 import io.tolgee.service.key.ScreenshotService
 import io.tolgee.service.project.LanguageStatsService
 import io.tolgee.service.project.ProjectService
+import io.tolgee.service.projectExportImport.blob.BinaryAssetBlobHandler
+import io.tolgee.service.projectExportImport.blob.BinaryAssetTranslationBlobHandler
 import io.tolgee.service.projectExportImport.blob.ProjectAvatarBlobHandler
 import io.tolgee.service.projectExportImport.blob.ScreenshotBlobHandler
 import io.tolgee.service.projectExportImport.model.SerializedEntity
@@ -51,6 +57,7 @@ class ProjectExportImportImporter(
   private val projectService: ProjectService,
   private val userAccountService: UserAccountService,
   private val screenshotService: ScreenshotService,
+  private val fileStorage: FileStorage,
   private val avatarService: AvatarService,
   private val languageStatsService: LanguageStatsService,
   private val activityHolder: ActivityHolder,
@@ -128,6 +135,12 @@ class ProjectExportImportImporter(
     val preparedScreenshots = prepareScreenshots(result.screenshotsBySourceId, parsed.blobs)
     restoreAvatar(project, parsed.blobs)
     writePreparedScreenshots(preparedScreenshots)
+    restoreBinaryAssets(
+      targetProjectId,
+      result.binaryAssetsBySourceId,
+      result.binaryAssetTranslationsBySourceId,
+      parsed.blobs,
+    )
     refreshDerivedData(targetProjectId)
   }
 
@@ -243,6 +256,40 @@ class ProjectExportImportImporter(
       }
       corruptArchiveOnParseError { handler.restore(json, context) }
     }
+  }
+
+
+  private fun restoreBinaryAssets(
+    targetProjectId: Long,
+    assetsBySourceId: Map<Long, BinaryAsset>,
+    translationsBySourceId: Map<Long, BinaryAssetTranslation>,
+    blobs: Map<String, ByteArray>,
+  ) {
+    assetsBySourceId.forEach { (sourceId, asset) ->
+      val name = BinaryAssetBlobHandler.blobName(sourceId)
+      val bytes = blobs[name]
+      if (bytes == null) {
+        logger.warn("Imported binary asset $sourceId has no blob '$name'")
+        return@forEach
+      }
+      val newKey = BinaryAssetStoragePaths.newBlobKey(targetProjectId)
+      fileStorage.storeFile(newKey, bytes)
+      asset.storageKey = newKey
+      asset.byteSize = bytes.size.toLong()
+    }
+    translationsBySourceId.forEach { (sourceId, translation) ->
+      val name = BinaryAssetTranslationBlobHandler.blobName(sourceId)
+      val bytes = blobs[name]
+      if (bytes == null) {
+        logger.warn("Imported binary asset translation $sourceId has no blob '$name'")
+        return@forEach
+      }
+      val newKey = BinaryAssetStoragePaths.newBlobKey(targetProjectId)
+      fileStorage.storeFile(newKey, bytes)
+      translation.storageKey = newKey
+      translation.byteSize = bytes.size.toLong()
+    }
+    entityManager.flush()
   }
 
   private fun refreshDerivedData(projectId: Long) {

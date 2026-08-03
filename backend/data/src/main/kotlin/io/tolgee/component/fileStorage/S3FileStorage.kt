@@ -10,17 +10,32 @@ import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException
+import software.amazon.awssdk.services.s3.model.S3Exception
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier
 import java.io.ByteArrayInputStream
+import java.io.InputStream
+import java.nio.file.Files
+import java.security.DigestInputStream
+import java.security.MessageDigest
 
 open class S3FileStorage(
   private val bucketName: String,
   private val path: String?,
   private val s3: S3Client,
 ) : FileStorage {
+  override fun supportsStreaming(): Boolean = true
+
   override fun readFile(storageFilePath: String): ByteArray {
     try {
       return s3.getObject { b -> b.bucket(bucketName).key("$canonicalPath$storageFilePath") }.readAllBytes()
+    } catch (e: Exception) {
+      throw FileStoreException("Can not obtain file", storageFilePath, e)
+    }
+  }
+
+  override fun openFileStream(storageFilePath: String): InputStream {
+    try {
+      return s3.getObject { b -> b.bucket(bucketName).key("$canonicalPath$storageFilePath") }
     } catch (e: Exception) {
       throw FileStoreException("Can not obtain file", storageFilePath, e)
     }
@@ -39,16 +54,44 @@ open class S3FileStorage(
     storageFilePath: String,
     bytes: ByteArray,
   ) {
-    val byteArrayInputStream = ByteArrayInputStream(bytes)
+    storeFileStream(storageFilePath, ByteArrayInputStream(bytes), bytes.size.toLong())
+  }
+
+  override fun storeFileStream(
+    storageFilePath: String,
+    inputStream: InputStream,
+    contentLength: Long?,
+  ): StoredFileInfo {
+    // S3 putObject needs a known content length. Stage to a temp file while hashing, then upload.
+    val digest = MessageDigest.getInstance("SHA-256")
     try {
-      s3.putObject(
-        { b -> b.bucket(bucketName).key("$canonicalPath$storageFilePath") },
-        RequestBody.fromInputStream(byteArrayInputStream, bytes.size.toLong()),
-      )
+      val tmp = Files.createTempFile("tolgee-s3-", ".bin")
+      try {
+        var size = 0L
+        DigestInputStream(inputStream, digest).use { input ->
+          Files.newOutputStream(tmp).use { output ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+              val read = input.read(buffer)
+              if (read < 0) break
+              output.write(buffer, 0, read)
+              size += read
+            }
+          }
+        }
+        Files.newInputStream(tmp).use { staged ->
+          s3.putObject(
+            { b -> b.bucket(bucketName).key("$canonicalPath$storageFilePath") },
+            RequestBody.fromInputStream(staged, size),
+          )
+        }
+        return StoredFileInfo(size, digest.digest().toHex())
+      } finally {
+        Files.deleteIfExists(tmp)
+      }
     } catch (e: Exception) {
       throw FileStoreException("Can not store file using s3 bucket!", storageFilePath, e)
     }
-    return
   }
 
   override fun fileExists(storageFilePath: String): Boolean {
@@ -57,6 +100,14 @@ open class S3FileStorage(
       true
     } catch (e: NoSuchKeyException) {
       false
+    } catch (e: S3Exception) {
+      // DigitalOcean Spaces and some S3-compatible stores return a generic S3Exception (404)
+      // rather than NoSuchKeyException for missing objects.
+      if (e.statusCode() == 404 || e.awsErrorDetails()?.errorCode() in setOf("NoSuchKey", "NotFound", "404")) {
+        false
+      } else {
+        throw FileStoreException("Can not check file existence using s3 bucket!", storageFilePath, e)
+      }
     }
   }
 

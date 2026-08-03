@@ -23,6 +23,7 @@ import io.tolgee.service.security.PermissionService
 import io.tolgee.service.security.SecurityService
 import io.tolgee.service.translation.AutoTranslationService
 import io.tolgee.service.translation.TranslationService
+import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.translation.TranslationSuggestionService
 import jakarta.persistence.EntityManager
 import org.springframework.beans.factory.annotation.Autowired
@@ -66,6 +67,10 @@ class LanguageService(
   @set:Lazy
   lateinit var translationService: TranslationService
 
+  @set:Autowired
+  @set:Lazy
+  lateinit var binaryAssetService: BinaryAssetService
+
   @Transactional
   fun createLanguage(
     dto: LanguageRequest?,
@@ -96,6 +101,7 @@ class LanguageService(
 
   @Transactional
   fun deleteLanguage(language: Language) {
+    binaryAssetService.assertNotUsedAsSourceLanguage(language.id)
     language.deletedAt = currentDateProvider.date
     importService.onExistingLanguageRemoved(language)
     permissionService.removeLanguageFromPermissions(language)

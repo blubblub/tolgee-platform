@@ -17,14 +17,30 @@
 package io.tolgee.util
 
 import io.tolgee.component.fileStorage.FileStorage
+import io.tolgee.component.fileStorage.StoredFileInfo
+import io.tolgee.component.fileStorage.toHex
 import io.tolgee.exceptions.FileStoreException
+import java.io.ByteArrayInputStream
+import java.io.InputStream
+import java.security.DigestInputStream
+import java.security.MessageDigest
 
+/**
+ * In-memory storage for tests. Does not support true streaming (buffers in heap).
+ * Binary-asset service paths must not use this for large-file tests.
+ */
 class InMemoryFileStorage : FileStorage {
   private val files = mutableMapOf<String, ByteArray>()
+
+  override fun supportsStreaming(): Boolean = false
 
   override fun readFile(storageFilePath: String): ByteArray {
     return files[storageFilePath]
       ?: throw FileStoreException("File not found", storageFilePath)
+  }
+
+  override fun openFileStream(storageFilePath: String): InputStream {
+    return ByteArrayInputStream(readFile(storageFilePath))
   }
 
   override fun deleteFile(storageFilePath: String) {
@@ -36,6 +52,17 @@ class InMemoryFileStorage : FileStorage {
     bytes: ByteArray,
   ) {
     files[storageFilePath] = bytes
+  }
+
+  override fun storeFileStream(
+    storageFilePath: String,
+    inputStream: InputStream,
+    contentLength: Long?,
+  ): StoredFileInfo {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val bytes = DigestInputStream(inputStream, digest).use { it.readBytes() }
+    files[storageFilePath] = bytes
+    return StoredFileInfo(bytes.size.toLong(), digest.digest().toHex())
   }
 
   override fun fileExists(storageFilePath: String): Boolean {

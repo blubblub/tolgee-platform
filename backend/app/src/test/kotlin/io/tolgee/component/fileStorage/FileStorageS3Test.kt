@@ -101,6 +101,21 @@ class FileStorageS3Test : AbstractFileStorageServiceTest() {
   }
 
   @Test
+  fun `storeFileStream and openFileStream round-trip with sha256`() {
+    val storage = createFileStorage()
+    assertThat(storage.supportsStreaming()).isTrue
+    val payload = ByteArray(64 * 1024) { (it % 127).toByte() }
+    val info = storage.storeFileStream("stream/test.bin", payload.inputStream(), payload.size.toLong())
+    assertThat(info.byteSize).isEqualTo(payload.size.toLong())
+    assertThat(info.sha256).hasSize(64)
+    storage.openFileStream("stream/test.bin").use { stream ->
+      assertThat(stream.readBytes()).isEqualTo(payload)
+    }
+    assertThat(storage.fileExists("stream/test.bin")).isTrue
+    assertThat(storage.fileExists("stream/missing.bin")).isFalse
+  }
+
+  @Test
   fun `stores files to path by config`() {
     val storage = s3FileStorageFactory.create(defaultProperties.copy(path = "content/path"))
     storage.storeFile(

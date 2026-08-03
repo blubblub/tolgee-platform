@@ -6,6 +6,8 @@ import io.tolgee.constants.Message
 import io.tolgee.exceptions.BadRequestException
 import io.tolgee.model.Project
 import io.tolgee.model.Screenshot
+import io.tolgee.model.binaryAsset.BinaryAsset
+import io.tolgee.model.binaryAsset.BinaryAssetTranslation
 import io.tolgee.model.UserAccount
 import io.tolgee.model.branching.Branch
 import io.tolgee.model.branching.snapshot.KeySnapshot
@@ -53,7 +55,13 @@ class EntityGraphDeserializer(
     ownedTypes.forEach { type -> recordsByType.getValue(type).forEach { phaseBWire(type, it, context) } }
     projectRecord?.let { wireProjectRootContentPointers(it, context) }
 
-    return Result(context.screenshotsBySourceId, context.keyIdBySourceId, context.maxTaskNumber)
+    return Result(
+      context.screenshotsBySourceId,
+      context.keyIdBySourceId,
+      context.maxTaskNumber,
+      context.binaryAssetsBySourceId,
+      context.binaryAssetTranslationsBySourceId,
+    )
   }
 
   private fun phaseAInsert(
@@ -215,6 +223,12 @@ class EntityGraphDeserializer(
     if (entity is Screenshot) {
       context.screenshotsBySourceId[requireNumericHandle(record)] = entity
     }
+    if (entity is BinaryAsset) {
+      context.binaryAssetsBySourceId[requireNumericHandle(record)] = entity
+    }
+    if (entity is BinaryAssetTranslation) {
+      context.binaryAssetTranslationsBySourceId[requireNumericHandle(record)] = entity
+    }
     if (entity is Key) {
       context.keyIdBySourceId[requireNumericHandle(record)] = entity.id
     }
@@ -281,6 +295,8 @@ class EntityGraphDeserializer(
   ) {
     private val byTypeAndHandle = HashMap<String, MutableMap<Any, Any>>()
     val screenshotsBySourceId = LinkedHashMap<Long, Screenshot>()
+    val binaryAssetsBySourceId = LinkedHashMap<Long, BinaryAsset>()
+    val binaryAssetTranslationsBySourceId = LinkedHashMap<Long, BinaryAssetTranslation>()
     val keyIdBySourceId = LinkedHashMap<Long, Long>()
     var importedDefaultBranch: Branch? = null
     var sourceDefaultBranchHandle: Any? = null
@@ -316,6 +332,8 @@ class EntityGraphDeserializer(
     val screenshotsBySourceId: Map<Long, Screenshot>,
     val keyIdBySourceId: Map<Long, Long>,
     val maxImportedTaskNumber: Long,
+    val binaryAssetsBySourceId: Map<Long, BinaryAsset>,
+    val binaryAssetTranslationsBySourceId: Map<Long, BinaryAssetTranslation>,
   )
 
   companion object {

@@ -1,6 +1,8 @@
 package io.tolgee.service.projectExportImport
 
 import io.tolgee.model.Language
+import io.tolgee.model.binaryAsset.BinaryAsset
+import io.tolgee.model.binaryAsset.BinaryAssetTranslation
 import io.tolgee.model.Screenshot
 import io.tolgee.model.TranslationSuggestion
 import io.tolgee.model.branching.Branch
@@ -128,6 +130,15 @@ object ProjectScopedCollectorQueries {
         KeyMetaSnapshot::class,
         "select e from KeyMetaSnapshot e join e.keySnapshot ks join ks.branch b " +
           "where ks.project.id = :projectId and b.deletedAt is null",
+      )
+      query(
+        BinaryAsset::class,
+        "select e from BinaryAsset e where e.project.id = :projectId",
+      )
+      query(
+        BinaryAssetTranslation::class,
+        "select e from BinaryAssetTranslation e join e.asset a " +
+          "where a.project.id = :projectId and e.language.deletedAt is null",
       )
     }
 
