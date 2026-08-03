@@ -6,9 +6,15 @@ const base = (projectId: number | string) =>
   `projects/${projectId}/binary-assets`;
 
 export const binaryAssetApi = {
-  list(projectId: number, page = 0, search?: string) {
+  list(
+    projectId: number,
+    page = 0,
+    search?: string,
+    mediaTypes?: Array<'AUDIO' | 'VIDEO' | 'IMAGE'>
+  ) {
     const q = new URLSearchParams({ page: String(page) });
     if (search) q.set('search', search);
+    (mediaTypes || []).forEach((t) => q.append('filterMediaType', t));
     return apiV2HttpService.get<BinaryAssetPage>(`${base(projectId)}?${q}`);
   },
   get(projectId: number, assetId: number) {

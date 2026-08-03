@@ -9,6 +9,7 @@ import io.tolgee.dtos.request.binaryAsset.BinaryAssetUpdateRequest
 import io.tolgee.hateoas.binaryAsset.BinaryAssetDownloadTicketModel
 import io.tolgee.hateoas.binaryAsset.BinaryAssetModel
 import io.tolgee.hateoas.binaryAsset.BinaryAssetModelAssembler
+import io.tolgee.model.enums.BinaryAssetMediaType
 import io.tolgee.model.enums.Scope
 import io.tolgee.security.ProjectHolder
 import io.tolgee.security.authentication.AllowApiAccess
@@ -67,9 +68,11 @@ class BinaryAssetController(
   fun list(
     @ParameterObject pageable: Pageable,
     @RequestParam(required = false) search: String?,
+    @RequestParam(required = false, name = "filterMediaType") filterMediaType: List<String>?,
   ): PagedModel<BinaryAssetModel> {
     val projectId = projectHolder.project.id
-    val page = binaryAssetService.getPage(projectId, pageable, search)
+    val mediaTypes = BinaryAssetMediaType.parseList(filterMediaType)
+    val page = binaryAssetService.getPage(projectId, pageable, search, mediaTypes)
     val languages = languageService.findAll(projectId)
     val visible = visibleLanguageIds(projectId)
     return pagedAssembler.toModel(page) { asset ->

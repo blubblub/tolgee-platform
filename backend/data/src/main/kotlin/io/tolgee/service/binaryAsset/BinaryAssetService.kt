@@ -11,6 +11,7 @@ import io.tolgee.model.Project
 import io.tolgee.model.UserAccount
 import io.tolgee.model.binaryAsset.BinaryAsset
 import io.tolgee.model.binaryAsset.BinaryAssetTranslation
+import io.tolgee.model.enums.BinaryAssetMediaType
 import io.tolgee.model.enums.BinaryAssetTranslationStatus
 import io.tolgee.repository.binaryAsset.BinaryAssetRepository
 import io.tolgee.repository.binaryAsset.BinaryAssetTranslationRepository
@@ -47,9 +48,18 @@ class BinaryAssetService(
     projectId: Long,
     pageable: Pageable,
     search: String?,
+    mediaTypes: Set<BinaryAssetMediaType> = emptySet(),
   ): Page<BinaryAsset> {
     val normalized = search?.takeIf { it.isNotBlank() }
-    val page = binaryAssetRepository.findAllByProjectId(projectId, normalized, pageable)
+    val page =
+      binaryAssetRepository.findAllByProjectId(
+        projectId,
+        normalized,
+        filterAudio = BinaryAssetMediaType.AUDIO in mediaTypes,
+        filterVideo = BinaryAssetMediaType.VIDEO in mediaTypes,
+        filterImage = BinaryAssetMediaType.IMAGE in mediaTypes,
+        pageable = pageable,
+      )
     if (page.isEmpty) return page
     val detailed = binaryAssetRepository.findAllWithDetailsByIdIn(page.content.map { it.id }).associateBy { it.id }
     return page.map { detailed[it.id] ?: it }

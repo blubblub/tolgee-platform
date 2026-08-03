@@ -1,5 +1,13 @@
-import { useState } from 'react';
-import { Box, Button, TextField, Typography, Chip } from '@mui/material';
+import { useMemo, useState } from 'react';
+import {
+  Box,
+  Button,
+  Chip,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography,
+} from '@mui/material';
 import { Plus } from '@untitled-ui/icons-react';
 import { useTranslate } from '@tolgee/react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
@@ -13,6 +21,8 @@ import { BoxLoading } from 'tg.component/common/BoxLoading';
 import { binaryAssetApi } from './binaryAssetApi';
 import { BinaryAssetPreview } from './BinaryAssetPreview';
 
+type MediaFilter = 'AUDIO' | 'VIDEO' | 'IMAGE';
+
 export const AssetsView = () => {
   const project = useProject();
   const { t } = useTranslate();
@@ -20,6 +30,7 @@ export const AssetsView = () => {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
+  const [mediaFilters, setMediaFilters] = useState<MediaFilter[]>([]);
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -27,8 +38,14 @@ export const AssetsView = () => {
   const canCreate = satisfiesPermission('keys.create');
 
   const listQuery = useQuery(
-    ['binary-assets', project.id, page, search],
-    () => binaryAssetApi.list(project.id, page, search || undefined),
+    ['binary-assets', project.id, page, search, mediaFilters.slice().sort().join(',')],
+    () =>
+      binaryAssetApi.list(
+        project.id,
+        page,
+        search || undefined,
+        mediaFilters.length ? mediaFilters : undefined
+      ),
     { keepPreviousData: true }
   );
 
@@ -52,6 +69,12 @@ export const AssetsView = () => {
   );
 
   const assets = listQuery.data?._embedded?.binaryAssets ?? [];
+  const total = listQuery.data?.page?.totalElements ?? 0;
+
+  const filterLabel = useMemo(() => {
+    if (!mediaFilters.length) return null;
+    return mediaFilters.join(', ');
+  }, [mediaFilters]);
 
   return (
     <BaseProjectView
@@ -112,10 +135,17 @@ export const AssetsView = () => {
         </Box>
       )}
 
-      <Box mb={2}>
+      <Box
+        mb={2}
+        display="flex"
+        gap={2}
+        flexWrap="wrap"
+        alignItems="center"
+        data-cy="binary-assets-filters"
+      >
         <TextField
           size="small"
-          fullWidth
+          sx={{ flex: 1, minWidth: 200 }}
           placeholder={t('binary_assets_search', 'Search assets')}
           value={search}
           onChange={(e) => {
@@ -124,7 +154,49 @@ export const AssetsView = () => {
           }}
           data-cy="binary-assets-search"
         />
+        <ToggleButtonGroup
+          size="small"
+          exclusive={false}
+          value={mediaFilters}
+          onChange={(_e, next: MediaFilter[]) => {
+            setMediaFilters(next);
+            setPage(0);
+          }}
+          aria-label={t('binary_assets_type_filter', 'Filter by type')}
+          data-cy="binary-assets-type-filter"
+        >
+          <ToggleButton value="AUDIO" data-cy="binary-assets-filter-audio">
+            {t('binary_assets_filter_audio', 'Audio')}
+          </ToggleButton>
+          <ToggleButton value="VIDEO" data-cy="binary-assets-filter-video">
+            {t('binary_assets_filter_video', 'Video')}
+          </ToggleButton>
+          <ToggleButton value="IMAGE" data-cy="binary-assets-filter-image">
+            {t('binary_assets_filter_image', 'Image')}
+          </ToggleButton>
+        </ToggleButtonGroup>
+        {mediaFilters.length > 0 && (
+          <Button
+            size="small"
+            onClick={() => {
+              setMediaFilters([]);
+              setPage(0);
+            }}
+            data-cy="binary-assets-filter-clear"
+          >
+            {t('binary_assets_filter_clear', 'Clear filters')}
+          </Button>
+        )}
       </Box>
+
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+        {filterLabel
+          ? t('binary_assets_filter_summary', '{count} assets · filter: {filter}', {
+              count: total,
+              filter: filterLabel,
+            })
+          : t('binary_assets_count', '{count} assets', { count: total })}
+      </Typography>
 
       {listQuery.isError && (
         <Typography color="error" sx={{ mb: 2 }} data-cy="binary-assets-error">
@@ -167,12 +239,17 @@ export const AssetsView = () => {
                       [PARAMS.PROJECT_ID]: project.id,
                       [PARAMS.ASSET_ID]: asset.id,
                     })}
-                    sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                    sx={{
+                      color: 'inherit',
+                      textDecoration: 'none',
+                      '&:hover': { textDecoration: 'underline' },
+                    }}
                   >
                     {asset.name}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {asset.originalFilename} · {asset.sourceLanguageTag} r{asset.sourceRevision}
+                    {asset.originalFilename} · {asset.sourceLanguageTag} r
+                    {asset.sourceRevision} · {asset.contentType}
                   </Typography>
                   <Box mt={1}>
                     <BinaryAssetPreview
@@ -190,7 +267,11 @@ export const AssetsView = () => {
                     label={`${asset.currentCount}/${asset.targetLanguageCount} current`}
                   />
                   {asset.outdatedCount > 0 && (
-                    <Chip size="small" color="warning" label={`${asset.outdatedCount} outdated`} />
+                    <Chip
+                      size="small"
+                      color="warning"
+                      label={`${asset.outdatedCount} outdated`}
+                    />
                   )}
                 </Box>
               </Box>

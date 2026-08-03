@@ -13,6 +13,11 @@ import org.springframework.stereotype.Repository
 @Repository
 @Lazy
 interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
+  /**
+   * When filterAudio/Video/Image are all false, every type is returned.
+   * When any is true, assets matching any selected type are returned (OR).
+   * Type is inferred from source contentType and originalFilename.
+   */
   @Query(
     """
     from BinaryAsset a
@@ -20,16 +25,95 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
     left join fetch a.uploadedBy
     where a.project.id = :projectId
       and (:search is null or lower(a.name) like lower(concat('%', cast(:search as string), '%')))
+      and (
+        (:filterAudio = false and :filterVideo = false and :filterImage = false)
+        or (
+          :filterAudio = true and (
+            lower(a.contentType) like 'audio/%'
+            or lower(a.originalFilename) like '%.mp3'
+            or lower(a.originalFilename) like '%.wav'
+            or lower(a.originalFilename) like '%.ogg'
+            or lower(a.originalFilename) like '%.m4a'
+            or lower(a.originalFilename) like '%.aac'
+            or lower(a.originalFilename) like '%.flac'
+            or lower(a.originalFilename) like '%.webm'
+          )
+        )
+        or (
+          :filterVideo = true and (
+            lower(a.contentType) like 'video/%'
+            or lower(a.originalFilename) like '%.mp4'
+            or lower(a.originalFilename) like '%.mov'
+            or lower(a.originalFilename) like '%.m4v'
+            or lower(a.originalFilename) like '%.webm'
+            or lower(a.originalFilename) like '%.mkv'
+            or lower(a.originalFilename) like '%.avi'
+          )
+        )
+        or (
+          :filterImage = true and (
+            lower(a.contentType) like 'image/%'
+            or lower(a.originalFilename) like '%.png'
+            or lower(a.originalFilename) like '%.jpg'
+            or lower(a.originalFilename) like '%.jpeg'
+            or lower(a.originalFilename) like '%.gif'
+            or lower(a.originalFilename) like '%.webp'
+            or lower(a.originalFilename) like '%.svg'
+            or lower(a.originalFilename) like '%.bmp'
+          )
+        )
+      )
     """,
     countQuery = """
     select count(a) from BinaryAsset a
     where a.project.id = :projectId
       and (:search is null or lower(a.name) like lower(concat('%', cast(:search as string), '%')))
+      and (
+        (:filterAudio = false and :filterVideo = false and :filterImage = false)
+        or (
+          :filterAudio = true and (
+            lower(a.contentType) like 'audio/%'
+            or lower(a.originalFilename) like '%.mp3'
+            or lower(a.originalFilename) like '%.wav'
+            or lower(a.originalFilename) like '%.ogg'
+            or lower(a.originalFilename) like '%.m4a'
+            or lower(a.originalFilename) like '%.aac'
+            or lower(a.originalFilename) like '%.flac'
+            or lower(a.originalFilename) like '%.webm'
+          )
+        )
+        or (
+          :filterVideo = true and (
+            lower(a.contentType) like 'video/%'
+            or lower(a.originalFilename) like '%.mp4'
+            or lower(a.originalFilename) like '%.mov'
+            or lower(a.originalFilename) like '%.m4v'
+            or lower(a.originalFilename) like '%.webm'
+            or lower(a.originalFilename) like '%.mkv'
+            or lower(a.originalFilename) like '%.avi'
+          )
+        )
+        or (
+          :filterImage = true and (
+            lower(a.contentType) like 'image/%'
+            or lower(a.originalFilename) like '%.png'
+            or lower(a.originalFilename) like '%.jpg'
+            or lower(a.originalFilename) like '%.jpeg'
+            or lower(a.originalFilename) like '%.gif'
+            or lower(a.originalFilename) like '%.webp'
+            or lower(a.originalFilename) like '%.svg'
+            or lower(a.originalFilename) like '%.bmp'
+          )
+        )
+      )
     """,
   )
   fun findAllByProjectId(
     projectId: Long,
     search: String?,
+    filterAudio: Boolean,
+    filterVideo: Boolean,
+    filterImage: Boolean,
     pageable: Pageable,
   ): Page<BinaryAsset>
 
