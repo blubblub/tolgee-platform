@@ -11,6 +11,7 @@ import { useProjectPermissions } from 'tg.hooks/useProjectPermissions';
 import { LINKS, PARAMS } from 'tg.constants/links';
 import { BoxLoading } from 'tg.component/common/BoxLoading';
 import { binaryAssetApi } from './binaryAssetApi';
+import { BinaryAssetPreview } from './BinaryAssetPreview';
 
 export const AssetsView = () => {
   const project = useProject();
@@ -66,7 +67,7 @@ export const AssetsView = () => {
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }} data-cy="binary-assets-help">
         {t(
           'binary_assets_help',
-          'Project-global binary assets (not branch-scoped). Upload a source file and localized files per language. Assets are managed here, not under Translations.'
+          'Project-global binary assets (not branch-scoped). Audio, video, and images preview inline. Assets are managed here, not under Translations.'
         )}
       </Typography>
 
@@ -143,28 +144,45 @@ export const AssetsView = () => {
           {assets.map((asset) => (
             <Box
               key={asset.id}
-              component={RouterLink}
-              to={LINKS.PROJECT_ASSET.build({
-                [PARAMS.PROJECT_ID]: project.id,
-                [PARAMS.ASSET_ID]: asset.id,
-              })}
               sx={{
                 p: 2,
                 border: 1,
                 borderColor: 'divider',
                 borderRadius: 1,
-                textDecoration: 'none',
-                color: 'inherit',
-                '&:hover': { bgcolor: 'action.hover' },
               }}
               data-cy="binary-assets-list-item"
             >
-              <Box display="flex" justifyContent="space-between" gap={2} flexWrap="wrap">
-                <Box>
-                  <Typography fontWeight={600}>{asset.name}</Typography>
+              <Box
+                display="flex"
+                justifyContent="space-between"
+                gap={2}
+                flexWrap="wrap"
+                alignItems="flex-start"
+              >
+                <Box flex={1} minWidth={200}>
+                  <Typography
+                    fontWeight={600}
+                    component={RouterLink}
+                    to={LINKS.PROJECT_ASSET.build({
+                      [PARAMS.PROJECT_ID]: project.id,
+                      [PARAMS.ASSET_ID]: asset.id,
+                    })}
+                    sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                  >
+                    {asset.name}
+                  </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {asset.originalFilename} · {asset.sourceLanguageTag} r{asset.sourceRevision}
                   </Typography>
+                  <Box mt={1}>
+                    <BinaryAssetPreview
+                      projectId={project.id}
+                      assetId={asset.id}
+                      contentType={asset.contentType}
+                      filename={asset.originalFilename}
+                      compact
+                    />
+                  </Box>
                 </Box>
                 <Box display="flex" gap={1} alignItems="center">
                   <Chip

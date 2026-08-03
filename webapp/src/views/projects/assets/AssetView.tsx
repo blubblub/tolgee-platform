@@ -20,6 +20,7 @@ import { useProjectPermissions } from 'tg.hooks/useProjectPermissions';
 import { LINKS, PARAMS } from 'tg.constants/links';
 import { BoxLoading } from 'tg.component/common/BoxLoading';
 import { binaryAssetApi } from './binaryAssetApi';
+import { BinaryAssetPreview } from './BinaryAssetPreview';
 import { BinaryAssetTranslationStatus } from './types';
 
 const statusColor = (status: BinaryAssetTranslationStatus) => {
@@ -166,7 +167,7 @@ export const AssetView = () => {
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         {t(
           'binary_assets_help',
-          'Project-global binary assets (not branch-scoped). Upload a source file and localized files per language.'
+          'Project-global binary assets (not branch-scoped). Audio, video, and images preview inline.'
         )}
       </Typography>
 
@@ -191,6 +192,14 @@ export const AssetView = () => {
         <Typography variant="body2" color="text.secondary" mb={1}>
           {asset.originalFilename} · {asset.byteSize} bytes · {asset.contentType}
         </Typography>
+        <Box mb={1.5}>
+          <BinaryAssetPreview
+            projectId={project.id}
+            assetId={asset.id}
+            contentType={asset.contentType}
+            filename={asset.originalFilename}
+          />
+        </Box>
         <Box display="flex" gap={1} flexWrap="wrap">
           <Button size="small" onClick={downloadSource} data-cy="binary-asset-download-source">
             {t('binary_assets_download', 'Download')}
@@ -233,6 +242,7 @@ export const AssetView = () => {
           <TableRow>
             <TableCell>Language</TableCell>
             <TableCell>Status</TableCell>
+            <TableCell>Preview</TableCell>
             <TableCell>File</TableCell>
             <TableCell align="right">Actions</TableCell>
           </TableRow>
@@ -245,6 +255,22 @@ export const AssetView = () => {
               </TableCell>
               <TableCell>
                 <Chip size="small" color={statusColor(row.status) as any} label={row.status} />
+              </TableCell>
+              <TableCell sx={{ minWidth: 220 }}>
+                {row.status !== 'MISSING' ? (
+                  <BinaryAssetPreview
+                    projectId={project.id}
+                    assetId={asset.id}
+                    languageId={row.languageId}
+                    contentType={row.contentType}
+                    filename={row.originalFilename}
+                    compact
+                  />
+                ) : (
+                  <Typography variant="caption" color="text.secondary">
+                    —
+                  </Typography>
+                )}
               </TableCell>
               <TableCell>
                 {row.originalFilename

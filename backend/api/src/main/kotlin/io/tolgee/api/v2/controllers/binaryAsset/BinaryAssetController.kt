@@ -18,6 +18,7 @@ import io.tolgee.security.authorization.RequiresProjectPermissions
 import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.language.LanguageService
 import io.tolgee.service.security.SecurityService
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import org.springdoc.core.annotations.ParameterObject
 import org.springframework.data.domain.Pageable
@@ -293,10 +294,25 @@ class BinaryAssetController(
     val url =
       ServletUriComponentsBuilder
         .fromCurrentContextPath()
+        .scheme(resolveRequestScheme())
         .path("/v2/binary-assets/download")
         .queryParam("token", token)
         .toUriString()
     return BinaryAssetDownloadTicketModel(url)
+  }
+
+  private fun resolveRequestScheme(): String {
+    val request =
+      org.springframework.web.context.request.RequestContextHolder
+        .getRequestAttributes()
+        .let { it as? org.springframework.web.context.request.ServletRequestAttributes }
+        ?.request
+    val forwarded = request?.getHeader("X-Forwarded-Proto")?.split(",")?.firstOrNull()?.trim()
+    return when {
+      !forwarded.isNullOrBlank() -> forwarded
+      request?.scheme != null -> request.scheme
+      else -> "https"
+    }
   }
 
   private fun visibleLanguageIds(projectId: Long): Set<Long>? {
