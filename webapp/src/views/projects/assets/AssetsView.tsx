@@ -125,6 +125,13 @@ export const AssetsView = () => {
         />
       </Box>
 
+      {listQuery.isError && (
+        <Typography color="error" sx={{ mb: 2 }} data-cy="binary-assets-error">
+          {(listQuery.error as any)?.message ||
+            t('binary_assets_load_failed', 'Failed to load assets.')}
+        </Typography>
+      )}
+
       {listQuery.isLoading ? (
         <BoxLoading />
       ) : assets.length === 0 ? (
