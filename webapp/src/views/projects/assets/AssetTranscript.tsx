@@ -48,6 +48,14 @@ export const AssetTranscript = ({
     method: 'delete',
   });
 
+  const generateTranscript = useApiMutation({
+    url: '/v2/projects/{projectId}/binary-assets/{assetId}/transcript/generate',
+    method: 'post',
+  });
+
+  const generate = () =>
+    generateTranscript.mutate({ path }, { onSuccess: done });
+
   const done = () => {
     setMode('none');
     setText('');
@@ -116,6 +124,33 @@ export const AssetTranscript = ({
           >
             {t('binary_assets_transcript_edit', 'Edit translations')}
           </Button>
+          {canCreate && asset.transcriptionAvailable && (
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={generateTranscript.isLoading}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    t(
+                      'binary_assets_transcript_regenerate_confirm',
+                      'Replace the current transcript text with a new AI transcription?'
+                    )
+                  )
+                ) {
+                  generate();
+                }
+              }}
+              data-cy="binary-asset-transcript-regenerate"
+            >
+              {generateTranscript.isLoading
+                ? t('binary_assets_transcript_generating', 'Transcribing…')
+                : t(
+                    'binary_assets_transcript_regenerate',
+                    'Regenerate with AI'
+                  )}
+            </Button>
+          )}
           {canEdit && (
             <Button
               size="small"
@@ -176,6 +211,19 @@ export const AssetTranscript = ({
           >
             {t('binary_assets_transcript_link', 'Link existing key')}
           </Button>
+          {asset.transcriptionAvailable && (
+            <Button
+              size="small"
+              variant="contained"
+              disabled={generateTranscript.isLoading}
+              onClick={generate}
+              data-cy="binary-asset-transcript-generate"
+            >
+              {generateTranscript.isLoading
+                ? t('binary_assets_transcript_generating', 'Transcribing…')
+                : t('binary_assets_transcript_generate', 'Transcribe with AI')}
+            </Button>
+          )}
         </Box>
       )}
 

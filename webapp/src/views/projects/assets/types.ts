@@ -38,6 +38,7 @@ export type BinaryAsset = {
   transcriptKeyOwned?: boolean;
   transcriptKeyDeleted?: boolean;
   transcriptSourceText?: string | null;
+  transcriptionAvailable?: boolean;
   translations?: BinaryAssetTranslation[] | null;
 };
 

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component
 @Component
 class BinaryAssetModelAssembler(
   private val binaryAssetService: BinaryAssetService,
+  private val binaryAssetTranscriptService: BinaryAssetTranscriptService,
 ) : RepresentationModelAssemblerSupport<BinaryAsset, BinaryAssetModel>(
     BinaryAssetController::class.java,
     BinaryAssetModel::class.java,
@@ -38,7 +39,15 @@ class BinaryAssetModelAssembler(
         BinaryAssetTranslationStatus.MISSING -> {}
       }
     }
-    return baseModel(asset, current, outdated, visibleTargets.size, null, transcriptSourceText)
+    return baseModel(
+      asset,
+      current,
+      outdated,
+      visibleTargets.size,
+      null,
+      transcriptSourceText,
+      binaryAssetTranscriptService.canTranscribe(asset),
+    )
   }
 
   fun toDetailModel(
@@ -73,6 +82,7 @@ class BinaryAssetModelAssembler(
       visibleTargets.size,
       translationModels,
       transcripts[asset.sourceLanguage.id]?.text,
+      binaryAssetTranscriptService.canTranscribe(asset),
     )
   }
 
@@ -107,6 +117,7 @@ class BinaryAssetModelAssembler(
     targetCount: Int,
     translations: List<BinaryAssetTranslationModel>?,
     transcriptSourceText: String? = null,
+    transcriptionAvailable: Boolean = false,
   ): BinaryAssetModel =
     BinaryAssetModel(
       id = asset.id,
@@ -130,6 +141,7 @@ class BinaryAssetModelAssembler(
       transcriptKeyOwned = asset.transcriptKeyOwned,
       transcriptKeyDeleted = asset.transcriptKey?.deletedAt != null,
       transcriptSourceText = transcriptSourceText,
+      transcriptionAvailable = transcriptionAvailable,
       translations = translations,
     )
 

@@ -144,11 +144,13 @@ declare namespace DataCy {
         "binary-asset-transcript-cell": true;
         "binary-asset-transcript-deleted": true;
         "binary-asset-transcript-edit": true;
+        "binary-asset-transcript-generate": true;
         "binary-asset-transcript-input": true;
         "binary-asset-transcript-key": true;
         "binary-asset-transcript-key-input": true;
         "binary-asset-transcript-link-existing": true;
         "binary-asset-transcript-link-save": true;
+        "binary-asset-transcript-regenerate": true;
         "binary-asset-transcript-save": true;
         "binary-asset-transcript-source-text": true;
         "binary-asset-transcript-text-input": true;

@@ -116,6 +116,7 @@ class TolgeeProperties(
   @DocProperty(hidden = true)
   var mailjet: MailjetProperties = MailjetProperties(),
   var import: ImportProperties = ImportProperties(),
+  var transcription: TranscriptionProperties = TranscriptionProperties(),
   var rateLimits: RateLimitProperties = RateLimitProperties(),
   @DocProperty(hidden = true)
   var postHog: PostHogProperties = PostHogProperties(),

@@ -222,6 +222,17 @@ class BinaryAssetTranscriptControllerTest : ProjectAuthControllerTest("/v2/proje
 
   @Test
   @ProjectJWTAuthTestMethod
+  fun `transcription is offered only when a provider is configured`() {
+    val assetId = createAsset("vox-transcribe")
+    // no tolgee.transcription.api-key in the test profile
+    performProjectAuthGet("binary-assets/$assetId").andIsOk.andAssertThatJson {
+      node("transcriptionAvailable").isEqualTo(false)
+    }
+    performProjectAuthPost("binary-assets/$assetId/transcript/generate", null).andIsBadRequest
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
   fun `exposes transcript text per target language`() {
     val assetId = createAsset("vox-per-language")
     performProjectAuthPost(

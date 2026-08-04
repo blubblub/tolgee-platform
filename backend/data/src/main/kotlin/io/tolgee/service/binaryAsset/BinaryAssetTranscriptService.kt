@@ -1,5 +1,6 @@
 package io.tolgee.service.binaryAsset
 
+import io.tolgee.component.transcription.ElevenLabsTranscriptionClient
 import io.tolgee.constants.Message
 import io.tolgee.dtos.request.key.CreateKeyDto
 import io.tolgee.exceptions.BadRequestException
@@ -11,6 +12,7 @@ import io.tolgee.repository.TranslationRepository
 import io.tolgee.repository.binaryAsset.BinaryAssetRepository
 import io.tolgee.service.key.KeyService
 import io.tolgee.service.project.ProjectService
+import io.tolgee.service.translation.TranslationService
 import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -28,12 +30,24 @@ class BinaryAssetTranscriptService(
   private val keyRepository: KeyRepository,
   private val translationRepository: TranslationRepository,
   private val projectService: ProjectService,
+  private val transcriptionClient: ElevenLabsTranscriptionClient,
+  @Lazy
+  private val binaryAssetService: BinaryAssetService,
+  @Lazy
+  private val translationService: TranslationService,
   @Lazy
   private val keyService: KeyService,
 ) {
   companion object {
     const val TRANSCRIPT_KEY_PREFIX = "transcript."
     const val TRANSCRIPT_TAG = "transcript"
+
+    /** Uploads often arrive as application/octet-stream, so fall back to the extension. */
+    private val AUDIO_VIDEO_EXTENSIONS =
+      listOf(
+        ".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac",
+        ".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi",
+      )
   }
 
   /**
@@ -105,6 +119,55 @@ class BinaryAssetTranscriptService(
     if (owned) {
       keyService.hardDelete(key.id)
     }
+  }
+
+  /**
+   * Transcribes the asset's source file and writes the result into its transcript key, creating
+   * that key when the asset does not have one yet. Overwrites existing source text — the caller
+   * is expected to confirm first.
+   */
+  @Transactional
+  fun transcribe(
+    projectId: Long,
+    assetId: Long,
+  ): BinaryAsset {
+    transcriptionClient.checkConfigured()
+    val asset =
+      binaryAssetRepository.findByProjectIdAndId(projectId, assetId)
+        ?: throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
+    if (!isTranscribable(asset)) {
+      throw BadRequestException(Message.BINARY_ASSET_NOT_TRANSCRIBABLE)
+    }
+
+    val text =
+      binaryAssetService.openSourceStream(projectId, assetId).let { source ->
+        source.inputStream.use { stream ->
+          transcriptionClient.transcribe(
+            stream = stream,
+            filename = source.filename,
+            contentType = source.contentType,
+            byteSize = source.byteSize,
+            languageTag = asset.sourceLanguage.tag,
+          )
+        }
+      }
+
+    // reuse the existing paths rather than touching translations directly
+    val withKey = asset.transcriptKey?.let { asset } ?: create(projectId, assetId, null)
+    val key = withKey.transcriptKey ?: throw NotFoundException(Message.BINARY_ASSET_TRANSCRIPT_NOT_FOUND)
+    translationService.setForKey(keyService.get(key.id), mapOf(asset.sourceLanguage.tag to text))
+    return withKey
+  }
+
+  /** True when this instance can transcribe this asset: provider configured and the file is speech. */
+  fun canTranscribe(asset: BinaryAsset): Boolean = transcriptionClient.isConfigured && isTranscribable(asset)
+
+  /** Only speech has a transcript. Mirrors the audio/video gate the UI applies. */
+  private fun isTranscribable(asset: BinaryAsset): Boolean {
+    val type = asset.contentType.lowercase()
+    if (type.startsWith("audio/") || type.startsWith("video/")) return true
+    val name = asset.originalFilename.lowercase()
+    return AUDIO_VIDEO_EXTENSIONS.any { name.endsWith(it) }
   }
 
   /** Transcript translations of the linked key, by language id. Empty when nothing is linked. */

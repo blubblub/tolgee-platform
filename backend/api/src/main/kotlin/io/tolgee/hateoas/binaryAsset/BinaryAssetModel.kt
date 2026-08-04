@@ -34,6 +34,8 @@ open class BinaryAssetModel(
    * languages.
    */
   val transcriptSourceText: String? = null,
+  /** Whether "transcribe with AI" is offered: a provider is configured and this file is speech. */
+  val transcriptionAvailable: Boolean = false,
   val translations: List<BinaryAssetTranslationModel>? = null,
 ) : RepresentationModel<BinaryAssetModel>()
 

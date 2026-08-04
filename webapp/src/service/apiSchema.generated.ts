@@ -512,6 +512,10 @@ export interface paths {
     /** An owned key is deleted with it; a linked key is left in place. Returns the updated asset so callers do not need to re-fetch. */
     delete: operations["deleteTranscript"];
   };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/transcript/generate": {
+    /** Sends the source file to the configured speech-to-text provider and writes the result into the asset's transcript key, creating that key if it does not exist. Overwrites existing source-language text. Audio and video only. */
+    post: operations["generateTranscript"];
+  };
   "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}": {
     put: operations["upsertTranslation"];
     delete: operations["deleteTranslation"];
@@ -1732,6 +1736,7 @@ export interface components {
       transcriptKeyName?: string;
       transcriptKeyOwned: boolean;
       transcriptSourceText?: string;
+      transcriptionAvailable: boolean;
       translations?: components["schemas"]["BinaryAssetTranslationModel"][];
       /** Format: date-time */
       updatedAt?: string;
@@ -3327,6 +3332,13 @@ export interface components {
         | "binary_asset_transcript_exists"
         | "binary_asset_transcript_not_found"
         | "binary_asset_transcript_text_or_key_required"
+        | "binary_asset_not_transcribable"
+        | "transcription_not_configured"
+        | "transcription_file_too_large"
+        | "transcription_empty_result"
+        | "transcription_unauthorized"
+        | "transcription_rate_limited"
+        | "transcription_failed"
         | "file_empty"
         | "file_name_too_long"
         | "file_name_not_valid";
@@ -5417,6 +5429,7 @@ export interface components {
         | "BINARY_ASSET_TRANSLATION_DELETE"
         | "BINARY_ASSET_TRANSCRIPT_LINK"
         | "BINARY_ASSET_TRANSCRIPT_UNLINK"
+        | "BINARY_ASSET_TRANSCRIPT_GENERATE"
         | "KEY_TAGS_EDIT"
         | "KEY_NAME_EDIT"
         | "KEY_CHARACTER_LIMIT_EDIT"
@@ -7203,6 +7216,13 @@ export interface components {
         | "binary_asset_transcript_exists"
         | "binary_asset_transcript_not_found"
         | "binary_asset_transcript_text_or_key_required"
+        | "binary_asset_not_transcribable"
+        | "transcription_not_configured"
+        | "transcription_file_too_large"
+        | "transcription_empty_result"
+        | "transcription_unauthorized"
+        | "transcription_rate_limited"
+        | "transcription_failed"
         | "file_empty"
         | "file_name_too_long"
         | "file_name_not_valid";
@@ -15026,6 +15046,47 @@ export interface operations {
   };
   /** An owned key is deleted with it; a linked key is left in place. Returns the updated asset so callers do not need to re-fetch. */
   deleteTranscript: {
+    parameters: {
+      path: {
+        assetId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  /** Sends the source file to the configured speech-to-text provider and writes the result into the asset's transcript key, creating that key if it does not exist. Overwrites existing source-language text. Audio and video only. */
+  generateTranscript: {
     parameters: {
       path: {
         assetId: number;

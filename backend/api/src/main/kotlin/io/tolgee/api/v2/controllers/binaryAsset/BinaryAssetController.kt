@@ -171,6 +171,25 @@ class BinaryAssetController(
     return detailModel(projectId, assetId)
   }
 
+  @PostMapping("/{assetId}/transcript/generate")
+  @Operation(
+    summary = "Generate a transcript from the asset's audio",
+    description =
+      "Sends the source file to the configured speech-to-text provider and writes the result into " +
+        "the asset's transcript key, creating that key if it does not exist. Overwrites existing " +
+        "source-language text. Audio and video only.",
+  )
+  @RequiresProjectPermissions([Scope.KEYS_CREATE])
+  @AllowApiAccess
+  @RequestActivity(ActivityType.BINARY_ASSET_TRANSCRIPT_GENERATE)
+  fun generateTranscript(
+    @PathVariable assetId: Long,
+  ): BinaryAssetModel {
+    val projectId = projectHolder.project.id
+    binaryAssetTranscriptService.transcribe(projectId, assetId)
+    return detailModel(projectId, assetId)
+  }
+
   @DeleteMapping("/{assetId}/transcript")
   @Operation(
     summary = "Remove a binary asset's transcript",
