@@ -68,7 +68,10 @@ class ElevenLabsTranscriptionClient(
     val body = LinkedMultiValueMap<String, Any>()
     body.add("model_id", config.model)
     // ElevenLabs takes ISO-639-1/3; a region suffix like en-GB would be rejected
-    languageTag?.substringBefore('-')?.takeIf { it.isNotBlank() }?.let { body.add("language_code", it) }
+    languageTag
+      ?.substringBefore('-')
+      ?.takeIf { it.isNotBlank() }
+      ?.let { body.add("language_code", it) }
     // we want the words, not "[laughter]"
     body.add("tag_audio_events", "false")
     body.add("timestamps_granularity", "none")
@@ -96,9 +99,11 @@ class ElevenLabsTranscriptionClient(
           HttpEntity(body, headers),
           ScribeResponse::class.java,
         )
-      response?.text?.trim().orEmpty().ifBlank {
+      val text = response?.text?.trim().orEmpty()
+      if (text.isBlank()) {
         throw BadRequestException(Message.TRANSCRIPTION_EMPTY_RESULT)
       }
+      text
     } catch (e: HttpClientErrorException) {
       // 4xx is our fault (bad key, unsupported file) — surface it, never retry
       logger.warn("ElevenLabs rejected transcription of $filename: ${e.statusCode} ${e.responseBodyAsString.take(300)}")
