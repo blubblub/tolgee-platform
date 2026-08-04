@@ -95,20 +95,33 @@ const StyledLabel = styled(Box)`
 const STAT_ITEMS = [
   {
     key: 'current' as const,
-    labelKey: 'project_dashboard_asset_translation_current',
-    defaultValue: 'Current',
+    // keyName must stay a literal — the Tolgee extractor cannot resolve variables
+    label: (
+      <T
+        keyName="project_dashboard_asset_translation_current"
+        defaultValue="Current"
+      />
+    ),
     color: TRANSLATION_STATES.REVIEWED.color,
   },
   {
     key: 'outdated' as const,
-    labelKey: 'project_dashboard_asset_translation_outdated',
-    defaultValue: 'Outdated',
+    label: (
+      <T
+        keyName="project_dashboard_asset_translation_outdated"
+        defaultValue="Outdated"
+      />
+    ),
     color: TRANSLATION_STATES.TRANSLATED.color,
   },
   {
     key: 'missing' as const,
-    labelKey: 'project_dashboard_asset_translation_missing',
-    defaultValue: 'Missing',
+    label: (
+      <T
+        keyName="project_dashboard_asset_translation_missing"
+        defaultValue="Missing"
+      />
+    ),
     color: TRANSLATION_STATES.UNTRANSLATED.color,
   },
 ] as const;
@@ -134,15 +147,13 @@ export const AssetTranslationStats: React.FC<
         />
       </Box>
       <StyledStats>
-        {STAT_ITEMS.map(({ key, labelKey, defaultValue, color }) => (
+        {STAT_ITEMS.map(({ key, label, color }) => (
           <StyledStatItem key={key}>
             <StyledDot sx={{ backgroundColor: color }} />
             <StyledValue>
               <PercentFormat number={percentages[key]} />
             </StyledValue>
-            <StyledLabel>
-              <T keyName={labelKey} defaultValue={defaultValue} />
-            </StyledLabel>
+            <StyledLabel>{label}</StyledLabel>
           </StyledStatItem>
         ))}
       </StyledStats>

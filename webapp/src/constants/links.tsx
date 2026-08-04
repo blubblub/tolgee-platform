@@ -314,7 +314,10 @@ export class LINKS {
 
   static PROJECT_ASSETS = Link.ofParent(LINKS.PROJECT, 'assets');
 
-  static PROJECT_ASSET = Link.ofParent(LINKS.PROJECT_ASSETS, p(PARAMS.ASSET_ID));
+  static PROJECT_ASSET = Link.ofParent(
+    LINKS.PROJECT_ASSETS,
+    p(PARAMS.ASSET_ID)
+  );
 
   static PROJECT_TRANSLATIONS_WITH_BRANCH = Link.ofParent(
     LINKS.PROJECT_TRANSLATIONS,

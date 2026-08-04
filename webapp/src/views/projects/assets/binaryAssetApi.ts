@@ -74,7 +74,9 @@ export const binaryAssetApi = {
   },
   translationTicket(projectId: number, assetId: number, languageId: number) {
     return apiV2HttpService.post<DownloadTicket>(
-      `${base(projectId)}/${assetId}/translations/${languageId}/download-ticket`,
+      `${base(
+        projectId
+      )}/${assetId}/translations/${languageId}/download-ticket`,
       {}
     );
   },

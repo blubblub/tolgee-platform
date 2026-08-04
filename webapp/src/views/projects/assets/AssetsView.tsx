@@ -38,7 +38,13 @@ export const AssetsView = () => {
   const canCreate = satisfiesPermission('keys.create');
 
   const listQuery = useQuery(
-    ['binary-assets', project.id, page, search, mediaFilters.slice().sort().join(',')],
+    [
+      'binary-assets',
+      project.id,
+      page,
+      search,
+      mediaFilters.slice().sort().join(','),
+    ],
     () =>
       binaryAssetApi.list(
         project.id,
@@ -63,7 +69,9 @@ export const AssetsView = () => {
         queryClient.invalidateQueries(['binary-assets', project.id]);
       },
       onError: (e: any) => {
-        setError(e?.message || t('binary_assets_create_failed', 'Create failed'));
+        setError(
+          e?.message || t('binary_assets_create_failed', 'Create failed')
+        );
       },
     }
   );
@@ -87,7 +95,12 @@ export const AssetsView = () => {
         ],
       ]}
     >
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }} data-cy="binary-assets-help">
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ mb: 2 }}
+        data-cy="binary-assets-help"
+      >
         {t(
           'binary_assets_help',
           'Project-global binary assets (not branch-scoped). Audio, video, and images preview inline. Assets are managed here, not under Translations.'
@@ -110,8 +123,14 @@ export const AssetsView = () => {
             onChange={(e) => setName(e.target.value)}
             data-cy="binary-assets-name-input"
           />
-          <Button variant="outlined" component="label" data-cy="binary-assets-file-input">
-            {file ? file.name : t('binary_assets_choose_file', 'Choose source file')}
+          <Button
+            variant="outlined"
+            component="label"
+            data-cy="binary-assets-file-input"
+          >
+            {file
+              ? file.name
+              : t('binary_assets_choose_file', 'Choose source file')}
             <input
               hidden
               type="file"
@@ -189,7 +208,11 @@ export const AssetsView = () => {
         )}
       </Box>
 
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ display: 'block', mb: 1 }}
+      >
         {filterLabel
           ? t(
               'binary_assets_filter_summary',
@@ -220,7 +243,12 @@ export const AssetsView = () => {
           {t('binary_assets_empty', 'No assets yet.')}
         </Typography>
       ) : (
-        <Box display="flex" flexDirection="column" gap={1} data-cy="binary-assets-list">
+        <Box
+          display="flex"
+          flexDirection="column"
+          gap={1}
+          data-cy="binary-assets-list"
+        >
           {assets.map((asset) => (
             <Box
               key={asset.id}

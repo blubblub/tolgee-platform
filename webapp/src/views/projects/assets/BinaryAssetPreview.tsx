@@ -4,12 +4,18 @@ import { binaryAssetApi } from './binaryAssetApi';
 
 type Kind = 'audio' | 'video' | 'image' | 'pdf' | 'unknown';
 
-function previewKind(contentType?: string | null, filename?: string | null): Kind {
+function previewKind(
+  contentType?: string | null,
+  filename?: string | null
+): Kind {
   const ct = (contentType || '').toLowerCase();
   const name = (filename || '').toLowerCase();
-  if (ct.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac)$/.test(name)) return 'audio';
-  if (ct.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/.test(name)) return 'video';
-  if (ct.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/.test(name)) return 'image';
+  if (ct.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac)$/.test(name))
+    return 'audio';
+  if (ct.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/.test(name))
+    return 'video';
+  if (ct.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/.test(name))
+    return 'image';
   if (ct === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
   return 'unknown';
 }
@@ -17,7 +23,11 @@ function previewKind(contentType?: string | null, filename?: string | null): Kin
 function withInline(url: string): string {
   let u = url;
   // Ticket builder may emit http behind reverse proxy; upgrade when page is https.
-  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && u.startsWith('http://')) {
+  if (
+    typeof window !== 'undefined' &&
+    window.location.protocol === 'https:' &&
+    u.startsWith('http://')
+  ) {
     u = `https://${u.slice('http://'.length)}`;
   }
   if (u.includes('inline=')) return u;
@@ -69,7 +79,11 @@ export const BinaryAssetPreview = ({
         const ticket =
           languageId == null
             ? await binaryAssetApi.sourceTicket(projectId, assetId)
-            : await binaryAssetApi.translationTicket(projectId, assetId, languageId);
+            : await binaryAssetApi.translationTicket(
+                projectId,
+                assetId,
+                languageId
+              );
         if (!cancelled) {
           setSrc(withInline(ticket.url));
         }
@@ -89,7 +103,11 @@ export const BinaryAssetPreview = ({
 
   if (kind === 'unknown') {
     return (
-      <Typography variant="caption" color="text.secondary" data-cy="binary-asset-preview-unsupported">
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        data-cy="binary-asset-preview-unsupported"
+      >
         No inline preview for this file type
       </Typography>
     );
@@ -108,7 +126,11 @@ export const BinaryAssetPreview = ({
 
   if (error) {
     return (
-      <Typography variant="caption" color="error" data-cy="binary-asset-preview-error">
+      <Typography
+        variant="caption"
+        color="error"
+        data-cy="binary-asset-preview-error"
+      >
         {error}
       </Typography>
     );

@@ -36,7 +36,12 @@ export type BinaryAsset = {
 
 export type BinaryAssetPage = {
   _embedded?: { binaryAssets?: BinaryAsset[] };
-  page?: { totalElements?: number; totalPages?: number; number?: number; size?: number };
+  page?: {
+    totalElements?: number;
+    totalPages?: number;
+    number?: number;
+    size?: number;
+  };
 };
 
 export type DownloadTicket = { url: string };

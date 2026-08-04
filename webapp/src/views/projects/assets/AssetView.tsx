@@ -42,9 +42,9 @@ export const AssetView = () => {
   const { satisfiesPermission } = useProjectPermissions();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadLanguageId, setUploadLanguageId] = useState<number | 'source' | null>(
-    null
-  );
+  const [uploadLanguageId, setUploadLanguageId] = useState<
+    number | 'source' | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
   const canEdit = satisfiesPermission('keys.edit');
@@ -190,7 +190,8 @@ export const AssetView = () => {
           {asset.sourceRevision}
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={1}>
-          {asset.originalFilename} · {asset.byteSize} bytes · {asset.contentType}
+          {asset.originalFilename} · {asset.byteSize} bytes ·{' '}
+          {asset.contentType}
         </Typography>
         <Box mb={1.5}>
           <BinaryAssetPreview
@@ -201,7 +202,11 @@ export const AssetView = () => {
           />
         </Box>
         <Box display="flex" gap={1} flexWrap="wrap">
-          <Button size="small" onClick={downloadSource} data-cy="binary-asset-download-source">
+          <Button
+            size="small"
+            onClick={downloadSource}
+            data-cy="binary-asset-download-source"
+          >
             {t('binary_assets_download', 'Download')}
           </Button>
           {canEdit && (
@@ -222,7 +227,9 @@ export const AssetView = () => {
               size="small"
               color="error"
               onClick={() => {
-                if (window.confirm('Delete this asset and all localized files?')) {
+                if (
+                  window.confirm('Delete this asset and all localized files?')
+                ) {
                   deleteAsset.mutate();
                 }
               }}
@@ -254,7 +261,11 @@ export const AssetView = () => {
                 {row.languageName} ({row.languageTag})
               </TableCell>
               <TableCell>
-                <Chip size="small" color={statusColor(row.status) as any} label={row.status} />
+                <Chip
+                  size="small"
+                  color={statusColor(row.status) as any}
+                  label={row.status}
+                />
               </TableCell>
               <TableCell sx={{ minWidth: 220 }}>
                 {row.status !== 'MISSING' ? (
@@ -278,7 +289,12 @@ export const AssetView = () => {
                   : '—'}
               </TableCell>
               <TableCell align="right">
-                <Box display="flex" gap={1} justifyContent="flex-end" flexWrap="wrap">
+                <Box
+                  display="flex"
+                  gap={1}
+                  justifyContent="flex-end"
+                  flexWrap="wrap"
+                >
                   {row.status !== 'MISSING' && (
                     <Button
                       size="small"
