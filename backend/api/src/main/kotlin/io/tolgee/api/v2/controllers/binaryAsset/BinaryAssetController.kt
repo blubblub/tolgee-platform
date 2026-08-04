@@ -80,8 +80,18 @@ class BinaryAssetController(
     val page = binaryAssetService.getPage(projectId, pageable, search, mediaTypes)
     val languages = languageService.findAll(projectId)
     val visible = visibleLanguageIds(projectId)
+    // one query for the whole page rather than one per asset
+    val transcripts =
+      binaryAssetTranscriptService.getTranscriptTranslationsByKey(
+        page.content.mapNotNull { it.transcriptKey?.id },
+      )
     return pagedAssembler.toModel(page) { asset ->
-      binaryAssetModelAssembler.toListModel(asset, languages, visible)
+      binaryAssetModelAssembler.toListModel(
+        asset,
+        languages,
+        visible,
+        transcripts[asset.transcriptKey?.id]?.get(asset.sourceLanguage.id)?.text,
+      )
     }
   }
 

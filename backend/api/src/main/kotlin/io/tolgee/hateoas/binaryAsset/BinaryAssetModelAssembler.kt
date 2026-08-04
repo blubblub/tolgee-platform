@@ -21,6 +21,7 @@ class BinaryAssetModelAssembler(
     asset: BinaryAsset,
     targetLanguages: Collection<LanguageDto>,
     visibleLanguageIds: Set<Long>?,
+    transcriptSourceText: String? = null,
   ): BinaryAssetModel {
     val byLang = asset.translations.associateBy { it.language.id }
     val visibleTargets =
@@ -37,7 +38,7 @@ class BinaryAssetModelAssembler(
         BinaryAssetTranslationStatus.MISSING -> {}
       }
     }
-    return baseModel(asset, current, outdated, visibleTargets.size, null)
+    return baseModel(asset, current, outdated, visibleTargets.size, null, transcriptSourceText)
   }
 
   fun toDetailModel(

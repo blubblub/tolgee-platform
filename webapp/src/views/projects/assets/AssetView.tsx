@@ -146,6 +146,10 @@ export const AssetView = () => {
   }
 
   const asset = detailQuery.data;
+  // transcripts only make sense for something spoken
+  const hasTranscriptSupport = ['audio', 'video'].includes(
+    previewKind(asset.contentType, asset.originalFilename)
+  );
 
   return (
     <BaseProjectView
@@ -242,10 +246,7 @@ export const AssetView = () => {
         </Box>
       </Box>
 
-      {/* Transcripts only make sense for something spoken. */}
-      {['audio', 'video'].includes(
-        previewKind(asset.contentType, asset.originalFilename)
-      ) && (
+      {hasTranscriptSupport && (
         <AssetTranscript
           asset={asset}
           projectId={project.id}
@@ -265,7 +266,7 @@ export const AssetView = () => {
             <TableCell>Status</TableCell>
             <TableCell>Preview</TableCell>
             <TableCell>File</TableCell>
-            {asset.transcriptKeyId && (
+            {hasTranscriptSupport && (
               <TableCell>
                 {t('binary_assets_transcript', 'Transcript')}
               </TableCell>
@@ -307,17 +308,14 @@ export const AssetView = () => {
                   ? `${row.originalFilename} · ${row.byteSize} B`
                   : '—'}
               </TableCell>
-              {asset.transcriptKeyId && (
+              {hasTranscriptSupport && (
                 <TableCell
                   sx={{ maxWidth: 260 }}
                   data-cy="binary-asset-transcript-cell"
                 >
-                  {row.transcriptText ? (
+                  {row.transcriptText && asset.transcriptKeyId ? (
                     <Link
-                      to={transcriptKeyLink(
-                        project.id,
-                        asset.transcriptKeyId as number
-                      )}
+                      to={transcriptKeyLink(project.id, asset.transcriptKeyId)}
                     >
                       {row.transcriptText}
                     </Link>

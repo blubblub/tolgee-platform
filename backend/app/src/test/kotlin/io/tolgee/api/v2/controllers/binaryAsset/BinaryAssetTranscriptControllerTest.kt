@@ -193,6 +193,29 @@ class BinaryAssetTranscriptControllerTest : ProjectAuthControllerTest("/v2/proje
 
   @Test
   @ProjectJWTAuthTestMethod
+  fun `the list endpoint carries the transcript so the assets page can show it`() {
+    val withTranscript = createAsset("vox-listed")
+    createAsset("vox-unlisted")
+    performProjectAuthPost(
+      "binary-assets/$withTranscript/transcript",
+      mapOf("text" to "Listed transcript."),
+    ).andIsOk
+
+    val page =
+      jacksonObjectMapper()
+        .readTree(performProjectAuthGet("binary-assets?size=100").andIsOk.andReturn().response.contentAsString)
+    val rows = page.get("_embedded").get("binaryAssets")
+    val listed = rows.first { it.get("name").asText() == "vox-listed" }
+    val unlisted = rows.first { it.get("name").asText() == "vox-unlisted" }
+
+    assertThat(listed.get("transcriptSourceText").asText()).isEqualTo("Listed transcript.")
+    assertThat(listed.get("transcriptKeyName").asText()).isEqualTo("transcript.vox-listed")
+    assertThat(unlisted.get("transcriptKeyId").isNull).isTrue()
+    assertThat(unlisted.get("transcriptSourceText").isNull).isTrue()
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
   fun `exposes transcript text per target language`() {
     val assetId = createAsset("vox-per-language")
     performProjectAuthPost(

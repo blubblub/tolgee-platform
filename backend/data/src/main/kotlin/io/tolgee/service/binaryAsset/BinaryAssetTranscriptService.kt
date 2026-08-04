@@ -111,9 +111,22 @@ class BinaryAssetTranscriptService(
   @Transactional(readOnly = true)
   fun getTranscriptTranslations(keyId: Long?): Map<Long, TranscriptText> {
     keyId ?: return emptyMap()
+    return getTranscriptTranslationsByKey(listOf(keyId))[keyId] ?: emptyMap()
+  }
+
+  /**
+   * Transcripts for many keys in one query, keyed by key id then language id — so listing a page
+   * of assets costs one query rather than one per asset.
+   */
+  @Transactional(readOnly = true)
+  fun getTranscriptTranslationsByKey(keyIds: Collection<Long>): Map<Long, Map<Long, TranscriptText>> {
+    if (keyIds.isEmpty()) return emptyMap()
     return translationRepository
-      .getAllByKeyIdIn(listOf(keyId))
-      .associate { it.language.id to TranscriptText(it.text, it.state.name) }
+      .getAllByKeyIdIn(keyIds.distinct())
+      .groupBy { it.key.id }
+      .mapValues { (_, translations) ->
+        translations.associate { it.language.id to TranscriptText(it.text, it.state.name) }
+      }
   }
 
   private fun lockAsset(

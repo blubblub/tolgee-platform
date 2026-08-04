@@ -25,6 +25,7 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
     from BinaryAsset a
     left join fetch a.sourceLanguage
     left join fetch a.uploadedBy
+    left join fetch a.transcriptKey
     where a.project.id = :projectId
       and (:search is null or lower(a.name) like lower(concat('%', cast(:search as string), '%')))
       and (
@@ -163,6 +164,7 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
     from BinaryAsset a
     left join fetch a.sourceLanguage
     left join fetch a.uploadedBy
+    left join fetch a.transcriptKey
     left join fetch a.translations t
     left join fetch t.language
     left join fetch t.uploadedBy
