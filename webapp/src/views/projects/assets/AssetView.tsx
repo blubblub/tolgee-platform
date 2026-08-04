@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import { useTranslate } from '@tolgee/react';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
-import { Link, useRouteMatch } from 'react-router-dom';
+import { useRouteMatch } from 'react-router-dom';
 
 import { BaseProjectView } from 'tg.views/projects/BaseProjectView';
 import { useProject } from 'tg.hooks/useProject';
@@ -21,7 +21,8 @@ import { LINKS, PARAMS } from 'tg.constants/links';
 import { BoxLoading } from 'tg.component/common/BoxLoading';
 import { binaryAssetApi } from './binaryAssetApi';
 import { BinaryAssetPreview, previewKind } from './BinaryAssetPreview';
-import { AssetTranscript, transcriptKeyLink } from './AssetTranscript';
+import { AssetTranscript } from './AssetTranscript';
+import { TranscriptEditor } from './TranscriptEditor';
 import { BinaryAssetTranslationStatus } from './types';
 
 const statusColor = (status: BinaryAssetTranslationStatus) => {
@@ -40,7 +41,8 @@ export const AssetView = () => {
   const match = useRouteMatch();
   const assetId = Number(match.params[PARAMS.ASSET_ID]);
   const { t } = useTranslate();
-  const { satisfiesPermission } = useProjectPermissions();
+  const { satisfiesPermission, satisfiesLanguageAccess } =
+    useProjectPermissions();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadLanguageId, setUploadLanguageId] = useState<
@@ -252,6 +254,10 @@ export const AssetView = () => {
           projectId={project.id}
           canCreate={satisfiesPermission('keys.create')}
           canEdit={canEdit}
+          canEditSource={satisfiesLanguageAccess(
+            'translations.edit',
+            asset.sourceLanguageId
+          )}
           onChange={invalidate}
         />
       )}
@@ -310,15 +316,25 @@ export const AssetView = () => {
               </TableCell>
               {hasTranscriptSupport && (
                 <TableCell
-                  sx={{ maxWidth: 260 }}
+                  sx={{ maxWidth: 260, minWidth: 180 }}
                   data-cy="binary-asset-transcript-cell"
                 >
-                  {row.transcriptText && asset.transcriptKeyId ? (
-                    <Link
-                      to={transcriptKeyLink(project.id, asset.transcriptKeyId)}
-                    >
-                      {row.transcriptText}
-                    </Link>
+                  {asset.transcriptKeyName ? (
+                    <TranscriptEditor
+                      projectId={project.id}
+                      keyName={asset.transcriptKeyName}
+                      languageTag={row.languageTag}
+                      value={row.transcriptText}
+                      canEdit={satisfiesLanguageAccess(
+                        'translations.edit',
+                        row.languageId
+                      )}
+                      placeholder={t(
+                        'binary_assets_transcript_add_translation',
+                        'Add translation'
+                      )}
+                      onSaved={invalidate}
+                    />
                   ) : (
                     <Typography variant="caption" color="text.secondary">
                       —

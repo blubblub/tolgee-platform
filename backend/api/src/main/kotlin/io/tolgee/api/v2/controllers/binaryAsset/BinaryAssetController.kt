@@ -347,7 +347,12 @@ class BinaryAssetController(
         .getRequestAttributes()
         .let { it as? org.springframework.web.context.request.ServletRequestAttributes }
         ?.request
-    val forwarded = request?.getHeader("X-Forwarded-Proto")?.split(",")?.firstOrNull()?.trim()
+    val forwarded =
+      request
+        ?.getHeader("X-Forwarded-Proto")
+        ?.split(",")
+        ?.firstOrNull()
+        ?.trim()
     return when {
       !forwarded.isNullOrBlank() -> forwarded
       request?.scheme != null -> request.scheme
@@ -373,4 +378,3 @@ class BinaryAssetController(
     return null
   }
 }
-

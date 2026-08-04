@@ -42,7 +42,9 @@ class BinaryAssetTranslation(
   @Column(nullable = false)
   var sourceRevision: Long = 1
 
-  @Column(nullable = false)
+  // 512 matches the column; without it Hibernate assumes 255 and diffChangeLog
+  // generates a migration that would SHRINK the column.
+  @Column(nullable = false, length = 512)
   lateinit var storageKey: String
 
   @Column(nullable = false)

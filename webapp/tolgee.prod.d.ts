@@ -48,6 +48,8 @@ declare module '@tolgee/web' {
     | 'binary_assets_title'
     | 'binary_assets_transcript'
     | 'binary_assets_transcript_add'
+    | 'binary_assets_transcript_add_translation'
+    | 'binary_assets_transcript_cell_placeholder'
     | 'binary_assets_transcript_cancel'
     | 'binary_assets_transcript_delete'
     | 'binary_assets_transcript_deleted'

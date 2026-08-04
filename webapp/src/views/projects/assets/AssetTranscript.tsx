@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { LINKS, PARAMS } from 'tg.constants/links';
 import { queryEncode } from 'tg.hooks/useUrlSearchState';
 import { useApiMutation } from 'tg.service/http/useQueryApi';
+import { TranscriptEditor } from './TranscriptEditor';
 import { BinaryAsset } from './types';
 
 type Props = {
@@ -13,6 +14,8 @@ type Props = {
   projectId: number;
   canCreate: boolean;
   canEdit: boolean;
+  /** Whether the user may edit the source language's transcript text. */
+  canEditSource: boolean;
   onChange: () => void;
 };
 
@@ -27,6 +30,7 @@ export const AssetTranscript = ({
   projectId,
   canCreate,
   canEdit,
+  canEditSource,
   onChange,
 }: Props) => {
   const { t } = useTranslate();
@@ -88,19 +92,20 @@ export const AssetTranscript = ({
             />
           )}
         </Box>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          mb={1.5}
-          data-cy="binary-asset-transcript-source-text"
-        >
-          {asset.transcriptSourceText || (
-            <T
-              keyName="binary_assets_transcript_empty"
-              defaultValue="No transcript text yet."
-            />
-          )}
-        </Typography>
+        <Box mb={1.5} data-cy="binary-asset-transcript-source-text">
+          <TranscriptEditor
+            projectId={projectId}
+            keyName={asset.transcriptKeyName!}
+            languageTag={asset.sourceLanguageTag}
+            value={asset.transcriptSourceText}
+            canEdit={canEditSource}
+            placeholder={t(
+              'binary_assets_transcript_empty',
+              'No transcript text yet.'
+            )}
+            onSaved={onChange}
+          />
+        </Box>
         <Box display="flex" gap={1} flexWrap="wrap">
           <Button
             size="small"
