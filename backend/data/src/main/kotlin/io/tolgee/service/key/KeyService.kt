@@ -25,6 +25,7 @@ import io.tolgee.model.translation.Translation
 import io.tolgee.repository.KeyRepository
 import io.tolgee.repository.LanguageRepository
 import io.tolgee.repository.TaskKeyRepository
+import io.tolgee.repository.binaryAsset.BinaryAssetRepository
 import io.tolgee.security.authentication.AuthenticationFacade
 import io.tolgee.service.AiPlaygroundResultService
 import io.tolgee.service.bigMeta.BigMetaService
@@ -68,6 +69,8 @@ class KeyService(
   @Lazy
   private val aiPlaygroundResultService: AiPlaygroundResultService,
   private val taskKeyRepository: TaskKeyRepository,
+  @Lazy
+  private val binaryAssetRepository: BinaryAssetRepository,
   @Lazy
   private val branchService: BranchService,
   @Lazy
@@ -358,6 +361,7 @@ class KeyService(
     keyMetaService.deleteAllByKeyId(id)
     screenshotService.deleteAllByKeyId(id)
     taskKeyRepository.deleteAllByKeyIdIn(listOf(id))
+    binaryAssetRepository.clearTranscriptKeyByKeyIdIn(listOf(id))
     branchMergeService.deleteChangesByKeyIds(listOf(id))
     translationSuggestionService.deleteAllByKeyIds(listOf(id))
     // Flush and clear the persistence context to ensure deletions are synchronized
@@ -452,6 +456,10 @@ class KeyService(
       taskKeyRepository.deleteAllByKeyIdIn(ids)
     }
 
+    traceLogMeasureTime("delete multiple keys: clear binary asset transcript references") {
+      binaryAssetRepository.clearTranscriptKeyByKeyIdIn(ids)
+    }
+
     branchMergeService.deleteChangesByKeyIds(ids)
 
     translationSuggestionService.deleteAllByKeyIds(ids)
@@ -526,6 +534,9 @@ class KeyService(
     keyMetaService.deleteAllByProject(projectId)
     screenshotService.deleteAllByProject(projectId)
     taskKeyRepository.deleteAllByKeyProjectId(projectId)
+    // Defensive: ProjectHardDeletingService already deletes binary assets first, but this method
+    // is also reachable on its own (e.g. project content clearing).
+    binaryAssetRepository.clearTranscriptKeyByKeyProjectId(projectId)
 
     entityManager
       .createQuery("""delete from Key where project.id = :projectId""")

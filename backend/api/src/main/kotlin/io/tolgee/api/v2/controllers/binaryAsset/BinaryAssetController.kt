@@ -5,7 +5,10 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import io.tolgee.activity.RequestActivity
 import io.tolgee.activity.data.ActivityType
 import io.tolgee.api.v2.controllers.IController
+import io.tolgee.constants.Message
+import io.tolgee.dtos.request.binaryAsset.BinaryAssetTranscriptRequest
 import io.tolgee.dtos.request.binaryAsset.BinaryAssetUpdateRequest
+import io.tolgee.exceptions.BadRequestException
 import io.tolgee.hateoas.binaryAsset.BinaryAssetDownloadTicketModel
 import io.tolgee.hateoas.binaryAsset.BinaryAssetModel
 import io.tolgee.hateoas.binaryAsset.BinaryAssetModelAssembler
@@ -17,6 +20,7 @@ import io.tolgee.security.authentication.AuthenticationFacade
 import io.tolgee.security.authentication.JwtService
 import io.tolgee.security.authorization.RequiresProjectPermissions
 import io.tolgee.service.binaryAsset.BinaryAssetService
+import io.tolgee.service.binaryAsset.BinaryAssetTranscriptService
 import io.tolgee.service.language.LanguageService
 import io.tolgee.service.security.SecurityService
 import jakarta.servlet.http.HttpServletRequest
@@ -53,6 +57,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder
 @Tag(name = "Binary assets", description = "Project binary asset localization (source + per-language files)")
 class BinaryAssetController(
   private val binaryAssetService: BinaryAssetService,
+  private val binaryAssetTranscriptService: BinaryAssetTranscriptService,
   private val binaryAssetModelAssembler: BinaryAssetModelAssembler,
   private val pagedAssembler: PagedResourcesAssembler<io.tolgee.model.binaryAsset.BinaryAsset>,
   private val projectHolder: ProjectHolder,
@@ -87,10 +92,7 @@ class BinaryAssetController(
   fun get(
     @PathVariable assetId: Long,
   ): BinaryAssetModel {
-    val projectId = projectHolder.project.id
-    val asset = binaryAssetService.get(projectId, assetId)
-    val languages = languageService.findAll(projectId)
-    return binaryAssetModelAssembler.toDetailModel(asset, languages, visibleLanguageIds(projectId))
+    return detailModel(projectHolder.project.id, assetId)
   }
 
   @PostMapping("", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
@@ -115,12 +117,7 @@ class BinaryAssetController(
         file = file,
         uploader = authenticationFacade.authenticatedUserEntityOrNull,
       )
-    val languages = languageService.findAll(projectId)
-    return binaryAssetModelAssembler.toDetailModel(
-      binaryAssetService.get(projectId, asset.id),
-      languages,
-      visibleLanguageIds(projectId),
-    )
+    return detailModel(projectId, asset.id)
   }
 
   @PutMapping("/{assetId}")
@@ -134,12 +131,52 @@ class BinaryAssetController(
   ): BinaryAssetModel {
     val projectId = projectHolder.project.id
     binaryAssetService.updateMetadata(projectId, assetId, dto.name, dto.description)
-    val languages = languageService.findAll(projectId)
-    return binaryAssetModelAssembler.toDetailModel(
-      binaryAssetService.get(projectId, assetId),
-      languages,
-      visibleLanguageIds(projectId),
-    )
+    return detailModel(projectId, assetId)
+  }
+
+  @PostMapping("/{assetId}/transcript")
+  @Operation(
+    summary = "Add a transcript to a binary asset",
+    description =
+      "Creates a key owned by this asset (optionally seeded with text), or links an existing key. " +
+        "Transcript text itself is edited through the normal key/translation endpoints.",
+  )
+  @RequiresProjectPermissions([Scope.KEYS_CREATE])
+  @AllowApiAccess
+  @RequestActivity(ActivityType.BINARY_ASSET_TRANSCRIPT_LINK)
+  fun addTranscript(
+    @PathVariable assetId: Long,
+    @Valid @RequestBody dto: BinaryAssetTranscriptRequest,
+  ): BinaryAssetModel {
+    val projectId = projectHolder.project.id
+    val keyId = dto.keyId
+    if (keyId != null) {
+      if (dto.text != null) {
+        throw BadRequestException(Message.BINARY_ASSET_TRANSCRIPT_TEXT_OR_KEY_REQUIRED)
+      }
+      binaryAssetTranscriptService.link(projectId, assetId, keyId)
+    } else {
+      binaryAssetTranscriptService.create(projectId, assetId, dto.text)
+    }
+    return detailModel(projectId, assetId)
+  }
+
+  @DeleteMapping("/{assetId}/transcript")
+  @Operation(
+    summary = "Remove a binary asset's transcript",
+    description =
+      "An owned key is deleted with it; a linked key is left in place. " +
+        "Returns the updated asset so callers do not need to re-fetch.",
+  )
+  @RequiresProjectPermissions([Scope.KEYS_EDIT])
+  @AllowApiAccess
+  @RequestActivity(ActivityType.BINARY_ASSET_TRANSCRIPT_UNLINK)
+  fun deleteTranscript(
+    @PathVariable assetId: Long,
+  ): BinaryAssetModel {
+    val projectId = projectHolder.project.id
+    binaryAssetTranscriptService.unlink(projectId, assetId)
+    return detailModel(projectId, assetId)
   }
 
   @PutMapping("/{assetId}/source", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
@@ -158,12 +195,7 @@ class BinaryAssetController(
       file,
       authenticationFacade.authenticatedUserEntityOrNull,
     )
-    val languages = languageService.findAll(projectId)
-    return binaryAssetModelAssembler.toDetailModel(
-      binaryAssetService.get(projectId, assetId),
-      languages,
-      visibleLanguageIds(projectId),
-    )
+    return detailModel(projectId, assetId)
   }
 
   @PostMapping("/{assetId}/source/download-ticket")
@@ -207,12 +239,7 @@ class BinaryAssetController(
       translatedAgainstSourceRevision = translatedAgainstSourceRevision.toLong(),
       uploader = authenticationFacade.authenticatedUserEntityOrNull,
     )
-    val languages = languageService.findAll(projectId)
-    return binaryAssetModelAssembler.toDetailModel(
-      binaryAssetService.get(projectId, assetId),
-      languages,
-      visibleLanguageIds(projectId),
-    )
+    return detailModel(projectId, assetId)
   }
 
   @PostMapping("/{assetId}/translations/{languageId}/download-ticket")
@@ -316,6 +343,19 @@ class BinaryAssetController(
       request?.scheme != null -> request.scheme
       else -> "https"
     }
+  }
+
+  private fun detailModel(
+    projectId: Long,
+    assetId: Long,
+  ): BinaryAssetModel {
+    val asset = binaryAssetService.get(projectId, assetId)
+    return binaryAssetModelAssembler.toDetailModel(
+      asset,
+      languageService.findAll(projectId),
+      visibleLanguageIds(projectId),
+      binaryAssetTranscriptService.getTranscriptTranslations(asset.transcriptKey?.id),
+    )
   }
 
   private fun visibleLanguageIds(projectId: Long): Set<Long>? {

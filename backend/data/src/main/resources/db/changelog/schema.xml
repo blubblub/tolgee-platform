@@ -5938,5 +5938,17 @@
         <addForeignKeyConstraint baseColumnNames="language_id" baseTableName="binary_asset_translation" constraintName="FK_binary_asset_translation_language" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="language" validate="true"/>
         <addForeignKeyConstraint baseColumnNames="uploaded_by_id" baseTableName="binary_asset_translation" constraintName="FK_binary_asset_translation_uploaded_by" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="user_account" validate="true"/>
     </changeSet>
+    <changeSet author="blubblub" id="1785801600000-1">
+        <addColumn tableName="binary_asset">
+            <column name="transcript_key_id" type="BIGINT"/>
+            <column defaultValueBoolean="false" name="transcript_key_owned" type="BOOLEAN">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <createIndex indexName="binary_asset_transcript_key_id_idx" tableName="binary_asset">
+            <column name="transcript_key_id"/>
+        </createIndex>
+        <addForeignKeyConstraint baseColumnNames="transcript_key_id" baseTableName="binary_asset" constraintName="FK_binary_asset_transcript_key" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="key" validate="true"/>
+    </changeSet>
 
 </databaseChangeLog>

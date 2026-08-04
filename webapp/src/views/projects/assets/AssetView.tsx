@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import { useTranslate } from '@tolgee/react';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
-import { useRouteMatch } from 'react-router-dom';
+import { Link, useRouteMatch } from 'react-router-dom';
 
 import { BaseProjectView } from 'tg.views/projects/BaseProjectView';
 import { useProject } from 'tg.hooks/useProject';
@@ -20,7 +20,8 @@ import { useProjectPermissions } from 'tg.hooks/useProjectPermissions';
 import { LINKS, PARAMS } from 'tg.constants/links';
 import { BoxLoading } from 'tg.component/common/BoxLoading';
 import { binaryAssetApi } from './binaryAssetApi';
-import { BinaryAssetPreview } from './BinaryAssetPreview';
+import { BinaryAssetPreview, previewKind } from './BinaryAssetPreview';
+import { AssetTranscript, transcriptKeyLink } from './AssetTranscript';
 import { BinaryAssetTranslationStatus } from './types';
 
 const statusColor = (status: BinaryAssetTranslationStatus) => {
@@ -241,6 +242,19 @@ export const AssetView = () => {
         </Box>
       </Box>
 
+      {/* Transcripts only make sense for something spoken. */}
+      {['audio', 'video'].includes(
+        previewKind(asset.contentType, asset.originalFilename)
+      ) && (
+        <AssetTranscript
+          asset={asset}
+          projectId={project.id}
+          canCreate={satisfiesPermission('keys.create')}
+          canEdit={canEdit}
+          onChange={invalidate}
+        />
+      )}
+
       <Typography fontWeight={600} mb={1}>
         {t('binary_assets_translations', 'Localized files')}
       </Typography>
@@ -251,6 +265,11 @@ export const AssetView = () => {
             <TableCell>Status</TableCell>
             <TableCell>Preview</TableCell>
             <TableCell>File</TableCell>
+            {asset.transcriptKeyId && (
+              <TableCell>
+                {t('binary_assets_transcript', 'Transcript')}
+              </TableCell>
+            )}
             <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
@@ -288,6 +307,27 @@ export const AssetView = () => {
                   ? `${row.originalFilename} · ${row.byteSize} B`
                   : '—'}
               </TableCell>
+              {asset.transcriptKeyId && (
+                <TableCell
+                  sx={{ maxWidth: 260 }}
+                  data-cy="binary-asset-transcript-cell"
+                >
+                  {row.transcriptText ? (
+                    <Link
+                      to={transcriptKeyLink(
+                        project.id,
+                        asset.transcriptKeyId as number
+                      )}
+                    >
+                      {row.transcriptText}
+                    </Link>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">
+                      —
+                    </Typography>
+                  )}
+                </TableCell>
+              )}
               <TableCell align="right">
                 <Box
                   display="flex"

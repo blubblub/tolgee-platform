@@ -4,7 +4,7 @@ import { binaryAssetApi } from './binaryAssetApi';
 
 type Kind = 'audio' | 'video' | 'image' | 'pdf' | 'unknown';
 
-function previewKind(
+export function previewKind(
   contentType?: string | null,
   filename?: string | null
 ): Kind {

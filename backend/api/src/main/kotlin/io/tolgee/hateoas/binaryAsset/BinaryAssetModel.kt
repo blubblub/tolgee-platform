@@ -23,6 +23,17 @@ open class BinaryAssetModel(
   val currentCount: Int,
   val outdatedCount: Int,
   val targetLanguageCount: Int,
+  val transcriptKeyId: Long? = null,
+  val transcriptKeyName: String? = null,
+  /** True when the key belongs to this asset and is deleted with it. */
+  val transcriptKeyOwned: Boolean = false,
+  /** The linked key is in the trash — the reference survives a soft delete. */
+  val transcriptKeyDeleted: Boolean = false,
+  /**
+   * Transcript in the asset's source language. Not in [translations], which only covers target
+   * languages.
+   */
+  val transcriptSourceText: String? = null,
   val translations: List<BinaryAssetTranslationModel>? = null,
 ) : RepresentationModel<BinaryAssetModel>()
 
@@ -39,6 +50,10 @@ open class BinaryAssetTranslationModel(
   val sha256: String?,
   val uploadedById: Long?,
   val updatedAt: Date?,
+  /** Transcript text for this language, from the linked key. Null when there is no transcript. */
+  val transcriptText: String? = null,
+  /** [io.tolgee.model.enums.TranslationState] name of the transcript translation. */
+  val transcriptState: String? = null,
 )
 
 open class BinaryAssetDownloadTicketModel(

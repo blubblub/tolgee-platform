@@ -64,4 +64,24 @@ export const binaryAssetConfiguration: Partial<
       );
     },
   },
+  BINARY_ASSET_TRANSCRIPT_LINK: {
+    label() {
+      return (
+        <T
+          keyName="activity_binary_asset_transcript_link"
+          defaultValue="Added asset transcript"
+        />
+      );
+    },
+  },
+  BINARY_ASSET_TRANSCRIPT_UNLINK: {
+    label() {
+      return (
+        <T
+          keyName="activity_binary_asset_transcript_unlink"
+          defaultValue="Removed asset transcript"
+        />
+      );
+    },
+  },
 };

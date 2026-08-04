@@ -12,6 +12,8 @@ export type BinaryAssetTranslation = {
   sha256?: string | null;
   uploadedById?: number | null;
   updatedAt?: string | null;
+  transcriptText?: string | null;
+  transcriptState?: string | null;
 };
 
 export type BinaryAsset = {
@@ -31,6 +33,11 @@ export type BinaryAsset = {
   currentCount: number;
   outdatedCount: number;
   targetLanguageCount: number;
+  transcriptKeyId?: number | null;
+  transcriptKeyName?: string | null;
+  transcriptKeyOwned?: boolean;
+  transcriptKeyDeleted?: boolean;
+  transcriptSourceText?: string | null;
   translations?: BinaryAssetTranslation[] | null;
 };
 

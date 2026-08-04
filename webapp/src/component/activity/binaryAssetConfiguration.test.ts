@@ -9,6 +9,8 @@ describe('binary asset activity labels', () => {
     'BINARY_ASSET_SOURCE_REPLACE',
     'BINARY_ASSET_TRANSLATION_UPSERT',
     'BINARY_ASSET_TRANSLATION_DELETE',
+    'BINARY_ASSET_TRANSCRIPT_LINK',
+    'BINARY_ASSET_TRANSCRIPT_UNLINK',
   ];
 
   it.each(binaryAssetTypes)('has a label configuration for %s', (type) => {

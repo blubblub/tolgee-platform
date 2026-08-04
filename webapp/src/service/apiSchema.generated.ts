@@ -506,6 +506,12 @@ export interface paths {
   "/v2/projects/{projectId}/binary-assets/{assetId}/source/download-ticket": {
     post: operations["sourceDownloadTicket"];
   };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/transcript": {
+    /** Creates a key owned by this asset (optionally seeded with text), or links an existing key. Transcript text itself is edited through the normal key/translation endpoints. */
+    post: operations["addTranscript"];
+    /** An owned key is deleted with it; a linked key is left in place. Returns the updated asset so callers do not need to re-fetch. */
+    delete: operations["deleteTranscript"];
+  };
   "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}": {
     put: operations["upsertTranslation"];
     delete: operations["deleteTranslation"];
@@ -1720,11 +1726,26 @@ export interface components {
       sourceRevision: number;
       /** Format: int32 */
       targetLanguageCount: number;
+      transcriptKeyDeleted: boolean;
+      /** Format: int64 */
+      transcriptKeyId?: number;
+      transcriptKeyName?: string;
+      transcriptKeyOwned: boolean;
+      transcriptSourceText?: string;
       translations?: components["schemas"]["BinaryAssetTranslationModel"][];
       /** Format: date-time */
       updatedAt?: string;
       /** Format: int64 */
       uploadedById?: number;
+    };
+    BinaryAssetTranscriptRequest: {
+      /**
+       * Format: int64
+       * @description Id of an existing key in this project to use as the transcript. The key is not deleted when the asset is. Mutually exclusive with text.
+       */
+      keyId?: number;
+      /** @description Initial transcript text in the asset's source language. Creates a new key owned by this asset. Mutually exclusive with keyId. */
+      text?: string;
     };
     BinaryAssetTranslationModel: {
       /** Format: int64 */
@@ -1740,6 +1761,8 @@ export interface components {
       sourceRevision?: number;
       /** @enum {string} */
       status: "MISSING" | "CURRENT" | "OUTDATED";
+      transcriptState?: string;
+      transcriptText?: string;
       /** Format: date-time */
       updatedAt?: string;
       /** Format: int64 */
@@ -3301,6 +3324,9 @@ export interface components {
         | "binary_asset_target_is_source_language"
         | "binary_asset_invalid_source_revision"
         | "binary_asset_storage_not_streaming"
+        | "binary_asset_transcript_exists"
+        | "binary_asset_transcript_not_found"
+        | "binary_asset_transcript_text_or_key_required"
         | "file_empty"
         | "file_name_too_long"
         | "file_name_not_valid";
@@ -5389,6 +5415,8 @@ export interface components {
         | "BINARY_ASSET_SOURCE_REPLACE"
         | "BINARY_ASSET_TRANSLATION_UPSERT"
         | "BINARY_ASSET_TRANSLATION_DELETE"
+        | "BINARY_ASSET_TRANSCRIPT_LINK"
+        | "BINARY_ASSET_TRANSCRIPT_UNLINK"
         | "KEY_TAGS_EDIT"
         | "KEY_NAME_EDIT"
         | "KEY_CHARACTER_LIMIT_EDIT"
@@ -7172,6 +7200,9 @@ export interface components {
         | "binary_asset_target_is_source_language"
         | "binary_asset_invalid_source_revision"
         | "binary_asset_storage_not_streaming"
+        | "binary_asset_transcript_exists"
+        | "binary_asset_transcript_not_found"
+        | "binary_asset_transcript_text_or_key_required"
         | "file_empty"
         | "file_name_too_long"
         | "file_name_not_valid";
@@ -14919,6 +14950,93 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["BinaryAssetDownloadTicketModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  /** Creates a key owned by this asset (optionally seeded with text), or links an existing key. Transcript text itself is edited through the normal key/translation endpoints. */
+  addTranscript: {
+    parameters: {
+      path: {
+        assetId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BinaryAssetTranscriptRequest"];
+      };
+    };
+  };
+  /** An owned key is deleted with it; a linked key is left in place. Returns the updated asset so callers do not need to re-fetch. */
+  deleteTranscript: {
+    parameters: {
+      path: {
+        assetId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetModel"];
         };
       };
       /** Bad Request */

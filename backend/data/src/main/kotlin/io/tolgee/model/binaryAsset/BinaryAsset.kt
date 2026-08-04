@@ -7,6 +7,7 @@ import io.tolgee.model.Language
 import io.tolgee.model.Project
 import io.tolgee.model.StandardAuditModel
 import io.tolgee.model.UserAccount
+import io.tolgee.model.key.Key
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
@@ -68,6 +69,23 @@ class BinaryAsset(
 
   @ManyToOne(fetch = FetchType.LAZY)
   var uploadedBy: UserAccount? = null
+
+  /**
+   * Plain-text transcript of the spoken content, stored as a regular key so the whole
+   * translation stack (states, MT, review, export) applies to it.
+   *
+   * ManyToOne rather than OneToOne: a linked (not owned) key may back several assets, e.g. two
+   * voiceovers of the same on-screen string.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "transcript_key_id")
+  var transcriptKey: Key? = null
+
+  /** True when the key was created for this asset and should die with it. */
+  @ActivityLoggedProp
+  @ColumnDefault("false")
+  @Column(nullable = false)
+  var transcriptKeyOwned: Boolean = false
 
   @OneToMany(mappedBy = "asset", orphanRemoval = true)
   var translations: MutableList<BinaryAssetTranslation> = mutableListOf()

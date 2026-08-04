@@ -6,6 +6,7 @@ import io.tolgee.model.binaryAsset.BinaryAsset
 import io.tolgee.model.binaryAsset.BinaryAssetTranslation
 import io.tolgee.model.enums.BinaryAssetTranslationStatus
 import io.tolgee.service.binaryAsset.BinaryAssetService
+import io.tolgee.service.binaryAsset.BinaryAssetTranscriptService
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport
 import org.springframework.stereotype.Component
 
@@ -43,6 +44,7 @@ class BinaryAssetModelAssembler(
     asset: BinaryAsset,
     targetLanguages: Collection<LanguageDto>,
     visibleLanguageIds: Set<Long>?,
+    transcripts: Map<Long, BinaryAssetTranscriptService.TranscriptText> = emptyMap(),
   ): BinaryAssetModel {
     val byLang = asset.translations.associateBy { it.language.id }
     val visibleTargets =
@@ -52,7 +54,7 @@ class BinaryAssetModelAssembler(
       }
     val translationModels =
       visibleTargets.map { lang ->
-        toTranslationModel(asset, lang, byLang[lang.id])
+        toTranslationModel(asset, lang, byLang[lang.id], transcripts[lang.id])
       }
     var current = 0
     var outdated = 0
@@ -63,13 +65,21 @@ class BinaryAssetModelAssembler(
         BinaryAssetTranslationStatus.MISSING -> {}
       }
     }
-    return baseModel(asset, current, outdated, visibleTargets.size, translationModels)
+    return baseModel(
+      asset,
+      current,
+      outdated,
+      visibleTargets.size,
+      translationModels,
+      transcripts[asset.sourceLanguage.id]?.text,
+    )
   }
 
   private fun toTranslationModel(
     asset: BinaryAsset,
     language: LanguageDto,
     translation: BinaryAssetTranslation?,
+    transcript: BinaryAssetTranscriptService.TranscriptText?,
   ): BinaryAssetTranslationModel {
     val status = binaryAssetService.statusFor(asset, language.id, translation)
     return BinaryAssetTranslationModel(
@@ -84,6 +94,8 @@ class BinaryAssetModelAssembler(
       sha256 = translation?.sha256,
       uploadedById = translation?.uploadedBy?.id,
       updatedAt = translation?.updatedAt,
+      transcriptText = transcript?.text,
+      transcriptState = transcript?.state,
     )
   }
 
@@ -93,6 +105,7 @@ class BinaryAssetModelAssembler(
     outdated: Int,
     targetCount: Int,
     translations: List<BinaryAssetTranslationModel>?,
+    transcriptSourceText: String? = null,
   ): BinaryAssetModel =
     BinaryAssetModel(
       id = asset.id,
@@ -111,6 +124,11 @@ class BinaryAssetModelAssembler(
       currentCount = current,
       outdatedCount = outdated,
       targetLanguageCount = targetCount,
+      transcriptKeyId = asset.transcriptKey?.id,
+      transcriptKeyName = asset.transcriptKey?.name,
+      transcriptKeyOwned = asset.transcriptKeyOwned,
+      transcriptKeyDeleted = asset.transcriptKey?.deletedAt != null,
+      transcriptSourceText = transcriptSourceText,
       translations = translations,
     )
 

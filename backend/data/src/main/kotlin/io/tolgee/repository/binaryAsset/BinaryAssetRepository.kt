@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
 
@@ -196,4 +197,28 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
     """,
   )
   fun getBinaryAssetStats(projectId: Long): BinaryAssetStatsDto
+
+  /**
+   * There is no DB-level cascade from key, and deletion is ordered manually in application code,
+   * so every key hard-delete path must drop this reference first or the FK blocks the delete.
+   */
+  @Modifying
+  @Query(
+    """
+    update BinaryAsset a
+    set a.transcriptKey = null, a.transcriptKeyOwned = false
+    where a.transcriptKey.id in :keyIds
+    """,
+  )
+  fun clearTranscriptKeyByKeyIdIn(keyIds: Collection<Long>)
+
+  @Modifying
+  @Query(
+    """
+    update BinaryAsset a
+    set a.transcriptKey = null, a.transcriptKeyOwned = false
+    where a.transcriptKey.id in (select k.id from Key k where k.project.id = :projectId)
+    """,
+  )
+  fun clearTranscriptKeyByKeyProjectId(projectId: Long)
 }

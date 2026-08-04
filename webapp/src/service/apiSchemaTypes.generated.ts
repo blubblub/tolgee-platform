@@ -26,6 +26,7 @@ export type BatchJobModel = components['schemas']['BatchJobModel'];
 export type BigMetaDto = components['schemas']['BigMetaDto'];
 export type BinaryAssetDownloadTicketModel = components['schemas']['BinaryAssetDownloadTicketModel'];
 export type BinaryAssetModel = components['schemas']['BinaryAssetModel'];
+export type BinaryAssetTranscriptRequest = components['schemas']['BinaryAssetTranscriptRequest'];
 export type BinaryAssetTranslationModel = components['schemas']['BinaryAssetTranslationModel'];
 export type BinaryAssetUpdateRequest = components['schemas']['BinaryAssetUpdateRequest'];
 export type BranchMergeChangeModel = components['schemas']['BranchMergeChangeModel'];
