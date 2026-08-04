@@ -69,6 +69,7 @@ class ProjectStatsController(
         .sortedBy { languages[it.languageId]?.base == false }
 
     val totals = projectStatsService.computeProjectTotals(baseLanguage, languageStats)
+    val binaryAssetStats = projectStatsService.getBinaryAssetStats(projectHolder.project.id, languages.size)
 
     val statsLanguagePairs =
       languageStats.mapNotNull {
@@ -86,6 +87,10 @@ class ProjectStatsController(
       reviewedPercentage = totals.reviewedPercent,
       membersCount = visibleMembersCount(projectStats.memberCount),
       tagCount = projectStats.tagCount,
+      binaryAssetCount = binaryAssetStats.assetCount,
+      currentBinaryAssetTranslationCount = binaryAssetStats.currentTranslationCount,
+      outdatedBinaryAssetTranslationCount = binaryAssetStats.outdatedTranslationCount,
+      missingBinaryAssetTranslationCount = binaryAssetStats.missingTranslationCount,
       languageStats =
         statsLanguagePairs.map {
           languageStatsModelAssembler.toModel(it)

@@ -191,11 +191,19 @@ export const AssetsView = () => {
 
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
         {filterLabel
-          ? t('binary_assets_filter_summary', '{count} assets · filter: {filter}', {
-              count: total,
-              filter: filterLabel,
-            })
-          : t('binary_assets_count', '{count} assets', { count: total })}
+          ? t(
+              'binary_assets_filter_summary',
+              '{count, plural, one {# asset} other {# assets}} · filter: {filter}',
+              {
+                count: total,
+                filter: filterLabel,
+              }
+            )
+          : t(
+              'binary_assets_count',
+              '{count, plural, one {# asset} other {# assets}}',
+              { count: total }
+            )}
       </Typography>
 
       {listQuery.isError && (

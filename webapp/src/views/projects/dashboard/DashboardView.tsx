@@ -9,6 +9,7 @@ import { ProjectLanguagesProvider } from 'tg.hooks/ProjectLanguagesProvider';
 import { useProjectPermissions } from 'tg.hooks/useProjectPermissions';
 
 import { ProjectTotals } from './ProjectTotals';
+import { AssetTranslationStats } from './AssetTranslationStats';
 import { LanguageStats } from './LanguageStats/LanguageStats';
 import { DailyActivityChart } from './DailyActivityChart';
 import { ActivityList } from './ActivityList';
@@ -141,6 +142,11 @@ export const DashboardView = () => {
             </StyledTopInfo>
             <Box gridArea="totalStats">
               <ProjectTotals stats={statsLoadable.data!} />
+              {statsLoadable.data!.binaryAssetCount > 0 && (
+                <Box marginTop={2}>
+                  <AssetTranslationStats stats={statsLoadable.data!} />
+                </Box>
+              )}
               {project.description && (
                 <Box marginTop={2} display="grid">
                   <ProjectDescription description={project.description} />

@@ -1,10 +1,12 @@
 import { T } from '@tolgee/react';
 import { ActivityOptions, ActivityTypeEnum } from './types';
 import { BranchNameChipNode } from 'tg.component/branching/BranchNameChip';
+import { binaryAssetConfiguration } from './binaryAssetConfiguration';
 
 export const actionsConfiguration: Partial<
   Record<ActivityTypeEnum, ActivityOptions>
 > = {
+  ...binaryAssetConfiguration,
   CREATE_PROJECT: {
     label(params) {
       return <T keyName="activity_create_project" params={params} />;

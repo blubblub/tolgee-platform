@@ -1,5 +1,6 @@
 package io.tolgee.repository.binaryAsset
 
+import io.tolgee.dtos.queryResults.BinaryAssetStatsDto
 import io.tolgee.model.binaryAsset.BinaryAsset
 import jakarta.persistence.LockModeType
 import org.springframework.context.annotation.Lazy
@@ -177,4 +178,22 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
     """,
   )
   fun findAllWithTranslationsByLanguageId(languageId: Long): List<BinaryAsset>
+
+  @Query(
+    """
+    select new io.tolgee.dtos.queryResults.BinaryAssetStatsDto(
+      count(distinct a.id),
+      coalesce(sum(case when t.id is not null
+        and t.language.id <> a.sourceLanguage.id
+        and t.sourceRevision = a.sourceRevision then 1 else 0 end), 0),
+      coalesce(sum(case when t.id is not null
+        and t.language.id <> a.sourceLanguage.id
+        and t.sourceRevision <> a.sourceRevision then 1 else 0 end), 0)
+    )
+    from BinaryAsset a
+    left join a.translations t
+    where a.project.id = :projectId
+    """,
+  )
+  fun getBinaryAssetStats(projectId: Long): BinaryAssetStatsDto
 }

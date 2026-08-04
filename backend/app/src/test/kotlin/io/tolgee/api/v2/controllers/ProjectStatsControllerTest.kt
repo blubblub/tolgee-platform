@@ -7,12 +7,18 @@ import io.tolgee.fixtures.andIsOk
 import io.tolgee.fixtures.andPrettyPrint
 import io.tolgee.fixtures.isValidId
 import io.tolgee.fixtures.node
+import io.tolgee.model.Language
+import io.tolgee.model.binaryAsset.BinaryAsset
+import io.tolgee.model.binaryAsset.BinaryAssetTranslation
 import io.tolgee.model.enums.Scope
+import io.tolgee.repository.binaryAsset.BinaryAssetRepository
+import io.tolgee.repository.binaryAsset.BinaryAssetTranslationRepository
 import io.tolgee.testing.annotations.ProjectApiKeyAuthTestMethod
 import io.tolgee.testing.annotations.ProjectJWTAuthTestMethod
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
 import java.math.BigDecimal
 import java.text.SimpleDateFormat
 
@@ -22,6 +28,12 @@ class ProjectStatsControllerTest : ProjectAuthControllerTest("/v2/projects/") {
   private var activityCounter = 0
 
   var format: SimpleDateFormat = SimpleDateFormat("yyyy-MM-dd")
+
+  @Autowired
+  lateinit var binaryAssetRepository: BinaryAssetRepository
+
+  @Autowired
+  lateinit var binaryAssetTranslationRepository: BinaryAssetTranslationRepository
 
   @BeforeEach
   fun setup() {
@@ -50,6 +62,10 @@ class ProjectStatsControllerTest : ProjectAuthControllerTest("/v2/projects/") {
       node("reviewedPercentage").isNumber.isLessThan(BigDecimal(14.5)).isGreaterThan(BigDecimal(14))
       node("membersCount").isEqualTo(1)
       node("tagCount").isEqualTo(3)
+      node("binaryAssetCount").isEqualTo(0)
+      node("currentBinaryAssetTranslationCount").isEqualTo(0)
+      node("outdatedBinaryAssetTranslationCount").isEqualTo(0)
+      node("missingBinaryAssetTranslationCount").isEqualTo(0)
       node("languageStats") {
         isArray
         node("[0]") {
@@ -100,6 +116,61 @@ class ProjectStatsControllerTest : ProjectAuthControllerTest("/v2/projects/") {
   fun `hides member count from API key lacking members-view`() {
     performProjectAuthGet("stats").andIsOk.andAssertThatJson {
       node("membersCount").isEqualTo(0)
+    }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `returns binary asset stats with current outdated and missing semantics`() {
+    val project = projectSupplier!!()
+    val sourceLanguage = testData.englishLanguage
+    val targetLanguage = testData.germanLanguage
+
+    fun createAsset(name: String, sourceRevision: Long): BinaryAsset {
+      val asset = BinaryAsset(project).apply {
+        this.name = name
+        this.sourceLanguage = sourceLanguage
+        this.sourceRevision = sourceRevision
+        this.storageKey = "test/$name"
+        this.originalFilename = "$name.bin"
+        this.contentType = "application/octet-stream"
+        this.sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+      return binaryAssetRepository.save(asset)
+    }
+
+    fun createTranslation(
+      asset: BinaryAsset,
+      language: Language,
+      sourceRevision: Long,
+    ) {
+      val translation = BinaryAssetTranslation(asset).apply {
+        this.language = language
+        this.sourceRevision = sourceRevision
+        this.storageKey = "test/${asset.name}-${language.tag}"
+        this.originalFilename = "${asset.name}-${language.tag}.bin"
+        this.contentType = "application/octet-stream"
+        this.sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+      binaryAssetTranslationRepository.save(translation)
+    }
+
+    // Asset A: sourceRevision=3, de translation at sourceRevision=3 -> CURRENT
+    val assetA = createAsset("asset-a", 3)
+    createTranslation(assetA, targetLanguage, 3)
+
+    // Asset B: sourceRevision=2, de translation at sourceRevision=1 -> OUTDATED
+    val assetB = createAsset("asset-b", 2)
+    createTranslation(assetB, targetLanguage, 1)
+
+    // Asset C: sourceRevision=1, no de translation -> MISSING
+    createAsset("asset-c", 1)
+
+    performProjectAuthGet("stats").andIsOk.andAssertThatJson {
+      node("binaryAssetCount").isEqualTo(3)
+      node("currentBinaryAssetTranslationCount").isEqualTo(1)
+      node("outdatedBinaryAssetTranslationCount").isEqualTo(1)
+      node("missingBinaryAssetTranslationCount").isEqualTo(1)
     }
   }
 

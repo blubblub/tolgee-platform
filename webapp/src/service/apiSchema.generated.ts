@@ -98,7 +98,7 @@ export interface paths {
   "/v2/api-keys": {
     get: operations["allByUser"];
     /** Creates new API key with provided scopes */
-    post: operations["create_19"];
+    post: operations["create_20"];
   };
   "/v2/api-keys/availableScopes": {
     get: operations["getScopes"];
@@ -112,15 +112,15 @@ export interface paths {
     get: operations["getCurrentPermissions"];
   };
   "/v2/api-keys/{apiKeyId}": {
-    put: operations["update_13"];
-    delete: operations["delete_12"];
+    put: operations["update_14"];
+    delete: operations["delete_13"];
   };
   "/v2/api-keys/{apiKeyId}/regenerate": {
     put: operations["regenerate_1"];
   };
   "/v2/api-keys/{keyId}": {
     /** Returns specific API key info */
-    get: operations["get_26"];
+    get: operations["get_27"];
   };
   "/v2/auth-provider": {
     get: operations["getCurrentAuthProvider"];
@@ -130,6 +130,10 @@ export interface paths {
     get: operations["getChangedAuthProvider"];
     post: operations["acceptChangeAuthProvider"];
     delete: operations["rejectChangeAuthProvider"];
+  };
+  "/v2/binary-assets/download": {
+    /** Pass inline=true (or omit when content type is audio/image/video) to stream with Content-Disposition: inline so browsers can play/preview in-page. */
+    get: operations["download"];
   };
   "/v2/ee-current-subscription-usage": {
     get: operations["getUsage_1"];
@@ -156,7 +160,7 @@ export interface paths {
     post: operations["upload"];
   };
   "/v2/image-upload/{ids}": {
-    delete: operations["delete_19"];
+    delete: operations["delete_20"];
   };
   "/v2/invitations/{code}/accept": {
     get: operations["acceptInvitation"];
@@ -180,13 +184,13 @@ export interface paths {
   "/v2/organizations": {
     /** Returns all organizations, which is current user allowed to view */
     get: operations["getAll_10"];
-    post: operations["create_14"];
+    post: operations["create_15"];
   };
   "/v2/organizations/{id}": {
-    get: operations["get_17"];
-    put: operations["update_12"];
+    get: operations["get_18"];
+    put: operations["update_13"];
     /** Deletes organization and all its data including projects */
-    delete: operations["delete_11"];
+    delete: operations["delete_12"];
   };
   "/v2/organizations/{id}/avatar": {
     put: operations["uploadAvatar_2"];
@@ -214,15 +218,15 @@ export interface paths {
   };
   "/v2/organizations/{organizationId}/glossaries": {
     get: operations["getAll_13"];
-    post: operations["create_17"];
+    post: operations["create_18"];
   };
   "/v2/organizations/{organizationId}/glossaries-with-stats": {
     get: operations["getAllWithStats_1"];
   };
   "/v2/organizations/{organizationId}/glossaries/{glossaryId}": {
-    get: operations["get_15"];
-    put: operations["update_10"];
-    delete: operations["delete_9"];
+    get: operations["get_16"];
+    put: operations["update_11"];
+    delete: operations["delete_10"];
   };
   "/v2/organizations/{organizationId}/glossaries/{glossaryId}/assigned-projects": {
     get: operations["getAssignedProjects_1"];
@@ -238,19 +242,19 @@ export interface paths {
   };
   "/v2/organizations/{organizationId}/glossaries/{glossaryId}/terms": {
     get: operations["getAll_14"];
-    post: operations["create_18"];
+    post: operations["create_19"];
     delete: operations["deleteMultiple"];
   };
   "/v2/organizations/{organizationId}/glossaries/{glossaryId}/terms/{termId}": {
-    get: operations["get_16"];
-    put: operations["update_11"];
-    delete: operations["delete_10"];
+    get: operations["get_17"];
+    put: operations["update_12"];
+    delete: operations["delete_11"];
   };
   "/v2/organizations/{organizationId}/glossaries/{glossaryId}/terms/{termId}/translations": {
-    post: operations["update_14"];
+    post: operations["update_15"];
   };
   "/v2/organizations/{organizationId}/glossaries/{glossaryId}/terms/{termId}/translations/{languageTag}": {
-    get: operations["get_25"];
+    get: operations["get_26"];
   };
   "/v2/organizations/{organizationId}/glossaries/{glossaryId}/termsIds": {
     get: operations["getAllIds"];
@@ -321,7 +325,7 @@ export interface paths {
   };
   "/v2/organizations/{organizationId}/translation-memories": {
     get: operations["getAll_11"];
-    post: operations["create_15"];
+    post: operations["create_16"];
   };
   "/v2/organizations/{organizationId}/translation-memories-with-stats": {
     get: operations["getAllWithStats"];
@@ -331,17 +335,17 @@ export interface paths {
     get: operations["getEntryCounts"];
   };
   "/v2/organizations/{organizationId}/translation-memories/{translationMemoryId}": {
-    get: operations["get_13"];
-    put: operations["update_8"];
-    delete: operations["delete_7"];
+    get: operations["get_14"];
+    put: operations["update_9"];
+    delete: operations["delete_8"];
   };
   "/v2/organizations/{organizationId}/translation-memories/{translationMemoryId}/assigned-projects": {
     get: operations["getAssignedProjects"];
   };
   "/v2/organizations/{organizationId}/translation-memories/{translationMemoryId}/entries": {
     /** Pagination is row-level: each STORED bucket (manual entries on a source collapse into one row; each TMX `tuid` is its own row) and each VIRTUAL origin (one row per project key) gets its own page item. The `targetLanguageTag` filter narrows the *cells* of a row to a subset of target languages; rows themselves still appear with empty cells so the user can add a translation. */
-    get: operations["list_3"];
-    post: operations["create_16"];
+    get: operations["list_4"];
+    post: operations["create_17"];
     /** For every entry ID in the payload, deletes the entire group that shares the same source text (and key). The request is deduplicated to distinct groups so passing multiple entries from the same row is a no-op past the first one. */
     delete: operations["deleteMultipleGroups"];
   };
@@ -354,9 +358,9 @@ export interface paths {
     post: operations["createMultiple"];
   };
   "/v2/organizations/{organizationId}/translation-memories/{translationMemoryId}/entries/{entryId}": {
-    get: operations["get_14"];
-    put: operations["update_9"];
-    delete: operations["delete_8"];
+    get: operations["get_15"];
+    put: operations["update_10"];
+    delete: operations["delete_9"];
   };
   "/v2/organizations/{organizationId}/translation-memories/{translationMemoryId}/entries/{entryId}/group": {
     /** Deletes every entry that shares the same source text (and key) as the given entry — i.e. the entire translation-unit group visible as one row in the UI. */
@@ -384,7 +388,7 @@ export interface paths {
     put: operations["setUserRole"];
   };
   "/v2/organizations/{slug}": {
-    get: operations["get_24"];
+    get: operations["get_25"];
   };
   "/v2/organizations/{slug}/projects": {
     /** Returns all organization projects the user has access to */
@@ -396,18 +400,18 @@ export interface paths {
   };
   "/v2/pats": {
     get: operations["getAll_9"];
-    post: operations["create_13"];
+    post: operations["create_14"];
   };
   "/v2/pats/current": {
     /** Returns current Personal Access Token. If the request is not authenticated with a Personal Access Token, it will return 400 response status. */
     get: operations["getCurrent"];
   };
   "/v2/pats/{id}": {
-    get: operations["get_12"];
+    get: operations["get_13"];
     /** Updates Personal Access Token */
-    put: operations["update_7"];
+    put: operations["update_8"];
     /** Deletes Personal Access Token */
-    delete: operations["delete_6"];
+    delete: operations["delete_7"];
   };
   "/v2/pats/{id}/regenerate": {
     /** Regenerates Personal Access Token. It generates new token value and updates its time of expiration. */
@@ -474,10 +478,10 @@ export interface paths {
     delete: operations["removeAvatar_1"];
   };
   "/v2/projects/{projectId}/batch-jobs": {
-    get: operations["list_4"];
+    get: operations["list_5"];
   };
   "/v2/projects/{projectId}/batch-jobs/{id}": {
-    get: operations["get_22"];
+    get: operations["get_23"];
   };
   "/v2/projects/{projectId}/batch-jobs/{id}/cancel": {
     /** Stops batch operation if possible. */
@@ -486,6 +490,28 @@ export interface paths {
   "/v2/projects/{projectId}/big-meta": {
     /** Stores a bigMeta for a project */
     post: operations["store_2"];
+  };
+  "/v2/projects/{projectId}/binary-assets": {
+    get: operations["list_3"];
+    post: operations["create_13"];
+  };
+  "/v2/projects/{projectId}/binary-assets/{assetId}": {
+    get: operations["get_12"];
+    put: operations["update_7"];
+    delete: operations["delete_6"];
+  };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/source": {
+    put: operations["replaceSource"];
+  };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/source/download-ticket": {
+    post: operations["sourceDownloadTicket"];
+  };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}": {
+    put: operations["upsertTranslation"];
+    delete: operations["deleteTranslation"];
+  };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/download-ticket": {
+    post: operations["translationDownloadTicket"];
   };
   "/v2/projects/{projectId}/branches": {
     get: operations["all"];
@@ -529,7 +555,7 @@ export interface paths {
   };
   "/v2/projects/{projectId}/branches/{branchId}": {
     post: operations["rename"];
-    delete: operations["delete_15"];
+    delete: operations["delete_16"];
   };
   "/v2/projects/{projectId}/branches/{branchId}/protected": {
     post: operations["setProtected"];
@@ -701,7 +727,7 @@ export interface paths {
     get: operations["getAll_7"];
     post: operations["create_6"];
     /** Delete one or multiple keys by their IDs in request body. Useful for larger requests esxceeding allowed URL length. */
-    delete: operations["delete_13"];
+    delete: operations["delete_14"];
   };
   "/v2/projects/{projectId}/keys/create": {
     post: operations["create_5"];
@@ -734,7 +760,7 @@ export interface paths {
     get: operations["selectKeys_2"];
   };
   "/v2/projects/{projectId}/keys/trash": {
-    get: operations["list_8"];
+    get: operations["list_9"];
   };
   "/v2/projects/{projectId}/keys/trash/deleters": {
     get: operations["listDeleters"];
@@ -749,7 +775,7 @@ export interface paths {
     put: operations["restore"];
   };
   "/v2/projects/{projectId}/keys/{ids}": {
-    delete: operations["delete_17"];
+    delete: operations["delete_18"];
   };
   "/v2/projects/{projectId}/keys/{id}": {
     get: operations["get_8"];
@@ -1058,7 +1084,7 @@ export interface paths {
   };
   "/v2/projects/{projectId}/translation-memories": {
     /** Always readable. When the TRANSLATION_MEMORY feature is not enabled for the organization, only the project-type assignment (if any) is returned so the settings page can still show the row that already drives in-project suggestions. */
-    get: operations["list_6"];
+    get: operations["list_7"];
   };
   "/v2/projects/{projectId}/translation-memories/project-tm-settings": {
     /** Sets TM-level flags on the project's own PROJECT-type TM. The shared-TM update endpoint rejects PROJECT TMs; this narrow endpoint exists so project admins can toggle the `writeOnlyReviewed` flag without org-level privileges. */
@@ -1180,14 +1206,14 @@ export interface paths {
   };
   "/v2/public/configuration-properties": {
     /** Return server configuration properties documentation */
-    get: operations["get_21"];
+    get: operations["get_22"];
   };
   "/v2/public/export-info/formats": {
-    get: operations["get_20"];
+    get: operations["get_21"];
   };
   "/v2/public/initial-data": {
     /** Returns initial data required by the UI to load */
-    get: operations["get_19"];
+    get: operations["get_20"];
   };
   "/v2/public/machine-translation-providers": {
     /** Get machine translation providers */
@@ -1265,7 +1291,7 @@ export interface paths {
     delete: operations["delete"];
   };
   "/v2/user-preferences": {
-    get: operations["get_18"];
+    get: operations["get_19"];
   };
   "/v2/user-preferences/set-language/{languageTag}": {
     put: operations["setLanguage"];
@@ -1667,6 +1693,61 @@ export interface components {
     BigMetaDto: {
       /** @description Keys in the document used as a context for machine translation. Keys in the same order as they appear in the document. The order is important! We are using it for graph distance calculation. */
       relatedKeysInOrder?: components["schemas"]["RelatedKeyDto"][];
+    };
+    BinaryAssetDownloadTicketModel: {
+      url: string;
+    };
+    BinaryAssetModel: {
+      /** Format: int64 */
+      byteSize: number;
+      contentType: string;
+      /** Format: date-time */
+      createdAt?: string;
+      /** Format: int32 */
+      currentCount: number;
+      description?: string;
+      /** Format: int64 */
+      id: number;
+      name: string;
+      originalFilename: string;
+      /** Format: int32 */
+      outdatedCount: number;
+      sha256: string;
+      /** Format: int64 */
+      sourceLanguageId: number;
+      sourceLanguageTag: string;
+      /** Format: int64 */
+      sourceRevision: number;
+      /** Format: int32 */
+      targetLanguageCount: number;
+      translations?: components["schemas"]["BinaryAssetTranslationModel"][];
+      /** Format: date-time */
+      updatedAt?: string;
+      /** Format: int64 */
+      uploadedById?: number;
+    };
+    BinaryAssetTranslationModel: {
+      /** Format: int64 */
+      byteSize?: number;
+      contentType?: string;
+      /** Format: int64 */
+      languageId: number;
+      languageName: string;
+      languageTag: string;
+      originalFilename?: string;
+      sha256?: string;
+      /** Format: int64 */
+      sourceRevision?: number;
+      /** @enum {string} */
+      status: "MISSING" | "CURRENT" | "OUTDATED";
+      /** Format: date-time */
+      updatedAt?: string;
+      /** Format: int64 */
+      uploadedById?: number;
+    };
+    BinaryAssetUpdateRequest: {
+      description?: string;
+      name: string;
     };
     BranchMergeChangeModel: {
       /** @description Languages changed by the merge */
@@ -3210,7 +3291,19 @@ export interface components {
         | "source_and_target_plan_must_be_different"
         | "project_import_version_mismatch"
         | "project_import_missing_project_json"
-        | "project_import_corrupt_archive";
+        | "project_import_corrupt_archive"
+        | "binary_asset_not_found"
+        | "binary_asset_translation_not_found"
+        | "binary_asset_name_exists"
+        | "binary_asset_name_required"
+        | "binary_asset_name_too_long"
+        | "binary_asset_language_is_source"
+        | "binary_asset_target_is_source_language"
+        | "binary_asset_invalid_source_revision"
+        | "binary_asset_storage_not_streaming"
+        | "file_empty"
+        | "file_name_too_long"
+        | "file_name_not_valid";
       params?: unknown[];
     };
     ExistenceEntityDescription: {
@@ -4615,6 +4708,12 @@ export interface components {
       };
       page?: components["schemas"]["PageMetadata"];
     };
+    PagedModelBinaryAssetModel: {
+      _embedded?: {
+        binaryAssets?: components["schemas"]["BinaryAssetModel"][];
+      };
+      page?: components["schemas"]["PageMetadata"];
+    };
     PagedModelBranchMergeChangeModel: {
       _embedded?: {
         branchMergeChanges?: components["schemas"]["BranchMergeChangeModel"][];
@@ -5284,6 +5383,12 @@ export interface components {
         | "TRANSLATION_COMMENT_SET_STATE"
         | "SCREENSHOT_DELETE"
         | "SCREENSHOT_ADD"
+        | "BINARY_ASSET_CREATE"
+        | "BINARY_ASSET_UPDATE"
+        | "BINARY_ASSET_DELETE"
+        | "BINARY_ASSET_SOURCE_REPLACE"
+        | "BINARY_ASSET_TRANSLATION_UPSERT"
+        | "BINARY_ASSET_TRANSLATION_DELETE"
         | "KEY_TAGS_EDIT"
         | "KEY_NAME_EDIT"
         | "KEY_CHARACTER_LIMIT_EDIT"
@@ -5518,12 +5623,20 @@ export interface components {
       /** Format: int64 */
       baseWordsCount: number;
       /** Format: int64 */
+      binaryAssetCount: number;
+      /** Format: int64 */
+      currentBinaryAssetTranslationCount: number;
+      /** Format: int64 */
       keyCount: number;
       /** Format: int32 */
       languageCount: number;
       languageStats: components["schemas"]["LanguageStatsModel"][];
       /** Format: int64 */
       membersCount: number;
+      /** Format: int64 */
+      missingBinaryAssetTranslationCount: number;
+      /** Format: int64 */
+      outdatedBinaryAssetTranslationCount: number;
       /** Format: int64 */
       projectId: number;
       /** Format: double */
@@ -7049,7 +7162,19 @@ export interface components {
         | "source_and_target_plan_must_be_different"
         | "project_import_version_mismatch"
         | "project_import_missing_project_json"
-        | "project_import_corrupt_archive";
+        | "project_import_corrupt_archive"
+        | "binary_asset_not_found"
+        | "binary_asset_translation_not_found"
+        | "binary_asset_name_exists"
+        | "binary_asset_name_required"
+        | "binary_asset_name_too_long"
+        | "binary_asset_language_is_source"
+        | "binary_asset_target_is_source_language"
+        | "binary_asset_invalid_source_revision"
+        | "binary_asset_storage_not_streaming"
+        | "file_empty"
+        | "file_name_too_long"
+        | "file_name_not_valid";
       params?: unknown[];
       success: boolean;
     };
@@ -8852,7 +8977,7 @@ export interface operations {
     };
   };
   /** Creates new API key with provided scopes */
-  create_19: {
+  create_20: {
     responses: {
       /** OK */
       200: {
@@ -9001,7 +9126,7 @@ export interface operations {
       };
     };
   };
-  update_13: {
+  update_14: {
     parameters: {
       path: {
         apiKeyId: number;
@@ -9045,7 +9170,7 @@ export interface operations {
       };
     };
   };
-  delete_12: {
+  delete_13: {
     parameters: {
       path: {
         apiKeyId: number;
@@ -9125,7 +9250,7 @@ export interface operations {
     };
   };
   /** Returns specific API key info */
-  get_26: {
+  get_27: {
     parameters: {
       path: {
         keyId: number;
@@ -9305,6 +9430,47 @@ export interface operations {
     responses: {
       /** OK */
       200: unknown;
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  /** Pass inline=true (or omit when content type is audio/image/video) to stream with Content-Disposition: inline so browsers can play/preview in-page. */
+  download: {
+    parameters: {
+      query: {
+        token: string;
+        inline?: boolean;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["StreamingResponseBody"];
+        };
+      };
       /** Bad Request */
       400: {
         content: {
@@ -9587,7 +9753,7 @@ export interface operations {
       };
     };
   };
-  delete_19: {
+  delete_20: {
     parameters: {
       path: {
         ids: number[];
@@ -9935,7 +10101,7 @@ export interface operations {
       };
     };
   };
-  create_14: {
+  create_15: {
     responses: {
       /** OK */
       200: {
@@ -9974,7 +10140,7 @@ export interface operations {
       };
     };
   };
-  get_17: {
+  get_18: {
     parameters: {
       path: {
         id: number;
@@ -10013,7 +10179,7 @@ export interface operations {
       };
     };
   };
-  update_12: {
+  update_13: {
     parameters: {
       path: {
         id: number;
@@ -10058,7 +10224,7 @@ export interface operations {
     };
   };
   /** Deletes organization and all its data including projects */
-  delete_11: {
+  delete_12: {
     parameters: {
       path: {
         id: number;
@@ -10462,7 +10628,7 @@ export interface operations {
       };
     };
   };
-  create_17: {
+  create_18: {
     parameters: {
       path: {
         organizationId: number;
@@ -10554,7 +10720,7 @@ export interface operations {
       };
     };
   };
-  get_15: {
+  get_16: {
     parameters: {
       path: {
         organizationId: number;
@@ -10594,7 +10760,7 @@ export interface operations {
       };
     };
   };
-  update_10: {
+  update_11: {
     parameters: {
       path: {
         organizationId: number;
@@ -10639,7 +10805,7 @@ export interface operations {
       };
     };
   };
-  delete_9: {
+  delete_10: {
     parameters: {
       path: {
         organizationId: number;
@@ -10896,7 +11062,7 @@ export interface operations {
       };
     };
   };
-  create_18: {
+  create_19: {
     parameters: {
       path: {
         organizationId: number;
@@ -10982,7 +11148,7 @@ export interface operations {
       };
     };
   };
-  get_16: {
+  get_17: {
     parameters: {
       path: {
         organizationId: number;
@@ -11023,7 +11189,7 @@ export interface operations {
       };
     };
   };
-  update_11: {
+  update_12: {
     parameters: {
       path: {
         organizationId: number;
@@ -11069,7 +11235,7 @@ export interface operations {
       };
     };
   };
-  delete_10: {
+  delete_11: {
     parameters: {
       path: {
         organizationId: number;
@@ -11106,7 +11272,7 @@ export interface operations {
       };
     };
   };
-  update_14: {
+  update_15: {
     parameters: {
       path: {
         organizationId: number;
@@ -11152,7 +11318,7 @@ export interface operations {
       };
     };
   };
-  get_25: {
+  get_26: {
     parameters: {
       path: {
         organizationId: number;
@@ -12084,7 +12250,7 @@ export interface operations {
       };
     };
   };
-  create_15: {
+  create_16: {
     parameters: {
       path: {
         organizationId: number;
@@ -12220,7 +12386,7 @@ export interface operations {
       };
     };
   };
-  get_13: {
+  get_14: {
     parameters: {
       path: {
         organizationId: number;
@@ -12260,7 +12426,7 @@ export interface operations {
       };
     };
   };
-  update_8: {
+  update_9: {
     parameters: {
       path: {
         organizationId: number;
@@ -12305,7 +12471,7 @@ export interface operations {
       };
     };
   };
-  delete_7: {
+  delete_8: {
     parameters: {
       path: {
         organizationId: number;
@@ -12382,7 +12548,7 @@ export interface operations {
     };
   };
   /** Pagination is row-level: each STORED bucket (manual entries on a source collapse into one row; each TMX `tuid` is its own row) and each VIRTUAL origin (one row per project key) gets its own page item. The `targetLanguageTag` filter narrows the *cells* of a row to a subset of target languages; rows themselves still appear with empty cells so the user can add a translation. */
-  list_3: {
+  list_4: {
     parameters: {
       path: {
         organizationId: number;
@@ -12432,7 +12598,7 @@ export interface operations {
       };
     };
   };
-  create_16: {
+  create_17: {
     parameters: {
       path: {
         organizationId: number;
@@ -12609,7 +12775,7 @@ export interface operations {
       };
     };
   };
-  get_14: {
+  get_15: {
     parameters: {
       path: {
         organizationId: number;
@@ -12650,7 +12816,7 @@ export interface operations {
       };
     };
   };
-  update_9: {
+  update_10: {
     parameters: {
       path: {
         organizationId: number;
@@ -12696,7 +12862,7 @@ export interface operations {
       };
     };
   };
-  delete_8: {
+  delete_9: {
     parameters: {
       path: {
         organizationId: number;
@@ -13022,7 +13188,7 @@ export interface operations {
       };
     };
   };
-  get_24: {
+  get_25: {
     parameters: {
       path: {
         slug: string;
@@ -13209,7 +13375,7 @@ export interface operations {
       };
     };
   };
-  create_13: {
+  create_14: {
     responses: {
       /** Created */
       201: {
@@ -13283,7 +13449,7 @@ export interface operations {
       };
     };
   };
-  get_12: {
+  get_13: {
     parameters: {
       path: {
         id: number;
@@ -13323,7 +13489,7 @@ export interface operations {
     };
   };
   /** Updates Personal Access Token */
-  update_7: {
+  update_8: {
     parameters: {
       path: {
         id: number;
@@ -13368,7 +13534,7 @@ export interface operations {
     };
   };
   /** Deletes Personal Access Token */
-  delete_6: {
+  delete_7: {
     parameters: {
       path: {
         id: number;
@@ -14308,7 +14474,7 @@ export interface operations {
       };
     };
   };
-  list_4: {
+  list_5: {
     parameters: {
       query: {
         /** Zero-based page index (0..N) */
@@ -14355,7 +14521,7 @@ export interface operations {
       };
     };
   };
-  get_22: {
+  get_23: {
     parameters: {
       path: {
         id: number;
@@ -14470,6 +14636,442 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["BigMetaDto"];
+      };
+    };
+  };
+  list_3: {
+    parameters: {
+      query: {
+        /** Zero-based page index (0..N) */
+        page?: number;
+        /** The size of the page to be returned */
+        size?: number;
+        /** Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported. */
+        sort?: string[];
+        search?: string;
+        filterMediaType?: string[];
+      };
+      path: {
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PagedModelBinaryAssetModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  create_13: {
+    parameters: {
+      path: {
+        projectId: number;
+      };
+    };
+    responses: {
+      /** Created */
+      201: {
+        content: {
+          "*/*": components["schemas"]["BinaryAssetModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": {
+          name: string;
+          description?: string;
+          sourceLanguageId?: string;
+          /** Format: binary */
+          file: string;
+        };
+      };
+    };
+  };
+  get_12: {
+    parameters: {
+      path: {
+        assetId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  update_7: {
+    parameters: {
+      path: {
+        assetId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BinaryAssetUpdateRequest"];
+      };
+    };
+  };
+  delete_6: {
+    parameters: {
+      path: {
+        assetId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** No Content */
+      204: never;
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  replaceSource: {
+    parameters: {
+      path: {
+        assetId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": {
+          /** Format: binary */
+          file: string;
+        };
+      };
+    };
+  };
+  sourceDownloadTicket: {
+    parameters: {
+      path: {
+        assetId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetDownloadTicketModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  upsertTranslation: {
+    parameters: {
+      path: {
+        assetId: number;
+        languageId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": {
+          /** Format: binary */
+          file: string;
+          translatedAgainstSourceRevision: string;
+        };
+      };
+    };
+  };
+  deleteTranslation: {
+    parameters: {
+      path: {
+        assetId: number;
+        languageId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** No Content */
+      204: never;
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  translationDownloadTicket: {
+    parameters: {
+      path: {
+        assetId: number;
+        languageId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetDownloadTicketModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
       };
     };
   };
@@ -15120,7 +15722,7 @@ export interface operations {
       };
     };
   };
-  delete_15: {
+  delete_16: {
     parameters: {
       path: {
         branchId: number;
@@ -17151,7 +17753,7 @@ export interface operations {
     };
   };
   /** Delete one or multiple keys by their IDs in request body. Useful for larger requests esxceeding allowed URL length. */
-  delete_13: {
+  delete_14: {
     parameters: {
       path: {
         projectId: number;
@@ -17677,7 +18279,7 @@ export interface operations {
       };
     };
   };
-  list_8: {
+  list_9: {
     parameters: {
       query: {
         /** Zero-based page index (0..N) */
@@ -18283,7 +18885,7 @@ export interface operations {
       };
     };
   };
-  delete_17: {
+  delete_18: {
     parameters: {
       path: {
         ids: number[];
@@ -22883,7 +23485,7 @@ export interface operations {
     };
   };
   /** Always readable. When the TRANSLATION_MEMORY feature is not enabled for the organization, only the project-type assignment (if any) is returned so the settings page can still show the row that already drives in-project suggestions. */
-  list_6: {
+  list_7: {
     parameters: {
       path: {
         projectId: number;
@@ -25121,7 +25723,7 @@ export interface operations {
     };
   };
   /** Return server configuration properties documentation */
-  get_21: {
+  get_22: {
     responses: {
       /** OK */
       200: {
@@ -25155,7 +25757,7 @@ export interface operations {
       };
     };
   };
-  get_20: {
+  get_21: {
     responses: {
       /** OK */
       200: {
@@ -25190,7 +25792,7 @@ export interface operations {
     };
   };
   /** Returns initial data required by the UI to load */
-  get_19: {
+  get_20: {
     responses: {
       /** OK */
       200: {
@@ -26068,7 +26670,7 @@ export interface operations {
       };
     };
   };
-  get_18: {
+  get_19: {
     responses: {
       /** OK */
       200: {

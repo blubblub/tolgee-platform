@@ -9,6 +9,7 @@ import io.tolgee.model.branching.Branch_
 import io.tolgee.model.key.Key_
 import io.tolgee.model.views.projectStats.ProjectStatsView
 import io.tolgee.repository.activity.ActivityRevisionRepository
+import io.tolgee.repository.binaryAsset.BinaryAssetRepository
 import io.tolgee.service.queryBuilders.ProjectStatsProvider
 import jakarta.persistence.EntityManager
 import jakarta.persistence.criteria.JoinType
@@ -21,12 +22,28 @@ import java.time.LocalDate
 class ProjectStatsService(
   private val entityManager: EntityManager,
   private val activityRevisionRepository: ActivityRevisionRepository,
+  private val binaryAssetRepository: BinaryAssetRepository,
 ) {
   fun getProjectStats(
     projectId: Long,
     branchId: Long? = null,
   ): ProjectStatsView {
     return ProjectStatsProvider(entityManager, projectId, branchId).getResult()
+  }
+
+  fun getBinaryAssetStats(
+    projectId: Long,
+    languageCount: Int,
+  ): BinaryAssetStats {
+    val stats = binaryAssetRepository.getBinaryAssetStats(projectId)
+    val expected = stats.assetCount * maxOf(languageCount - 1, 0)
+    val missing = maxOf(expected - stats.currentTranslationCount - stats.outdatedTranslationCount, 0)
+    return BinaryAssetStats(
+      assetCount = stats.assetCount,
+      currentTranslationCount = stats.currentTranslationCount,
+      outdatedTranslationCount = stats.outdatedTranslationCount,
+      missingTranslationCount = missing,
+    )
   }
 
   fun getProjectDailyActivity(projectId: Long): Map<LocalDate, Long> {
@@ -110,5 +127,12 @@ class ProjectStatsService(
   data class ProjectTotals(
     val languageCount: Long,
     val keyCount: Long,
+  )
+
+  data class BinaryAssetStats(
+    val assetCount: Long,
+    val currentTranslationCount: Long,
+    val outdatedTranslationCount: Long,
+    val missingTranslationCount: Long,
   )
 }
