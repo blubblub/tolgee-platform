@@ -44,11 +44,11 @@ class BinaryAssetControllerTest : ProjectAuthControllerTest("/v2/projects/") {
           node("originalFilename").isEqualTo("hero.psd")
           node("byteSize").isEqualTo(7)
           node("sha256").isString.hasSize(64)
-        }
-        .andReturn()
+        }.andReturn()
 
     val assetId =
-      com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+      com.fasterxml.jackson.module.kotlin
+        .jacksonObjectMapper()
         .readTree(create.response.contentAsString)
         .get("id")
         .asLong()
@@ -68,7 +68,8 @@ class BinaryAssetControllerTest : ProjectAuthControllerTest("/v2/projects/") {
         .andIsOk
         .andReturn()
     val ticketUrl =
-      com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+      com.fasterxml.jackson.module.kotlin
+        .jacksonObjectMapper()
         .readTree(ticketResponse.response.contentAsString)
         .get("url")
         .asText()

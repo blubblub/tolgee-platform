@@ -9,8 +9,8 @@ import io.tolgee.fixtures.andIsCreated
 import io.tolgee.fixtures.andIsNotFound
 import io.tolgee.fixtures.andIsOk
 import io.tolgee.repository.binaryAsset.BinaryAssetRepository
-import io.tolgee.service.key.KeyService
 import io.tolgee.service.binaryAsset.BinaryAssetTranscriptService
+import io.tolgee.service.key.KeyService
 import io.tolgee.testing.annotations.ProjectJWTAuthTestMethod
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -109,7 +109,8 @@ class BinaryAssetTranscriptControllerTest : ProjectAuthControllerTest("/v2/proje
     val assetId = createAsset("vox-owned")
     val response =
       performProjectAuthPost("binary-assets/$assetId/transcript", mapOf("text" to "Bye."))
-        .andIsOk.andReturn()
+        .andIsOk
+        .andReturn()
     val keyId =
       jacksonObjectMapper().readTree(response.response.contentAsString).get("transcriptKeyId").asLong()
 
@@ -203,7 +204,12 @@ class BinaryAssetTranscriptControllerTest : ProjectAuthControllerTest("/v2/proje
 
     val page =
       jacksonObjectMapper()
-        .readTree(performProjectAuthGet("binary-assets?size=100").andIsOk.andReturn().response.contentAsString)
+        .readTree(
+          performProjectAuthGet("binary-assets?size=100")
+            .andIsOk
+            .andReturn()
+            .response.contentAsString,
+        )
     val rows = page.get("_embedded").get("binaryAssets")
     val listed = rows.first { it.get("name").asText() == "vox-listed" }
     val unlisted = rows.first { it.get("name").asText() == "vox-unlisted" }
@@ -234,7 +240,12 @@ class BinaryAssetTranscriptControllerTest : ProjectAuthControllerTest("/v2/proje
 
     val detail =
       jacksonObjectMapper()
-        .readTree(performProjectAuthGet("binary-assets/$assetId").andIsOk.andReturn().response.contentAsString)
+        .readTree(
+          performProjectAuthGet("binary-assets/$assetId")
+            .andIsOk
+            .andReturn()
+            .response.contentAsString,
+        )
     val german = detail.get("translations").first { it.get("languageTag").asText() == "de" }
     assertThat(german.get("transcriptText").asText()).isEqualTo("Quelltext.")
     assertThat(german.get("transcriptState").asText()).isEqualTo("TRANSLATED")

@@ -126,8 +126,12 @@ class ProjectStatsControllerTest : ProjectAuthControllerTest("/v2/projects/") {
     val sourceLanguage = testData.englishLanguage
     val targetLanguage = testData.germanLanguage
 
-    fun createAsset(name: String, sourceRevision: Long): BinaryAsset {
-      val asset = BinaryAsset(project).apply {
+    fun createAsset(
+      name: String,
+      sourceRevision: Long,
+    ): BinaryAsset {
+      val asset =
+        BinaryAsset(project).apply {
         this.name = name
         this.sourceLanguage = sourceLanguage
         this.sourceRevision = sourceRevision
@@ -144,7 +148,8 @@ class ProjectStatsControllerTest : ProjectAuthControllerTest("/v2/projects/") {
       language: Language,
       sourceRevision: Long,
     ) {
-      val translation = BinaryAssetTranslation(asset).apply {
+      val translation =
+        BinaryAssetTranslation(asset).apply {
         this.language = language
         this.sourceRevision = sourceRevision
         this.storageKey = "test/${asset.name}-${language.tag}"
