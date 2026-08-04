@@ -190,6 +190,26 @@ class BinaryAssetController(
     return detailModel(projectId, assetId)
   }
 
+  @PostMapping("/{assetId}/transcript/generate/{languageId}")
+  @Operation(
+    summary = "Generate one language's transcript from its localized audio",
+    description =
+      "Transcribes the localized file for this language — not a translation of the source " +
+        "transcript — so the text matches what that language's voice actually says.",
+  )
+  @RequiresProjectPermissions([Scope.TRANSLATIONS_EDIT])
+  @AllowApiAccess
+  @RequestActivity(ActivityType.BINARY_ASSET_TRANSCRIPT_GENERATE)
+  fun generateTranslationTranscript(
+    @PathVariable assetId: Long,
+    @PathVariable languageId: Long,
+  ): BinaryAssetModel {
+    val projectId = projectHolder.project.id
+    securityService.checkLanguageTranslatePermission(projectId, listOf(languageId))
+    binaryAssetTranscriptService.transcribeTranslation(projectId, assetId, languageId)
+    return detailModel(projectId, assetId)
+  }
+
   @DeleteMapping("/{assetId}/transcript")
   @Operation(
     summary = "Remove a binary asset's transcript",

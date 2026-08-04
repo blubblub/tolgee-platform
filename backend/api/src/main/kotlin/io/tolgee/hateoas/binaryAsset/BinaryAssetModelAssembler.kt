@@ -64,7 +64,13 @@ class BinaryAssetModelAssembler(
       }
     val translationModels =
       visibleTargets.map { lang ->
-        toTranslationModel(asset, lang, byLang[lang.id], transcripts[lang.id])
+        toTranslationModel(
+          asset,
+          lang,
+          byLang[lang.id],
+          transcripts[lang.id],
+          binaryAssetTranscriptService.canTranscribe(asset),
+        )
       }
     var current = 0
     var outdated = 0
@@ -91,6 +97,7 @@ class BinaryAssetModelAssembler(
     language: LanguageDto,
     translation: BinaryAssetTranslation?,
     transcript: BinaryAssetTranscriptService.TranscriptText?,
+    assetTranscribable: Boolean,
   ): BinaryAssetTranslationModel {
     val status = binaryAssetService.statusFor(asset, language.id, translation)
     return BinaryAssetTranslationModel(
@@ -107,6 +114,8 @@ class BinaryAssetModelAssembler(
       updatedAt = translation?.updatedAt,
       transcriptText = transcript?.text,
       transcriptState = transcript?.state,
+      // only meaningful when this language actually has its own audio
+      transcriptionAvailable = assetTranscribable && status != BinaryAssetTranslationStatus.MISSING,
     )
   }
 

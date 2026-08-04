@@ -3,13 +3,17 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
+  IconButton,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import { Stars01 } from '@untitled-ui/icons-react';
 import { useTranslate } from '@tolgee/react';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
 import { useRouteMatch } from 'react-router-dom';
@@ -19,6 +23,7 @@ import { useProject } from 'tg.hooks/useProject';
 import { useProjectPermissions } from 'tg.hooks/useProjectPermissions';
 import { LINKS, PARAMS } from 'tg.constants/links';
 import { BoxLoading } from 'tg.component/common/BoxLoading';
+import { useApiMutation } from 'tg.service/http/useQueryApi';
 import { binaryAssetApi } from './binaryAssetApi';
 import { BinaryAssetPreview, previewKind } from './BinaryAssetPreview';
 import { AssetTranscript } from './AssetTranscript';
@@ -49,6 +54,14 @@ export const AssetView = () => {
     number | 'source' | null
   >(null);
   const [error, setError] = useState<string | null>(null);
+  const [generatingLanguageId, setGeneratingLanguageId] = useState<
+    number | null
+  >(null);
+
+  const generateLanguage = useApiMutation({
+    url: '/v2/projects/{projectId}/binary-assets/{assetId}/transcript/generate/{languageId}',
+    method: 'post',
+  });
 
   const canEdit = satisfiesPermission('keys.edit');
   const canTranslate = satisfiesPermission('translations.edit');
@@ -320,21 +333,68 @@ export const AssetView = () => {
                   data-cy="binary-asset-transcript-cell"
                 >
                   {asset.transcriptKeyName ? (
-                    <TranscriptEditor
-                      projectId={project.id}
-                      keyName={asset.transcriptKeyName}
-                      languageTag={row.languageTag}
-                      value={row.transcriptText}
-                      canEdit={satisfiesLanguageAccess(
-                        'translations.edit',
-                        row.languageId
-                      )}
-                      placeholder={t(
-                        'binary_assets_transcript_add_translation',
-                        'Add translation'
-                      )}
-                      onSaved={invalidate}
-                    />
+                    <Box display="flex" alignItems="flex-start" gap={0.5}>
+                      <Box flex={1} minWidth={0}>
+                        <TranscriptEditor
+                          projectId={project.id}
+                          keyName={asset.transcriptKeyName}
+                          languageTag={row.languageTag}
+                          value={row.transcriptText}
+                          canEdit={satisfiesLanguageAccess(
+                            'translations.edit',
+                            row.languageId
+                          )}
+                          placeholder={t(
+                            'binary_assets_transcript_add_translation',
+                            'Add translation'
+                          )}
+                          onSaved={invalidate}
+                        />
+                      </Box>
+                      {row.transcriptionAvailable &&
+                        satisfiesLanguageAccess(
+                          'translations.edit',
+                          row.languageId
+                        ) && (
+                          <Tooltip
+                            title={t(
+                              'binary_assets_transcript_generate_language',
+                              "Transcribe this language's audio with AI"
+                            )}
+                          >
+                            <span>
+                              <IconButton
+                                size="small"
+                                disabled={
+                                  generateLanguage.isLoading &&
+                                  generatingLanguageId === row.languageId
+                                }
+                                onClick={() => {
+                                  setGeneratingLanguageId(row.languageId);
+                                  generateLanguage.mutate(
+                                    {
+                                      path: {
+                                        projectId: project.id,
+                                        assetId: asset.id,
+                                        languageId: row.languageId,
+                                      },
+                                    },
+                                    { onSuccess: invalidate }
+                                  );
+                                }}
+                                data-cy="binary-asset-transcript-generate-language"
+                              >
+                                {generateLanguage.isLoading &&
+                                generatingLanguageId === row.languageId ? (
+                                  <CircularProgress size={16} />
+                                ) : (
+                                  <Stars01 width={16} height={16} />
+                                )}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        )}
+                    </Box>
                   ) : (
                     <Typography variant="caption" color="text.secondary">
                       —

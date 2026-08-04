@@ -56,6 +56,8 @@ open class BinaryAssetTranslationModel(
   val transcriptText: String? = null,
   /** [io.tolgee.model.enums.TranslationState] name of the transcript translation. */
   val transcriptState: String? = null,
+  /** Whether this language's own audio can be transcribed — it has a file and a provider exists. */
+  val transcriptionAvailable: Boolean = false,
 )
 
 open class BinaryAssetDownloadTicketModel(

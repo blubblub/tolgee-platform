@@ -11,6 +11,7 @@ import io.tolgee.repository.KeyRepository
 import io.tolgee.repository.TranslationRepository
 import io.tolgee.repository.binaryAsset.BinaryAssetRepository
 import io.tolgee.service.key.KeyService
+import io.tolgee.service.language.LanguageService
 import io.tolgee.service.project.ProjectService
 import io.tolgee.service.translation.TranslationService
 import org.springframework.context.annotation.Lazy
@@ -31,6 +32,7 @@ class BinaryAssetTranscriptService(
   private val translationRepository: TranslationRepository,
   private val projectService: ProjectService,
   private val transcriptionClient: ElevenLabsTranscriptionClient,
+  private val languageService: LanguageService,
   @Lazy
   private val binaryAssetService: BinaryAssetService,
   @Lazy
@@ -156,6 +158,46 @@ class BinaryAssetTranscriptService(
     val withKey = asset.transcriptKey?.let { asset } ?: create(projectId, assetId, null)
     val key = withKey.transcriptKey ?: throw NotFoundException(Message.BINARY_ASSET_TRANSCRIPT_NOT_FOUND)
     translationService.setForKey(keyService.get(key.id), mapOf(asset.sourceLanguage.tag to text))
+    return withKey
+  }
+
+  /**
+   * Transcribes one language's *localized* audio into that language's transcript translation.
+   *
+   * Deliberately not a translation of the source transcript: the localized file is what the voice
+   * actor actually said, which is frequently not a literal translation of the English.
+   */
+  @Transactional
+  fun transcribeTranslation(
+    projectId: Long,
+    assetId: Long,
+    languageId: Long,
+  ): BinaryAsset {
+    transcriptionClient.checkConfigured()
+    val asset =
+      binaryAssetRepository.findByProjectIdAndId(projectId, assetId)
+        ?: throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
+    if (!isTranscribable(asset)) {
+      throw BadRequestException(Message.BINARY_ASSET_NOT_TRANSCRIBABLE)
+    }
+    val language = languageService.getEntity(languageId, projectId)
+
+    val text =
+      binaryAssetService.openTranslationStream(projectId, assetId, languageId).let { source ->
+        source.inputStream.use { stream ->
+          transcriptionClient.transcribe(
+            stream = stream,
+            filename = source.filename,
+            contentType = source.contentType,
+            byteSize = source.byteSize,
+            languageTag = language.tag,
+          )
+        }
+      }
+
+    val withKey = asset.transcriptKey?.let { asset } ?: create(projectId, assetId, null)
+    val key = withKey.transcriptKey ?: throw NotFoundException(Message.BINARY_ASSET_TRANSCRIPT_NOT_FOUND)
+    translationService.setForKey(keyService.get(key.id), mapOf(language.tag to text))
     return withKey
   }
 

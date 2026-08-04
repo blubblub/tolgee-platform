@@ -516,6 +516,10 @@ export interface paths {
     /** Sends the source file to the configured speech-to-text provider and writes the result into the asset's transcript key, creating that key if it does not exist. Overwrites existing source-language text. Audio and video only. */
     post: operations["generateTranscript"];
   };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/transcript/generate/{languageId}": {
+    /** Transcribes the localized file for this language — not a translation of the source transcript — so the text matches what that language's voice actually says. */
+    post: operations["generateTranslationTranscript"];
+  };
   "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}": {
     put: operations["upsertTranslation"];
     delete: operations["deleteTranslation"];
@@ -1768,6 +1772,7 @@ export interface components {
       status: "MISSING" | "CURRENT" | "OUTDATED";
       transcriptState?: string;
       transcriptText?: string;
+      transcriptionAvailable: boolean;
       /** Format: date-time */
       updatedAt?: string;
       /** Format: int64 */
@@ -15090,6 +15095,48 @@ export interface operations {
     parameters: {
       path: {
         assetId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  /** Transcribes the localized file for this language — not a translation of the source transcript — so the text matches what that language's voice actually says. */
+  generateTranslationTranscript: {
+    parameters: {
+      path: {
+        assetId: number;
+        languageId: number;
         projectId: number;
       };
     };

@@ -55,6 +55,7 @@ declare module '@tolgee/web' {
     | 'binary_assets_transcript_deleted'
     | 'binary_assets_transcript_edit'
     | 'binary_assets_transcript_generate'
+    | 'binary_assets_transcript_generate_language'
     | 'binary_assets_transcript_generating'
     | 'binary_assets_transcript_regenerate'
     | 'binary_assets_transcript_regenerate_confirm'

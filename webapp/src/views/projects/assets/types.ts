@@ -14,6 +14,7 @@ export type BinaryAssetTranslation = {
   updatedAt?: string | null;
   transcriptText?: string | null;
   transcriptState?: string | null;
+  transcriptionAvailable?: boolean;
 };
 
 export type BinaryAsset = {
