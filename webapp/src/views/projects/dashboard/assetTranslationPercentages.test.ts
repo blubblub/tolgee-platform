@@ -1,5 +1,5 @@
 import type { components } from 'tg.service/apiSchema.generated';
-import { getAssetTranslationStats } from './AssetTranslationStats';
+import { getAssetTranslationStats } from './assetTranslationPercentages';
 
 type ProjectStatsModel = components['schemas']['ProjectStatsModel'];
 

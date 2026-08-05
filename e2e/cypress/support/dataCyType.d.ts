@@ -605,8 +605,10 @@ declare namespace DataCy {
         "project-contributor-item-last-contribution": true;
         "project-dashboard-activity-chart": true;
         "project-dashboard-activity-list": true;
-        "project-dashboard-asset-translation-count": true;
-        "project-dashboard-asset-translation-heading": true;
+        "project-dashboard-asset-count": true;
+        "project-dashboard-asset-current": true;
+        "project-dashboard-asset-missing": true;
+        "project-dashboard-asset-outdated": true;
         "project-dashboard-asset-translation-stats": true;
         "project-dashboard-base-word-count": true;
         "project-dashboard-description": true;

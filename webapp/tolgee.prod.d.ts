@@ -78,6 +78,7 @@ declare module '@tolgee/web' {
     | 'project_dashboard_asset_translation_current'
     | 'project_dashboard_asset_translation_missing'
     | 'project_dashboard_asset_translation_outdated'
+    | 'project_dashboard_asset_translations_assets'
     | 'project_dashboard_asset_translations_count'
     | 'project_dashboard_asset_translations_heading'
     | 'project_menu_assets';
