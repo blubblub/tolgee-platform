@@ -1,8 +1,19 @@
 import { T } from '@tolgee/react';
 import type { ActivityOptions, ActivityTypeEnum } from './types';
 
-export const binaryAssetConfiguration: Partial<
-  Record<ActivityTypeEnum, ActivityOptions>
+/**
+ * Every BINARY_ASSET_* activity type, extracted from the generated schema. Typing the map as a
+ * total Record over this makes omitting a label a compile error — an unlabelled type renders in
+ * the activity feed as its raw enum name.
+ */
+type BinaryAssetActivityType = Extract<
+  ActivityTypeEnum,
+  `BINARY_ASSET_${string}`
+>;
+
+export const binaryAssetConfiguration: Record<
+  BinaryAssetActivityType,
+  ActivityOptions
 > = {
   BINARY_ASSET_CREATE: {
     label() {
@@ -80,6 +91,16 @@ export const binaryAssetConfiguration: Partial<
         <T
           keyName="activity_binary_asset_transcript_unlink"
           defaultValue="Removed asset transcript"
+        />
+      );
+    },
+  },
+  BINARY_ASSET_TRANSCRIPT_GENERATE: {
+    label() {
+      return (
+        <T
+          keyName="activity_binary_asset_transcript_generate"
+          defaultValue="Generated asset transcript with AI"
         />
       );
     },

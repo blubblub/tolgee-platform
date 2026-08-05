@@ -22,6 +22,7 @@ declare module '@tolgee/web' {
     | 'activity_binary_asset_create'
     | 'activity_binary_asset_delete'
     | 'activity_binary_asset_source_replace'
+    | 'activity_binary_asset_transcript_generate'
     | 'activity_binary_asset_transcript_link'
     | 'activity_binary_asset_transcript_unlink'
     | 'activity_binary_asset_translation_delete'
