@@ -172,6 +172,7 @@ declare namespace DataCy {
         "binary-assets-list": true;
         "binary-assets-list-item": true;
         "binary-assets-list-transcript": true;
+        "binary-assets-load-more": true;
         "binary-assets-name-input": true;
         "binary-assets-search": true;
         "binary-assets-type-filter": true;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import { Plus } from '@untitled-ui/icons-react';
 import { T, useTranslate } from '@tolgee/react';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useMutation, useQueryClient } from 'react-query';
 import { Link as RouterLink } from 'react-router-dom';
 
 import { BaseProjectView } from 'tg.views/projects/BaseProjectView';
@@ -18,17 +18,23 @@ import { useProject } from 'tg.hooks/useProject';
 import { useProjectPermissions } from 'tg.hooks/useProjectPermissions';
 import { LINKS, PARAMS } from 'tg.constants/links';
 import { BoxLoading } from 'tg.component/common/BoxLoading';
+import {
+  invalidateUrlPrefix,
+  useApiInfiniteQuery,
+} from 'tg.service/http/useQueryApi';
+import { useInView } from 'react-intersection-observer';
 import { binaryAssetApi } from './binaryAssetApi';
 import { BinaryAssetPreview } from './BinaryAssetPreview';
 
 type MediaFilter = 'AUDIO' | 'VIDEO' | 'IMAGE';
+
+const PAGE_SIZE = 30;
 
 export const AssetsView = () => {
   const project = useProject();
   const { t } = useTranslate();
   const { satisfiesPermission } = useProjectPermissions();
   const queryClient = useQueryClient();
-  const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [mediaFilters, setMediaFilters] = useState<MediaFilter[]>([]);
   const [name, setName] = useState('');
@@ -37,23 +43,41 @@ export const AssetsView = () => {
 
   const canCreate = satisfiesPermission('keys.create');
 
-  const listQuery = useQuery(
-    [
-      'binary-assets',
-      project.id,
-      page,
-      search,
-      mediaFilters.slice().sort().join(','),
-    ],
-    () =>
-      binaryAssetApi.list(
-        project.id,
-        page,
-        search || undefined,
-        mediaFilters.length ? mediaFilters : undefined
-      ),
-    { keepPreviousData: true }
-  );
+  const { ref: loadMoreRef, inView } = useInView({ rootMargin: '200px' });
+
+  const listPath = { projectId: project.id };
+  const listQueryParams = {
+    size: PAGE_SIZE,
+    search: search || undefined,
+    filterMediaType: mediaFilters.length ? mediaFilters : undefined,
+  };
+
+  const listQuery = useApiInfiniteQuery({
+    url: '/v2/projects/{projectId}/binary-assets',
+    method: 'get',
+    path: listPath,
+    query: listQueryParams,
+    options: {
+      keepPreviousData: true,
+      noGlobalLoading: true,
+      getNextPageParam: (lastPage) => {
+        const p = lastPage.page;
+        if (p && p.number! < p.totalPages! - 1) {
+          return {
+            path: listPath,
+            query: { ...listQueryParams, page: p.number! + 1 },
+          };
+        }
+        return null;
+      },
+    },
+  });
+
+  useEffect(() => {
+    if (inView && listQuery.hasNextPage && !listQuery.isFetchingNextPage) {
+      listQuery.fetchNextPage();
+    }
+  }, [inView, listQuery.hasNextPage, listQuery.isFetchingNextPage]);
 
   const createMutation = useMutation(
     () =>
@@ -66,7 +90,10 @@ export const AssetsView = () => {
         setName('');
         setFile(null);
         setError(null);
-        queryClient.invalidateQueries(['binary-assets', project.id]);
+        invalidateUrlPrefix(
+          queryClient,
+          '/v2/projects/{projectId}/binary-assets'
+        );
       },
       onError: (e: any) => {
         setError(
@@ -76,8 +103,14 @@ export const AssetsView = () => {
     }
   );
 
-  const assets = listQuery.data?._embedded?.binaryAssets ?? [];
-  const total = listQuery.data?.page?.totalElements ?? 0;
+  const assets = useMemo(
+    () =>
+      (listQuery.data?.pages ?? []).flatMap(
+        (p) => p._embedded?.binaryAssets ?? []
+      ),
+    [listQuery.data]
+  );
+  const total = listQuery.data?.pages?.[0]?.page?.totalElements ?? 0;
 
   const filterLabel = useMemo(() => {
     if (!mediaFilters.length) return null;
@@ -169,7 +202,6 @@ export const AssetsView = () => {
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
-            setPage(0);
           }}
           data-cy="binary-assets-search"
         />
@@ -179,7 +211,6 @@ export const AssetsView = () => {
           value={mediaFilters}
           onChange={(_e, next: MediaFilter[]) => {
             setMediaFilters(next);
-            setPage(0);
           }}
           aria-label={t('binary_assets_type_filter', 'Filter by type')}
           data-cy="binary-assets-type-filter"
@@ -199,7 +230,6 @@ export const AssetsView = () => {
             size="small"
             onClick={() => {
               setMediaFilters([]);
-              setPage(0);
             }}
             data-cy="binary-assets-filter-clear"
           >
@@ -330,17 +360,15 @@ export const AssetsView = () => {
         </Box>
       )}
 
-      {(listQuery.data?.page?.totalPages ?? 0) > 1 && (
-        <Box mt={2} display="flex" gap={1}>
-          <Button disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-            Previous
-          </Button>
-          <Button
-            disabled={page + 1 >= (listQuery.data?.page?.totalPages ?? 0)}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </Button>
+      {listQuery.hasNextPage && (
+        <Box
+          ref={loadMoreRef}
+          mt={2}
+          display="flex"
+          justifyContent="center"
+          data-cy="binary-assets-load-more"
+        >
+          <BoxLoading />
         </Box>
       )}
     </BaseProjectView>
