@@ -142,7 +142,9 @@ export const binaryAssetApi = {
     body: { versionId: number | null }
   ): Promise<BinaryAssetTranslationWithVersions> {
     return apiV2HttpService.put(
-      `${base(projectId)}/${assetId}/translations/${languageId}/chosen-version`,
+      `${base(
+        projectId
+      )}/${assetId}/translations/${languageId}/versions/chosen-version`,
       body
     );
   },
