@@ -1,5 +1,6 @@
 package io.tolgee.model.binaryAsset
 
+import io.tolgee.activity.annotation.ActivityEntityDescribingPaths
 import io.tolgee.activity.annotation.ActivityLoggedEntity
 import io.tolgee.activity.annotation.ActivityLoggedProp
 import io.tolgee.model.Language
@@ -16,6 +17,8 @@ import jakarta.persistence.UniqueConstraint
 
 @Entity
 @ActivityLoggedEntity
+// without this the activity row has no relation to hang a link on
+@ActivityEntityDescribingPaths(paths = ["asset"])
 @Table(
   name = "binary_asset_translation",
   uniqueConstraints = [

@@ -59,7 +59,9 @@ export type EntityEnum =
   | 'Label'
   | 'TranslationSuggestion'
   | 'TranslationQaIssue'
-  | 'Branch';
+  | 'Branch'
+  | 'BinaryAsset'
+  | 'BinaryAssetTranslation';
 
 export type FieldTypeEnum =
   | 'text'
@@ -126,6 +128,13 @@ export type ContentDeliveryConfigReferenceData = {
   name: string;
 };
 
+export type BinaryAssetReferenceData = {
+  type: 'binary_asset';
+  id: number;
+  name: string;
+  exists?: boolean;
+};
+
 export type ContentStorageReferenceData = {
   type: 'content_storage';
   name: string;
@@ -144,7 +153,8 @@ export type Reference =
   | ContentStorageReferenceData
   | WebhookConfigReferenceData
   | TaskReferenceData
-  | BranchReferenceData;
+  | BranchReferenceData
+  | BinaryAssetReferenceData;
 
 export type ReferenceBuilder = (
   data: ModifiedEntityModel

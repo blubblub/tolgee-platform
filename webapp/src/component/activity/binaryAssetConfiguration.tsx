@@ -24,6 +24,7 @@ export const binaryAssetConfiguration: Record<
         />
       );
     },
+    entities: { BinaryAsset: true },
   },
   BINARY_ASSET_UPDATE: {
     label() {
@@ -34,6 +35,7 @@ export const binaryAssetConfiguration: Record<
         />
       );
     },
+    entities: { BinaryAsset: true },
   },
   BINARY_ASSET_DELETE: {
     label() {
@@ -44,6 +46,7 @@ export const binaryAssetConfiguration: Record<
         />
       );
     },
+    entities: { BinaryAsset: true },
   },
   BINARY_ASSET_SOURCE_REPLACE: {
     label() {
@@ -54,6 +57,7 @@ export const binaryAssetConfiguration: Record<
         />
       );
     },
+    entities: { BinaryAsset: true },
   },
   BINARY_ASSET_TRANSLATION_UPSERT: {
     label() {
@@ -64,6 +68,7 @@ export const binaryAssetConfiguration: Record<
         />
       );
     },
+    entities: { BinaryAssetTranslation: true },
   },
   BINARY_ASSET_TRANSLATION_DELETE: {
     label() {
@@ -74,6 +79,7 @@ export const binaryAssetConfiguration: Record<
         />
       );
     },
+    entities: { BinaryAssetTranslation: true },
   },
   BINARY_ASSET_TRANSCRIPT_LINK: {
     label() {
@@ -84,6 +90,7 @@ export const binaryAssetConfiguration: Record<
         />
       );
     },
+    entities: { BinaryAsset: true },
   },
   BINARY_ASSET_TRANSCRIPT_UNLINK: {
     label() {
@@ -94,6 +101,7 @@ export const binaryAssetConfiguration: Record<
         />
       );
     },
+    entities: { BinaryAsset: true },
   },
   BINARY_ASSET_TRANSCRIPT_GENERATE: {
     label() {
@@ -104,5 +112,6 @@ export const binaryAssetConfiguration: Record<
         />
       );
     },
+    entities: { Translation: true },
   },
 };

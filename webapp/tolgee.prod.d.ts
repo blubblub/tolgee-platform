@@ -19,6 +19,10 @@ declare module '@tolgee/web' {
   // upstream Tolgee project 1, so fork-only keys can never appear there and are
   // declared here instead. They resolve from `defaultValue` at runtime.
   type BlubBlubTranslationKey =
+    | 'activity_entity_binary_asset'
+    | 'activity_entity_binary_asset.name'
+    | 'activity_entity_binary_asset.description'
+    | 'activity_entity_binary_asset_translation'
     | 'activity_binary_asset_create'
     | 'activity_binary_asset_delete'
     | 'activity_binary_asset_source_replace'

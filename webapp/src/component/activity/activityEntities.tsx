@@ -142,6 +142,71 @@ export const activityEntities: Record<EntityEnum, EntityOptions> = {
       return result;
     },
   },
+  BinaryAsset: {
+    label(params) {
+      return <T keyName="activity_entity_binary_asset" params={params} />;
+    },
+    fields: {
+      name: {
+        label(params) {
+          return (
+            <T keyName="activity_entity_binary_asset.name" params={params} />
+          );
+        },
+      },
+      description: {
+        label(params) {
+          return (
+            <T
+              keyName="activity_entity_binary_asset.description"
+              params={params}
+            />
+          );
+        },
+      },
+    },
+    references: ({ modifications, entityId, exists, description }) => {
+      const result: Reference[] = [];
+      const newData = getDiffVersion('new', modifications);
+      const data = newData.name
+        ? newData
+        : getDiffVersion('old', modifications);
+      // create/delete carry the name only as a modification; link/unlink as a description
+      const name = data.name || description?.name;
+      if (name) {
+        result.push({
+          type: 'binary_asset',
+          id: entityId,
+          name: name as unknown as string,
+          exists: exists ?? undefined,
+        });
+      }
+      return result;
+    },
+  },
+  BinaryAssetTranslation: {
+    label(params) {
+      return (
+        <T keyName="activity_entity_binary_asset_translation" params={params} />
+      );
+    },
+    fields: {},
+    references: ({ relations }) => {
+      const result: Reference[] = [];
+      // needs @ActivityEntityDescribingPaths(["asset"]) on the entity to be populated
+      const asset = relations?.asset;
+      const name = asset?.data?.name;
+      if (asset && name) {
+        result.push({
+          type: 'binary_asset',
+          id: asset.entityId,
+          name: name as unknown as string,
+          exists: asset.exists ?? undefined,
+        });
+      }
+      return result;
+    },
+  },
   KeyMeta: {
     label(params) {
       return <T keyName="activity_entity_key_meta" params={params} />;

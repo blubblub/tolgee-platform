@@ -7,6 +7,7 @@ import { LanguageReference } from './LanguageReference';
 import { ContentDeliveryReference } from './ContentDeliveryReference';
 import { ContentStorageReference } from './ContentStorageReference';
 import { WebhookConfigReference } from './WebhookConfigReference';
+import { BinaryAssetReference } from './BinaryAssetReference';
 import { TaskReference } from 'tg.ee';
 import { BranchReference } from 'tg.ee';
 export const StyledReferences = styled(Box)`
@@ -83,6 +84,8 @@ const getReference = (reference: Reference) => {
       return <TaskReference data={reference} />;
     case 'branch':
       return <BranchReference data={reference} />;
+    case 'binary_asset':
+      return <BinaryAssetReference data={reference} />;
     default:
       return null;
   }
