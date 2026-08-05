@@ -418,15 +418,24 @@ the worked example.
 one. Without it Hibernate assumes 255 and `diffChangeLog` generates a migration
 that *shrinks* the column — this kept Migration Check red until fixed.
 
-## Speech-to-text
+## Speech-to-text and voice tools
 
 Transcription of binary assets calls ElevenLabs Scribe directly over multipart —
 deliberately not through Tolgee's LLM stack, which is EE-only and speaks
-chat-completions, so audio would have to be base64-inlined. Configure on the
-droplet:
+chat-completions, so audio would have to be base64-inlined. The same API key
+drives the asset-translation pipeline tools (`tts`, `voice-changer`), which are
+`BinaryAssetTool` implementations resolved by name in `BinaryAssetToolService`.
+Configure on the droplet:
 
 ```bash
 TOLGEE_TRANSCRIPTION_API_KEY=...          # unset = feature hidden, endpoint refuses
 TOLGEE_TRANSCRIPTION_MODEL=scribe_v2
 TOLGEE_TRANSCRIPTION_API_URL=https://api.elevenlabs.io   # or api.eu.residency.elevenlabs.io
+TOLGEE_TRANSCRIPTION_TTS_MODEL=eleven_multilingual_v2            # default for the tts tool
+TOLGEE_TRANSCRIPTION_VOICE_CHANGER_MODEL=eleven_multilingual_sts_v2  # default for voice-changer
 ```
+
+Both model ids are per-run overridable from the pipeline dialog; the properties
+only set the default. The pipeline UI lives at
+`/projects/{id}/assets/{assetId}/translations/{languageId}` — reached from the
+asset page, there is no separate asset-translations list page.

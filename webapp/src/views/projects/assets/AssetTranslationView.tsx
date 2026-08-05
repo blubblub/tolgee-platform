@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -50,17 +51,25 @@ const formatDate = (s: string) => new Date(s).toLocaleString();
 
 const parseToolParams = (
   raw: string | null
-): { voiceId?: string; modelId?: string } => {
+): { voiceId?: string; modelId?: string; removeBackgroundNoise?: boolean } => {
   if (!raw) return {};
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     return {
       voiceId: typeof parsed.voiceId === 'string' ? parsed.voiceId : undefined,
       modelId: typeof parsed.modelId === 'string' ? parsed.modelId : undefined,
+      removeBackgroundNoise: parsed.removeBackgroundNoise === true,
     };
   } catch {
     return {};
   }
+};
+
+type Tool = 'tts' | 'voice-changer';
+
+const DEFAULT_MODEL_PLACEHOLDER: Record<Tool, string> = {
+  tts: 'eleven_multilingual_v2',
+  'voice-changer': 'eleven_multilingual_sts_v2',
 };
 
 const AssetTranslationContent = () => {
@@ -80,9 +89,10 @@ const AssetTranslationContent = () => {
     useProjectPermissions();
 
   const [runDialogOpen, setRunDialogOpen] = useState(false);
-  const [tool, setTool] = useState<'tts'>('tts');
+  const [tool, setTool] = useState<Tool>('tts');
   const [voiceId, setVoiceId] = useState('');
   const [modelId, setModelId] = useState('');
+  const [removeBackgroundNoise, setRemoveBackgroundNoise] = useState(false);
   const [baseVersionId, setBaseVersionId] = useState<string>('og');
 
   const canView = satisfiesPermission('translations.view');
@@ -184,6 +194,7 @@ const AssetTranslationContent = () => {
         params: {
           voiceId,
           ...(modelId ? { modelId } : {}),
+          ...(tool === 'voice-changer' ? { removeBackgroundNoise } : {}),
         },
         baseVersionId:
           baseVersionId === 'og' ? undefined : Number(baseVersionId),
@@ -194,6 +205,7 @@ const AssetTranslationContent = () => {
         setRunDialogOpen(false);
         setVoiceId('');
         setModelId('');
+        setRemoveBackgroundNoise(false);
         setBaseVersionId('og');
         actions.showMessage({
           text: t(
@@ -279,13 +291,14 @@ const AssetTranslationContent = () => {
           LINKS.PROJECT_ASSETS.build({ [PARAMS.PROJECT_ID]: project.id }),
         ],
         [
-          t('asset_translations_title', 'Asset translations'),
-          LINKS.PROJECT_ASSET_TRANSLATIONS.build({
+          asset.name,
+          LINKS.PROJECT_ASSET.build({
             [PARAMS.PROJECT_ID]: project.id,
+            [PARAMS.ASSET_ID]: assetId,
           }),
         ],
         [
-          `${asset.name} · ${language?.tag ?? languageId}`,
+          language?.tag ?? String(languageId),
           LINKS.PROJECT_ASSET_TRANSLATION.build({
             [PARAMS.PROJECT_ID]: project.id,
             [PARAMS.ASSET_ID]: assetId,
@@ -297,14 +310,15 @@ const AssetTranslationContent = () => {
       <Box display="flex" alignItems="center" gap={1} mb={2}>
         <Button
           component={RouterLink}
-          to={LINKS.PROJECT_ASSET_TRANSLATIONS.build({
+          to={LINKS.PROJECT_ASSET.build({
             [PARAMS.PROJECT_ID]: project.id,
+            [PARAMS.ASSET_ID]: assetId,
           })}
           startIcon={<ArrowLeft width={18} height={18} />}
           size="small"
           data-cy="asset-translation-back"
         >
-          {t('asset_translation_back', 'Back to asset translations')}
+          {t('asset_translation_back', 'Back to asset')}
         </Button>
       </Box>
 
@@ -452,6 +466,11 @@ const AssetTranslationContent = () => {
                       {version.tool}
                       {params.voiceId && ` · ${params.voiceId}`}
                       {params.modelId && ` · ${params.modelId}`}
+                      {params.removeBackgroundNoise &&
+                        ` · ${t(
+                          'asset_translation_remove_background_noise',
+                          'Remove background noise'
+                        )}`}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       {formatBytes(version.byteSize)} ·{' '}
@@ -564,11 +583,14 @@ const AssetTranslationContent = () => {
                 labelId="asset-version-tool-label"
                 value={tool}
                 label={t('asset_translation_tool_label', 'Tool')}
-                onChange={(e) => setTool(e.target.value as 'tts')}
+                onChange={(e) => setTool(e.target.value as Tool)}
                 data-cy="asset-version-tool-select"
               >
                 <MenuItem value="tts">
                   {t('asset_translation_tool_tts', 'Text-to-speech')}
+                </MenuItem>
+                <MenuItem value="voice-changer">
+                  {t('asset_translation_tool_voice_changer', 'Voice changer')}
                 </MenuItem>
               </Select>
             </FormControl>
@@ -585,11 +607,27 @@ const AssetTranslationContent = () => {
             <TextField
               size="small"
               label={t('asset_translation_model_id', 'Model ID')}
-              placeholder="eleven_multilingual_v2"
+              placeholder={DEFAULT_MODEL_PLACEHOLDER[tool]}
               value={modelId}
               onChange={(e) => setModelId(e.target.value)}
               data-cy="asset-version-model-id"
             />
+
+            {tool === 'voice-changer' && (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={removeBackgroundNoise}
+                    onChange={(e) => setRemoveBackgroundNoise(e.target.checked)}
+                    data-cy="asset-version-remove-background-noise"
+                  />
+                }
+                label={t(
+                  'asset_translation_remove_background_noise',
+                  'Remove background noise'
+                )}
+              />
+            )}
 
             <FormControl fullWidth size="small">
               <InputLabel id="asset-version-base-label">

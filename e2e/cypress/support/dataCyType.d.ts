@@ -106,12 +106,6 @@ declare namespace DataCy {
         "asset-translation-og-download": true;
         "asset-translation-og-final-badge": true;
         "asset-translation-outdated-badge": true;
-        "asset-translations-empty": true;
-        "asset-translations-expand-": true;
-        "asset-translations-help": true;
-        "asset-translations-language-chip-": true;
-        "asset-translations-load-more": true;
-        "asset-translations-table": true;
         "asset-version-base-select": true;
         "asset-version-choose-final": true;
         "asset-version-delete": true;
@@ -121,6 +115,7 @@ declare namespace DataCy {
         "asset-version-preview-audio": true;
         "asset-version-preview-image": true;
         "asset-version-preview-video": true;
+        "asset-version-remove-background-noise": true;
         "asset-version-row": true;
         "asset-version-run-dialog": true;
         "asset-version-run-submit": true;
@@ -680,7 +675,6 @@ declare namespace DataCy {
         "project-members-tab-team": true;
         "project-menu-item": true;
         "project-menu-item-ai": true;
-        "project-menu-item-asset-translations": true;
         "project-menu-item-assets": true;
         "project-menu-item-branches": true;
         "project-menu-item-dashboard": true;

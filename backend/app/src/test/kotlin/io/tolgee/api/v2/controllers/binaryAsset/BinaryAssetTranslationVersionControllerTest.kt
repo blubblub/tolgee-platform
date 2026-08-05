@@ -2,7 +2,7 @@ package io.tolgee.api.v2.controllers.binaryAsset
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.tolgee.ProjectAuthControllerTest
-import io.tolgee.component.transcription.ElevenLabsTtsClient
+import io.tolgee.component.transcription.ElevenLabsVoiceClient
 import io.tolgee.development.testDataBuilder.data.LanguagePermissionsTestData
 import io.tolgee.fixtures.andAssertThatJson
 import io.tolgee.fixtures.andIsBadRequest
@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -35,15 +36,17 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers
 class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/v2/projects/") {
   @Autowired
   @MockitoBean
-  lateinit var ttsClient: ElevenLabsTtsClient
+  lateinit var voiceClient: ElevenLabsVoiceClient
 
   private val mp3Bytes = byteArrayOf(0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00, 0x00)
+  private val voiceChangedBytes = byteArrayOf(0x49, 0x44, 0x33, 0x03, 0x01, 0x01)
 
   @BeforeEach
-  fun mockTts() {
-    whenever(ttsClient.isConfigured).thenReturn(true)
-    whenever(ttsClient.checkConfigured()).then { }
-    whenever(ttsClient.synthesize(any(), any(), any())).thenReturn(mp3Bytes)
+  fun mockVoiceClient() {
+    whenever(voiceClient.isConfigured).thenReturn(true)
+    whenever(voiceClient.checkConfigured()).then { }
+    whenever(voiceClient.synthesize(any(), any(), any())).thenReturn(mp3Bytes)
+    whenever(voiceClient.changeVoice(any(), any(), any(), any(), any(), any())).thenReturn(voiceChangedBytes)
   }
 
   private fun createAsset(name: String): Long {
@@ -198,6 +201,83 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
     val second = runTool(assetId, "de", "tts", baseVersionId = first)
 
     assertThat(listVersions(assetId, "de")).containsExactly(first, second)
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `runs voice changer on the uploaded translation`() {
+    val assetId = createAsset("vox-changer")
+    uploadTranslation(assetId, "de")
+
+    val versionId = runTool(assetId, "de", "voice-changer")
+
+    performProjectAuthGet("binary-assets/$assetId/translations/${languageId("de")}/versions")
+      .andIsOk
+      .andAssertThatJson {
+        node("[0].id").isEqualTo(versionId)
+        node("[0].tool").isEqualTo("voice-changer")
+        node("[0].byteSize").isEqualTo(voiceChangedBytes.size)
+        node("[0].contentType").isEqualTo("audio/mpeg")
+        node("[0].originalFilename").isEqualTo("de-voice.mp3")
+      }
+
+    // no params given -> configured default model, noise removal off
+    verify(voiceClient).changeVoice(
+      any(),
+      eq("de.mp3"),
+      any(),
+      eq("voice-1"),
+      eq("eleven_multilingual_sts_v2"),
+      eq(false),
+    )
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `chains voice changer after tts and honours param overrides`() {
+    val assetId = createAsset("vox-changer-chain")
+    uploadTranslation(assetId, "de")
+    createTranscriptWithText(assetId, "Source.")
+    setTranslationForKey("transcript.vox-changer-chain", "de", "Quelle.")
+
+    val ttsVersion = runTool(assetId, "de", "tts")
+    val changed =
+      runTool(
+        assetId,
+        "de",
+        "voice-changer",
+        params =
+          mapOf(
+            "voiceId" to "voice-9",
+            "modelId" to "eleven_english_sts_v2",
+            "removeBackgroundNoise" to true,
+          ),
+        baseVersionId = ttsVersion,
+      )
+
+    assertThat(listVersions(assetId, "de")).containsExactly(ttsVersion, changed)
+    verify(voiceClient).changeVoice(
+      any(),
+      eq("de-tts.mp3"),
+      any(),
+      eq("voice-9"),
+      eq("eleven_english_sts_v2"),
+      eq(true),
+    )
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `rejects voice changer without a voice id`() {
+    val assetId = createAsset("vox-changer-no-voice")
+    uploadTranslation(assetId, "de")
+
+    performProjectAuthPost(
+      "binary-assets/$assetId/translations/${languageId("de")}/versions/run",
+      mapOf("tool" to "voice-changer", "params" to mapOf<String, Any?>()),
+    ).andIsBadRequest.andAssertThatJson {
+      node("code").isEqualTo("binary_asset_tts_voice_id_required")
+    }
   }
 
   @Test

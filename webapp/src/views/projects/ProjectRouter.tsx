@@ -25,7 +25,6 @@ import { AiView } from './ai/AiView';
 import { BRANCH_ROUTES } from '../../branching/branchRoutes';
 import { AssetsView } from './assets/AssetsView';
 import { AssetView } from './assets/AssetView';
-import { AssetTranslationsView } from './assets/AssetTranslationsView';
 import { AssetTranslationView } from './assets/AssetTranslationView';
 
 export const ProjectRouter = () => {
@@ -59,10 +58,6 @@ export const ProjectRouter = () => {
 
         <Route exact path={LINKS.PROJECT_ASSETS.template}>
           <AssetsView />
-        </Route>
-
-        <Route exact path={LINKS.PROJECT_ASSET_TRANSLATIONS.template}>
-          <AssetTranslationsView />
         </Route>
 
         <Route exact path={LINKS.PROJECT_ASSET_TRANSLATION.template}>

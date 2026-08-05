@@ -5,16 +5,18 @@ import io.tolgee.configuration.tolgee.TolgeeProperties
 import io.tolgee.constants.Message
 import io.tolgee.exceptions.BadRequestException
 import io.tolgee.service.binaryAsset.BinaryAssetService.FileStream
-import io.tolgee.service.translation.TranslationService
 import org.springframework.stereotype.Component
 
+/**
+ * Re-speaks the input file (the uploaded translation or any earlier version) with another voice,
+ * keeping the original timing and delivery. Chains naturally after [ElevenLabsTtsTool].
+ */
 @Component
-class ElevenLabsTtsTool(
+class ElevenLabsVoiceChangerTool(
   private val voiceClient: ElevenLabsVoiceClient,
-  private val translationService: TranslationService,
   private val tolgeeProperties: TolgeeProperties,
 ) : BinaryAssetTool {
-  override val name: String = "tts"
+  override val name: String = "voice-changer"
 
   override fun run(
     input: FileStream,
@@ -29,21 +31,22 @@ class ElevenLabsTtsTool(
 
     val modelId =
       params["modelId"]?.toString()?.takeIf { it.isNotBlank() }
-        ?: tolgeeProperties.transcription.ttsModel
+        ?: tolgeeProperties.transcription.voiceChangerModel
 
-    val key =
-      context.asset.transcriptKey
-        ?: throw BadRequestException(Message.BINARY_ASSET_TTS_NO_TRANSCRIPT)
-    val translations = translationService.findForKeyByLanguages(key, listOf(context.language.tag))
-    val text =
-      translations.firstOrNull()?.text?.takeIf { it.isNotBlank() }
-        ?: throw BadRequestException(Message.BINARY_ASSET_TTS_NO_TRANSCRIPT)
+    val removeBackgroundNoise = params["removeBackgroundNoise"]?.toString().toBoolean()
 
-    val bytes = voiceClient.synthesize(text, voiceId, modelId)
+    val bytes =
+      voiceClient.changeVoice(
+        stream = input.inputStream,
+        filename = input.filename,
+        byteSize = input.byteSize,
+        voiceId = voiceId,
+        modelId = modelId,
+        removeBackgroundNoise = removeBackgroundNoise,
+      )
 
-    val baseName = context.translation.originalFilename.substringBeforeLast('.')
-    val filename = "$baseName-tts.mp3"
+    val baseName = input.filename.substringBeforeLast('.')
 
-    return BinaryAssetToolOutput(bytes = bytes, filename = filename, contentType = "audio/mpeg")
+    return BinaryAssetToolOutput(bytes = bytes, filename = "$baseName-voice.mp3", contentType = "audio/mpeg")
   }
 }

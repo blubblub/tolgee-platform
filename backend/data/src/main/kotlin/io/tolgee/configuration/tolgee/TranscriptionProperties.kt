@@ -46,6 +46,13 @@ class TranscriptionProperties {
   @DocProperty(description = "Default ElevenLabs TTS model id used by the tts tool.")
   var ttsModel: String = "eleven_multilingual_v2"
 
+  @DocProperty(
+    description =
+      "Default ElevenLabs speech-to-speech model id used by the voice-changer tool. " +
+        "Override per run from the pipeline dialog.",
+  )
+  var voiceChangerModel: String = "eleven_multilingual_sts_v2"
+
   val enabled: Boolean
     get() = !apiKey.isNullOrBlank()
 }
