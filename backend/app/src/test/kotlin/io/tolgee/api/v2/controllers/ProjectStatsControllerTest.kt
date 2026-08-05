@@ -132,14 +132,14 @@ class ProjectStatsControllerTest : ProjectAuthControllerTest("/v2/projects/") {
     ): BinaryAsset {
       val asset =
         BinaryAsset(project).apply {
-        this.name = name
-        this.sourceLanguage = sourceLanguage
-        this.sourceRevision = sourceRevision
-        this.storageKey = "test/$name"
-        this.originalFilename = "$name.bin"
-        this.contentType = "application/octet-stream"
-        this.sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-      }
+          this.name = name
+          this.sourceLanguage = sourceLanguage
+          this.sourceRevision = sourceRevision
+          this.storageKey = "test/$name"
+          this.originalFilename = "$name.bin"
+          this.contentType = "application/octet-stream"
+          this.sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
       return binaryAssetRepository.save(asset)
     }
 
@@ -150,13 +150,13 @@ class ProjectStatsControllerTest : ProjectAuthControllerTest("/v2/projects/") {
     ) {
       val translation =
         BinaryAssetTranslation(asset).apply {
-        this.language = language
-        this.sourceRevision = sourceRevision
-        this.storageKey = "test/${asset.name}-${language.tag}"
-        this.originalFilename = "${asset.name}-${language.tag}.bin"
-        this.contentType = "application/octet-stream"
-        this.sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-      }
+          this.language = language
+          this.sourceRevision = sourceRevision
+          this.storageKey = "test/${asset.name}-${language.tag}"
+          this.originalFilename = "${asset.name}-${language.tag}.bin"
+          this.contentType = "application/octet-stream"
+          this.sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
       binaryAssetTranslationRepository.save(translation)
     }
 
