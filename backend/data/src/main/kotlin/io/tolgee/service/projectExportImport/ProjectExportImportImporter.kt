@@ -3,15 +3,15 @@ package io.tolgee.service.projectExportImport
 import com.fasterxml.jackson.core.JacksonException
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.tolgee.activity.ActivityHolder
+import io.tolgee.component.fileStorage.FileStorage
 import io.tolgee.constants.Message
 import io.tolgee.exceptions.BadRequestException
 import io.tolgee.model.Project
 import io.tolgee.model.Screenshot
+import io.tolgee.model.UserAccount
 import io.tolgee.model.binaryAsset.BinaryAsset
 import io.tolgee.model.binaryAsset.BinaryAssetTranslation
-import io.tolgee.model.UserAccount
 import io.tolgee.service.AvatarService
-import io.tolgee.component.fileStorage.FileStorage
 import io.tolgee.service.binaryAsset.BinaryAssetStoragePaths
 import io.tolgee.service.key.ScreenshotService
 import io.tolgee.service.project.LanguageStatsService
@@ -257,7 +257,6 @@ class ProjectExportImportImporter(
       corruptArchiveOnParseError { handler.restore(json, context) }
     }
   }
-
 
   private fun restoreBinaryAssets(
     targetProjectId: Long,

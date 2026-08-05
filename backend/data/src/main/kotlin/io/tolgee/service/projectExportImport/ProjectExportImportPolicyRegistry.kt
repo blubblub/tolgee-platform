@@ -33,9 +33,9 @@ import io.tolgee.model.automations.Automation
 import io.tolgee.model.automations.AutomationAction
 import io.tolgee.model.automations.AutomationTrigger
 import io.tolgee.model.batch.BatchJob
+import io.tolgee.model.batch.BatchJobChunkExecution
 import io.tolgee.model.binaryAsset.BinaryAsset
 import io.tolgee.model.binaryAsset.BinaryAssetTranslation
-import io.tolgee.model.batch.BatchJobChunkExecution
 import io.tolgee.model.branching.Branch
 import io.tolgee.model.branching.BranchMerge
 import io.tolgee.model.branching.BranchMergeChange

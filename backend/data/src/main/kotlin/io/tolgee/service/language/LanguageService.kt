@@ -17,13 +17,13 @@ import io.tolgee.model.enums.Scope
 import io.tolgee.repository.LanguageRepository
 import io.tolgee.repository.qa.LanguageQaConfigRepository
 import io.tolgee.security.authentication.AuthenticationFacade
+import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.dataImport.ImportService
 import io.tolgee.service.project.ProjectService
 import io.tolgee.service.security.PermissionService
 import io.tolgee.service.security.SecurityService
 import io.tolgee.service.translation.AutoTranslationService
 import io.tolgee.service.translation.TranslationService
-import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.translation.TranslationSuggestionService
 import jakarta.persistence.EntityManager
 import org.springframework.beans.factory.annotation.Autowired

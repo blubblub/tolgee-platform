@@ -112,8 +112,9 @@ class BinaryAssetService(
     name: String,
     description: String?,
   ): BinaryAsset {
-    val asset = binaryAssetRepository.findByProjectIdAndIdForUpdate(projectId, assetId)
-      ?: throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
+    val asset =
+      binaryAssetRepository.findByProjectIdAndIdForUpdate(projectId, assetId)
+        ?: throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
     val trimmed = name.trim()
     if (trimmed != asset.name) {
       validateNameAvailable(projectId, trimmed, excludeId = assetId)
@@ -131,8 +132,9 @@ class BinaryAssetService(
     uploader: UserAccount?,
   ): BinaryAsset {
     requireStreamingStorage()
-    val asset = binaryAssetRepository.findByProjectIdAndIdForUpdate(projectId, assetId)
-      ?: throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
+    val asset =
+      binaryAssetRepository.findByProjectIdAndIdForUpdate(projectId, assetId)
+        ?: throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
     val previousKey = asset.storageKey
     val stored = storeNewBlob(projectId, file)
     asset.sourceRevision += 1
@@ -152,8 +154,9 @@ class BinaryAssetService(
     uploader: UserAccount?,
   ): BinaryAssetTranslation {
     requireStreamingStorage()
-    val asset = binaryAssetRepository.findByProjectIdAndIdForUpdate(projectId, assetId)
-      ?: throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
+    val asset =
+      binaryAssetRepository.findByProjectIdAndIdForUpdate(projectId, assetId)
+        ?: throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
     if (languageId == asset.sourceLanguage.id) {
       throw BadRequestException(Message.BINARY_ASSET_TARGET_IS_SOURCE_LANGUAGE)
     }
@@ -401,7 +404,12 @@ class BinaryAssetService(
   }
 
   private fun sanitizeFilename(original: String?): String {
-    val name = original?.substringAfterLast('/')?.substringAfterLast('\\')?.trim().orEmpty()
+    val name =
+      original
+        ?.substringAfterLast('/')
+        ?.substringAfterLast('\\')
+        ?.trim()
+        .orEmpty()
     if (name.isEmpty()) {
       return "file.bin"
     }

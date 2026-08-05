@@ -47,8 +47,18 @@ class BinaryAssetTranscriptService(
     /** Uploads often arrive as application/octet-stream, so fall back to the extension. */
     private val AUDIO_VIDEO_EXTENSIONS =
       listOf(
-        ".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac",
-        ".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi",
+        ".mp3",
+        ".wav",
+        ".ogg",
+        ".m4a",
+        ".aac",
+        ".flac",
+        ".mp4",
+        ".mov",
+        ".m4v",
+        ".webm",
+        ".mkv",
+        ".avi",
       )
   }
 

@@ -14,11 +14,11 @@ import io.tolgee.service.AvatarService
 import io.tolgee.service.GlossaryCleanupService
 import io.tolgee.service.PromptService
 import io.tolgee.service.bigMeta.BigMetaService
+import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.branching.BranchService
 import io.tolgee.service.dataImport.ImportService
 import io.tolgee.service.dataImport.ImportSettingsService
 import io.tolgee.service.key.KeyService
-import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.key.ScreenshotService
 import io.tolgee.service.label.LabelService
 import io.tolgee.service.language.LanguageService

@@ -383,7 +383,6 @@ enum class Message {
   FILE_NAME_NOT_VALID,
   ;
 
-
   val code: String
     get() = name.lowercase(Locale.ROOT)
 

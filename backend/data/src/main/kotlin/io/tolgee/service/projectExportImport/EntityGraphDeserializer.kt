@@ -6,9 +6,9 @@ import io.tolgee.constants.Message
 import io.tolgee.exceptions.BadRequestException
 import io.tolgee.model.Project
 import io.tolgee.model.Screenshot
+import io.tolgee.model.UserAccount
 import io.tolgee.model.binaryAsset.BinaryAsset
 import io.tolgee.model.binaryAsset.BinaryAssetTranslation
-import io.tolgee.model.UserAccount
 import io.tolgee.model.branching.Branch
 import io.tolgee.model.branching.snapshot.KeySnapshot
 import io.tolgee.model.key.Key

@@ -10,8 +10,8 @@ import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException
-import software.amazon.awssdk.services.s3.model.S3Exception
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier
+import software.amazon.awssdk.services.s3.model.S3Exception
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.nio.file.Files

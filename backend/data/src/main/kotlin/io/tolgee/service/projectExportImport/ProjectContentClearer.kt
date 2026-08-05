@@ -1,11 +1,11 @@
 package io.tolgee.service.projectExportImport
 
 import io.tolgee.model.Language
-import io.tolgee.model.binaryAsset.BinaryAsset
-import io.tolgee.model.binaryAsset.BinaryAssetTranslation
 import io.tolgee.model.Project
 import io.tolgee.model.Screenshot
 import io.tolgee.model.TranslationSuggestion
+import io.tolgee.model.binaryAsset.BinaryAsset
+import io.tolgee.model.binaryAsset.BinaryAssetTranslation
 import io.tolgee.model.branching.Branch
 import io.tolgee.model.branching.snapshot.KeyMetaSnapshot
 import io.tolgee.model.branching.snapshot.KeySnapshot
