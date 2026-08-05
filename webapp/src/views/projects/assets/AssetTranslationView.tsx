@@ -26,6 +26,7 @@ import { BaseProjectView } from 'tg.views/projects/BaseProjectView';
 import { useProject } from 'tg.hooks/useProject';
 import { useProjectPermissions } from 'tg.hooks/useProjectPermissions';
 import { useProjectLanguages } from 'tg.hooks/useProjectLanguages';
+import { ProjectLanguagesProvider } from 'tg.hooks/ProjectLanguagesProvider';
 import { LINKS, PARAMS } from 'tg.constants/links';
 import { BoxLoading } from 'tg.component/common/BoxLoading';
 import { FlagImage } from '@tginternal/library/components/languages/FlagImage';
@@ -62,7 +63,7 @@ const parseToolParams = (
   }
 };
 
-export const AssetTranslationView = () => {
+const AssetTranslationContent = () => {
   const project = useProject();
   const match = useRouteMatch();
   const assetId = Number(match.params[PARAMS.ASSET_ID]);
@@ -726,3 +727,9 @@ const VersionPreview = ({
     </Typography>
   );
 };
+
+export const AssetTranslationView = () => (
+  <ProjectLanguagesProvider>
+    <AssetTranslationContent />
+  </ProjectLanguagesProvider>
+);

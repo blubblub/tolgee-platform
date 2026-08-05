@@ -21,6 +21,7 @@ import { BaseProjectView } from 'tg.views/projects/BaseProjectView';
 import { useProject } from 'tg.hooks/useProject';
 import { useProjectPermissions } from 'tg.hooks/useProjectPermissions';
 import { useProjectLanguages } from 'tg.hooks/useProjectLanguages';
+import { ProjectLanguagesProvider } from 'tg.hooks/ProjectLanguagesProvider';
 import { LINKS, PARAMS } from 'tg.constants/links';
 import { BoxLoading } from 'tg.component/common/BoxLoading';
 import { useApiInfiniteQuery } from 'tg.service/http/useQueryApi';
@@ -145,7 +146,7 @@ const AssetLanguages = ({
   );
 };
 
-export const AssetTranslationsView = () => {
+const AssetTranslationsContent = () => {
   const project = useProject();
   const { t } = useTranslate();
   const { satisfiesPermission } = useProjectPermissions();
@@ -370,3 +371,9 @@ export const AssetTranslationsView = () => {
     </BaseProjectView>
   );
 };
+
+export const AssetTranslationsView = () => (
+  <ProjectLanguagesProvider>
+    <AssetTranslationsContent />
+  </ProjectLanguagesProvider>
+);

@@ -308,6 +308,8 @@ and the two ~440 MB transfers dominate the ~25 minute wall time.
 #    .github/workflows/export-blubblub-image.yml IMAGE:
 # 2. Commit and push main, then:
 gh workflow run blubblub-image.yml -R blubblub/tolgee-platform --ref main        # ~6 min
+# wait for the image build to COMPLETE first — the export pulls the new tag and
+# fails with manifest unknown otherwise; just re-run it
 gh workflow run export-blubblub-image.yml -R blubblub/tolgee-platform --ref main # ~1 min
 
 # 3. Download the artifact (1-day retention; gh buffers the whole zip, so
