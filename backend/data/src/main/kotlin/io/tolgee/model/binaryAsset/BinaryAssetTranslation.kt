@@ -12,6 +12,7 @@ import jakarta.persistence.FetchType
 import jakarta.persistence.Index
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
+import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 
@@ -64,4 +65,7 @@ class BinaryAssetTranslation(
 
   @ManyToOne(fetch = FetchType.LAZY)
   var uploadedBy: UserAccount? = null
+
+  @OneToMany(mappedBy = "translation", orphanRemoval = true)
+  var versions: MutableList<BinaryAssetTranslationVersion> = mutableListOf()
 }

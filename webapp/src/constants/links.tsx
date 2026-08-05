@@ -314,9 +314,19 @@ export class LINKS {
 
   static PROJECT_ASSETS = Link.ofParent(LINKS.PROJECT, 'assets');
 
+  static PROJECT_ASSET_TRANSLATIONS = Link.ofParent(
+    LINKS.PROJECT,
+    'asset-translations'
+  );
+
   static PROJECT_ASSET = Link.ofParent(
     LINKS.PROJECT_ASSETS,
     p(PARAMS.ASSET_ID)
+  );
+
+  static PROJECT_ASSET_TRANSLATION = Link.ofParent(
+    LINKS.PROJECT_ASSET_TRANSLATIONS,
+    `${p(PARAMS.ASSET_ID)}/translations/${p(PARAMS.LANGUAGE_ID)}`
   );
 
   static PROJECT_TRANSLATIONS_WITH_BRANCH = Link.ofParent(

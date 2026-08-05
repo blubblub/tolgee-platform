@@ -58,6 +58,8 @@ open class BinaryAssetTranslationModel(
   val transcriptState: String? = null,
   /** Whether this language's own audio can be transcribed — it has a file and a provider exists. */
   val transcriptionAvailable: Boolean = false,
+  val chosenVersionId: Long? = null,
+  val versionCount: Int = 0,
 )
 
 open class BinaryAssetDownloadTicketModel(

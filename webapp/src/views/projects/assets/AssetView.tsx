@@ -16,7 +16,7 @@ import {
 import { Stars01 } from '@untitled-ui/icons-react';
 import { useTranslate } from '@tolgee/react';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
-import { useRouteMatch } from 'react-router-dom';
+import { Link as RouterLink, useRouteMatch } from 'react-router-dom';
 
 import { BaseProjectView } from 'tg.views/projects/BaseProjectView';
 import { useProject } from 'tg.hooks/useProject';
@@ -439,6 +439,18 @@ export const AssetView = () => {
                       Delete
                     </Button>
                   )}
+                  <Button
+                    size="small"
+                    component={RouterLink}
+                    to={LINKS.PROJECT_ASSET_TRANSLATION.build({
+                      [PARAMS.PROJECT_ID]: project.id,
+                      [PARAMS.ASSET_ID]: asset.id,
+                      [PARAMS.LANGUAGE_ID]: row.languageId,
+                    })}
+                    data-cy="binary-asset-translation-pipeline"
+                  >
+                    {t('asset_translation_pipeline', 'Pipeline')}
+                  </Button>
                 </Box>
               </TableCell>
             </TableRow>

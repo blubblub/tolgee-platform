@@ -4,9 +4,11 @@ import io.tolgee.api.v2.controllers.binaryAsset.BinaryAssetController
 import io.tolgee.dtos.cacheable.LanguageDto
 import io.tolgee.model.binaryAsset.BinaryAsset
 import io.tolgee.model.binaryAsset.BinaryAssetTranslation
+import io.tolgee.model.binaryAsset.BinaryAssetTranslationVersion
 import io.tolgee.model.enums.BinaryAssetTranslationStatus
 import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.binaryAsset.BinaryAssetTranscriptService
+import io.tolgee.service.binaryAsset.BinaryAssetTranslationVersionService
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport
 import org.springframework.stereotype.Component
 
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Component
 class BinaryAssetModelAssembler(
   private val binaryAssetService: BinaryAssetService,
   private val binaryAssetTranscriptService: BinaryAssetTranscriptService,
+  private val binaryAssetTranslationVersionService: BinaryAssetTranslationVersionService,
 ) : RepresentationModelAssemblerSupport<BinaryAsset, BinaryAssetModel>(
     BinaryAssetController::class.java,
     BinaryAssetModel::class.java,
@@ -62,6 +65,15 @@ class BinaryAssetModelAssembler(
         lang.id != asset.sourceLanguage.id &&
           (visibleLanguageIds == null || lang.id in visibleLanguageIds)
       }
+    val translationIds = visibleTargets.mapNotNull { byLang[it.id]?.id }
+    val versionsByTranslation: Map<Long, List<BinaryAssetTranslationVersion>> =
+      if (translationIds.isEmpty()) {
+        emptyMap()
+      } else {
+        binaryAssetTranslationVersionService
+          .findByTranslationIdIn(translationIds)
+          .groupBy { it.translation.id }
+      }
     val translationModels =
       visibleTargets.map { lang ->
         toTranslationModel(
@@ -70,6 +82,7 @@ class BinaryAssetModelAssembler(
           byLang[lang.id],
           transcripts[lang.id],
           binaryAssetTranscriptService.canTranscribe(asset),
+          versionsByTranslation[byLang[lang.id]?.id].orEmpty(),
         )
       }
     var current = 0
@@ -98,8 +111,10 @@ class BinaryAssetModelAssembler(
     translation: BinaryAssetTranslation?,
     transcript: BinaryAssetTranscriptService.TranscriptText?,
     assetTranscribable: Boolean,
+    versions: List<BinaryAssetTranslationVersion> = emptyList(),
   ): BinaryAssetTranslationModel {
     val status = binaryAssetService.statusFor(asset, language.id, translation)
+    val chosen = versions.firstOrNull { it.chosen }
     return BinaryAssetTranslationModel(
       languageId = language.id,
       languageTag = language.tag,
@@ -114,8 +129,9 @@ class BinaryAssetModelAssembler(
       updatedAt = translation?.updatedAt,
       transcriptText = transcript?.text,
       transcriptState = transcript?.state,
-      // only meaningful when this language actually has its own audio
       transcriptionAvailable = assetTranscribable && status != BinaryAssetTranslationStatus.MISSING,
+      chosenVersionId = chosen?.id,
+      versionCount = versions.size,
     )
   }
 

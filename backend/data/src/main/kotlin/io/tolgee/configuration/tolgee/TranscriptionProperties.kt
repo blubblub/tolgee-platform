@@ -43,6 +43,9 @@ class TranscriptionProperties {
   @DocProperty(description = "Request timeout in seconds. Long audio legitimately takes a while.")
   var timeoutSeconds: Long = 300
 
+  @DocProperty(description = "Default ElevenLabs TTS model id used by the tts tool.")
+  var ttsModel: String = "eleven_multilingual_v2"
+
   val enabled: Boolean
     get() = !apiKey.isNullOrBlank()
 }

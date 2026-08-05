@@ -194,10 +194,11 @@ class BinaryAssetService(
     val translation =
       binaryAssetTranslationRepository.findByProjectAssetAndLanguage(projectId, assetId, languageId)
         ?: throw NotFoundException(Message.BINARY_ASSET_TRANSLATION_NOT_FOUND)
-    val key = translation.storageKey
+    val keys = mutableListOf(translation.storageKey)
+    keys += translation.versions.map { it.storageKey }
     binaryAssetTranslationRepository.delete(translation)
     entityManager.flush()
-    deleteBlobBestEffort(key)
+    keys.forEach { deleteBlobBestEffort(it) }
   }
 
   @Transactional
@@ -209,6 +210,7 @@ class BinaryAssetService(
       binaryAssetRepository.findByProjectIdAndId(projectId, assetId)
         ?: throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
     val keys = mutableListOf(asset.storageKey)
+    keys += asset.translations.flatMap { it.versions.map { v -> v.storageKey } }
     keys += asset.translations.map { it.storageKey }
     binaryAssetRepository.delete(asset)
     entityManager.flush()
@@ -221,6 +223,7 @@ class BinaryAssetService(
     val keys = mutableListOf<String>()
     assets.forEach { asset ->
       keys += asset.storageKey
+      keys += asset.translations.flatMap { it.versions.map { v -> v.storageKey } }
       keys += asset.translations.map { it.storageKey }
     }
     if (assets.isNotEmpty()) {
@@ -233,7 +236,7 @@ class BinaryAssetService(
   @Transactional
   fun deleteTranslationsForLanguage(languageId: Long) {
     val translations = binaryAssetTranslationRepository.findAllByLanguageId(languageId)
-    val keys = translations.map { it.storageKey }
+    val keys = translations.flatMap { it.versions.map { v -> v.storageKey } } + translations.map { it.storageKey }
     if (translations.isNotEmpty()) {
       binaryAssetTranslationRepository.deleteAll(translations)
       entityManager.flush()
@@ -393,7 +396,35 @@ class BinaryAssetService(
     }
   }
 
-  private fun deleteBlobBestEffort(storageKey: String) {
+  /** Store tool output bytes as a new blob, returning the storage key and file info. */
+  internal fun storeBlobBytes(
+    projectId: Long,
+    bytes: ByteArray,
+  ): StoredBlob {
+    if (bytes.isEmpty()) {
+      throw BadRequestException(Message.FILE_EMPTY)
+    }
+    val maxBytes = tolgeeProperties.maxUploadFileSize.toLong() * 1024L
+    if (bytes.size.toLong() > maxBytes) {
+      throw BadRequestException(Message.FILE_TOO_BIG)
+    }
+    val key = BinaryAssetStoragePaths.newBlobKey(projectId)
+    try {
+      val info = fileStorage.storeFileStream(key, bytes.inputStream(), bytes.size.toLong())
+      if (info.byteSize == 0L) {
+        deleteBlobBestEffort(key)
+        throw BadRequestException(Message.FILE_EMPTY)
+      }
+      return StoredBlob(key, info)
+    } catch (e: BadRequestException) {
+      throw e
+    } catch (e: Exception) {
+      deleteBlobBestEffort(key)
+      throw e
+    }
+  }
+
+  internal fun deleteBlobBestEffort(storageKey: String) {
     try {
       if (fileStorage.fileExists(storageKey)) {
         fileStorage.deleteFile(storageKey)
@@ -435,7 +466,7 @@ class BinaryAssetService(
     val storageKey: String,
   )
 
-  private data class StoredBlob(
+  internal data class StoredBlob(
     val storageKey: String,
     val info: StoredFileInfo,
   )

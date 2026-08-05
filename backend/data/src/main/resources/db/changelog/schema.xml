@@ -5950,5 +5950,50 @@
         </createIndex>
         <addForeignKeyConstraint baseColumnNames="transcript_key_id" baseTableName="binary_asset" constraintName="FK_binary_asset_transcript_key" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="key" validate="true"/>
     </changeSet>
+    <changeSet author="blubblub" id="1785922779000-1">
+        <createTable tableName="binary_asset_translation_version">
+            <column name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="binary_asset_translation_versionPK"/>
+            </column>
+            <column name="translation_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="storage_key" type="VARCHAR(512)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="original_filename" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="content_type" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="byte_size" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="sha256" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tool" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tool_params" type="TEXT"/>
+            <column defaultValueBoolean="false" name="chosen" type="BOOLEAN">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by_id" type="BIGINT"/>
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITHOUT TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex indexName="binary_asset_translation_version_translation_id_idx" tableName="binary_asset_translation_version">
+            <column name="translation_id"/>
+        </createIndex>
+        <addForeignKeyConstraint baseColumnNames="translation_id" baseTableName="binary_asset_translation_version" constraintName="FK_binary_asset_translation_version_translation" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="binary_asset_translation" validate="true"/>
+        <addForeignKeyConstraint baseColumnNames="created_by_id" baseTableName="binary_asset_translation_version" constraintName="FK_binary_asset_translation_version_created_by" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="user_account" validate="true"/>
+        <sql>CREATE UNIQUE INDEX batv_one_chosen_per_translation ON binary_asset_translation_version (translation_id) WHERE chosen</sql>
+    </changeSet>
 
 </databaseChangeLog>

@@ -1,9 +1,32 @@
 import { apiV2HttpService } from 'tg.service/http/ApiV2HttpService';
-import { BinaryAsset, BinaryAssetPage, DownloadTicket } from './types';
+import {
+  BinaryAsset,
+  BinaryAssetPage,
+  BinaryAssetTranslation,
+  DownloadTicket,
+} from './types';
 
 // apiV2HttpService already prefixes with /v2/
 const base = (projectId: number | string) =>
   `projects/${projectId}/binary-assets`;
+
+export type BinaryAssetTranslationVersionModel = {
+  id: number;
+  tool: string;
+  toolParams: string | null;
+  originalFilename: string;
+  contentType: string;
+  byteSize: number;
+  sha256: string;
+  chosen: boolean;
+  createdById: number | null;
+  createdAt: string;
+};
+
+export type BinaryAssetTranslationWithVersions = BinaryAssetTranslation & {
+  chosenVersionId: number | null;
+  versionCount: number;
+};
 
 export const binaryAssetApi = {
   list(
@@ -87,5 +110,65 @@ export const binaryAssetApi = {
   },
   deleteAsset(projectId: number, assetId: number) {
     return apiV2HttpService.delete(`${base(projectId)}/${assetId}`);
+  },
+  listVersions(
+    projectId: number,
+    assetId: number,
+    languageId: number
+  ): Promise<BinaryAssetTranslationVersionModel[]> {
+    return apiV2HttpService.get(
+      `${base(projectId)}/${assetId}/translations/${languageId}/versions`
+    );
+  },
+  runTool(
+    projectId: number,
+    assetId: number,
+    languageId: number,
+    body: {
+      tool: string;
+      params?: Record<string, unknown>;
+      baseVersionId?: number;
+    }
+  ): Promise<BinaryAssetTranslationVersionModel> {
+    return apiV2HttpService.post(
+      `${base(projectId)}/${assetId}/translations/${languageId}/versions/run`,
+      body
+    );
+  },
+  setChosenVersion(
+    projectId: number,
+    assetId: number,
+    languageId: number,
+    body: { versionId: number | null }
+  ): Promise<BinaryAssetTranslationWithVersions> {
+    return apiV2HttpService.put(
+      `${base(projectId)}/${assetId}/translations/${languageId}/chosen-version`,
+      body
+    );
+  },
+  deleteVersion(
+    projectId: number,
+    assetId: number,
+    languageId: number,
+    versionId: number
+  ) {
+    return apiV2HttpService.delete(
+      `${base(
+        projectId
+      )}/${assetId}/translations/${languageId}/versions/${versionId}`
+    );
+  },
+  versionTicket(
+    projectId: number,
+    assetId: number,
+    languageId: number,
+    versionId: number
+  ): Promise<DownloadTicket> {
+    return apiV2HttpService.post(
+      `${base(
+        projectId
+      )}/${assetId}/translations/${languageId}/versions/${versionId}/download-ticket`,
+      {}
+    );
   },
 };

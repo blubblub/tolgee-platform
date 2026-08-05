@@ -4,6 +4,7 @@ import {
   FileDownload03,
   Globe01,
   HomeLine,
+  LayersThree01,
   LayoutAlt04,
   Settings01,
   Translate01,
@@ -71,6 +72,16 @@ export const ProjectMenu = () => {
       icon: UploadCloud02,
       text: t('project_menu_assets', 'Assets'),
       dataCy: 'project-menu-item-assets',
+      matchAsPrefix: true,
+    },
+    {
+      id: 'asset-translations',
+      condition: ({ satisfiesPermission }) =>
+        satisfiesPermission('translations.view'),
+      link: LINKS.PROJECT_ASSET_TRANSLATIONS,
+      icon: LayersThree01,
+      text: t('project_menu_asset_translations', 'Asset translations'),
+      dataCy: 'project-menu-item-asset-translations',
       matchAsPrefix: true,
     },
     {

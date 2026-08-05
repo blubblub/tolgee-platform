@@ -9,6 +9,7 @@ import io.tolgee.exceptions.PermissionException
 import io.tolgee.model.enums.Scope
 import io.tolgee.security.authentication.JwtService
 import io.tolgee.service.binaryAsset.BinaryAssetService
+import io.tolgee.service.binaryAsset.BinaryAssetTranslationVersionService
 import io.tolgee.service.security.PermissionService
 import io.tolgee.service.security.SecurityService
 import org.springframework.http.HttpHeaders
@@ -29,6 +30,7 @@ import java.nio.charset.StandardCharsets
 class BinaryAssetDownloadController(
   private val jwtService: JwtService,
   private val binaryAssetService: BinaryAssetService,
+  private val binaryAssetTranslationVersionService: BinaryAssetTranslationVersionService,
   private val securityService: SecurityService,
   private val permissionService: PermissionService,
 ) {
@@ -53,6 +55,7 @@ class BinaryAssetDownloadController(
     val projectId = data["projectId"]?.toLongOrNull() ?: throw NotFoundException()
     val assetId = data["assetId"]?.toLongOrNull() ?: throw NotFoundException()
     val languageId = data["languageId"]?.toLongOrNull()
+    val versionId = data["versionId"]?.toLongOrNull()
     val storageKey = data["storageKey"] ?: throw NotFoundException()
     val rawContentType = data["contentType"] ?: "application/octet-stream"
     val filename = data["filename"] ?: "file.bin"
@@ -76,6 +79,14 @@ class BinaryAssetDownloadController(
     if (languageId == null) {
       val asset = binaryAssetService.get(projectId, assetId)
       if (asset.storageKey != storageKey) throw NotFoundException()
+    } else if (versionId != null) {
+      val version =
+        try {
+          binaryAssetTranslationVersionService.getVersion(projectId, assetId, languageId, versionId)
+        } catch (_: NotFoundException) {
+          throw NotFoundException()
+        }
+      if (version.storageKey != storageKey) throw NotFoundException()
     } else {
       val streamMeta =
         try {
