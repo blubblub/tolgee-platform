@@ -9,7 +9,7 @@ permissions:
 
 env:
   DOCKER_IMAGE: ghcr.io/blubblub/tolgee-platform
-  VERSION: v3.215.0-blubblub.20
+  VERSION: v3.215.0-blubblub.21
 
 jobs:
   publish:
