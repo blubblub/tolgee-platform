@@ -4,20 +4,10 @@ import {
   AlertTitle,
   Box,
   Button,
-  Checkbox,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControl,
   FormControlLabel,
-  InputLabel,
-  MenuItem,
   Radio,
-  Select,
-  TextField,
   Typography,
 } from '@mui/material';
 import { ArrowLeft, Download01, Trash01 } from '@untitled-ui/icons-react';
@@ -39,11 +29,14 @@ import {
   binaryAssetApi,
   BinaryAssetTranslationVersionModel,
   BinaryAssetTranslationWithVersions,
-  resolveDefaultVoice,
+  RunPayload,
+  TOOL_LABELS,
 } from './binaryAssetApi';
 import { BinaryAssetPreview } from './BinaryAssetPreview';
 import { BinaryAssetTranslation } from './types';
+import { RunToolDialog } from './RunToolDialog';
 import { useRunErrorText } from './useRunErrorText';
+import { useRunTool } from './useRunTool';
 
 const formatBytes = (n: number) => {
   if (n < 1024) return `${n} B`;
@@ -69,24 +62,6 @@ const parseToolParams = (
   }
 };
 
-type Tool = 'tts' | 'voice-changer';
-
-type RunPayload = {
-  tool: Tool;
-  params: Record<string, unknown>;
-  baseVersionId?: number;
-};
-
-const TOOL_LABELS: Record<Tool, string> = {
-  tts: 'Text-to-speech',
-  'voice-changer': 'Voice changer',
-};
-
-const DEFAULT_MODEL_PLACEHOLDER: Record<Tool, string> = {
-  tts: 'eleven_multilingual_v2',
-  'voice-changer': 'eleven_multilingual_sts_v2',
-};
-
 const AssetTranslationContent = () => {
   const project = useProject();
   const match = useRouteMatch();
@@ -104,11 +79,6 @@ const AssetTranslationContent = () => {
     useProjectPermissions();
 
   const [runDialogOpen, setRunDialogOpen] = useState(false);
-  const [tool, setTool] = useState<Tool>('tts');
-  const [voiceId, setVoiceId] = useState('');
-  const [modelId, setModelId] = useState('');
-  const [removeBackgroundNoise, setRemoveBackgroundNoise] = useState(false);
-  const [baseVersionId, setBaseVersionId] = useState<string>('og');
   const [failedRun, setFailedRun] = useState<{
     payload: RunPayload;
     code?: string;
@@ -130,14 +100,6 @@ const AssetTranslationContent = () => {
     () => binaryAssetApi.listVersions(project.id, assetId, languageId),
     { enabled: canView }
   );
-
-  const voicesQuery = useQuery(
-    ['binary-asset-voices', project.id],
-    () => binaryAssetApi.listVoices(project.id),
-    { enabled: canView }
-  );
-
-  const defaultVoiceId = resolveDefaultVoice(voicesQuery.data, languageId);
 
   const translation = useMemo(() => {
     const tr = assetQuery.data?.translations?.find(
@@ -211,46 +173,27 @@ const AssetTranslationContent = () => {
     }
   );
 
-  const runTool = useMutation(
-    (payload: RunPayload) =>
-      binaryAssetApi.runTool(project.id, assetId, languageId, payload),
-    {
-      onSuccess: () => {
-        invalidate();
-        setRunDialogOpen(false);
-        setFailedRun(null);
-        setVoiceId('');
-        setModelId('');
-        setRemoveBackgroundNoise(false);
-        setBaseVersionId('og');
-        actions.showMessage({
-          text: t(
-            'asset_translation_tool_started',
-            'Tool finished successfully.'
-          ),
-          variant: 'success',
-        });
-      },
-      onError: (e: any, payload) => {
-        // keep it on the page — a toast is gone before you can read it
-        setFailedRun({ payload, code: e?.code });
-        setRunDialogOpen(false);
-        actions.showMessage({
-          text: runErrorText(e?.code),
-          variant: 'error',
-        });
-      },
-    }
-  );
-
-  const buildPayload = (): RunPayload => ({
-    tool,
-    params: {
-      voiceId,
-      ...(modelId ? { modelId } : {}),
-      ...(tool === 'voice-changer' ? { removeBackgroundNoise } : {}),
+  const runTool = useRunTool({
+    projectId: project.id,
+    assetId,
+    languageId,
+    onSuccess: () => {
+      setRunDialogOpen(false);
+      setFailedRun(null);
+      actions.showMessage({
+        text: t(
+          'asset_translation_tool_started',
+          'Tool finished successfully.'
+        ),
+        variant: 'success',
+      });
     },
-    baseVersionId: baseVersionId === 'og' ? undefined : Number(baseVersionId),
+    onError: (code, payload) => {
+      // keep it on the page — a toast is gone before you can read it
+      setFailedRun({ payload, code });
+      setRunDialogOpen(false);
+      actions.showMessage({ text: runErrorText(code), variant: 'error' });
+    },
   });
 
   const downloadVersion = async (versionId: number) => {
@@ -488,11 +431,7 @@ const AssetTranslationContent = () => {
               <Button
                 size="small"
                 variant="outlined"
-                onClick={() => {
-                  // prefill the project/language default — the field stays editable
-                  setVoiceId(defaultVoiceId);
-                  setRunDialogOpen(true);
-                }}
+                onClick={() => setRunDialogOpen(true)}
                 data-cy="asset-version-run-tool"
               >
                 {t('asset_translation_run_tool', 'Run tool')}
@@ -670,121 +609,15 @@ const AssetTranslationContent = () => {
         </Box>
       )}
 
-      <Dialog
+      <RunToolDialog
+        projectId={project.id}
+        assetId={assetId}
+        languageId={languageId}
         open={runDialogOpen}
+        isLoading={runTool.isLoading}
         onClose={() => setRunDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        data-cy="asset-version-run-dialog"
-      >
-        <DialogTitle>
-          {t('asset_translation_run_dialog_title', 'Run tool')}
-        </DialogTitle>
-        <DialogContent>
-          <Box display="flex" flexDirection="column" gap={2} mt={1}>
-            <FormControl fullWidth size="small">
-              <InputLabel id="asset-version-tool-label">
-                {t('asset_translation_tool_label', 'Tool')}
-              </InputLabel>
-              <Select
-                labelId="asset-version-tool-label"
-                value={tool}
-                label={t('asset_translation_tool_label', 'Tool')}
-                onChange={(e) => setTool(e.target.value as Tool)}
-                data-cy="asset-version-tool-select"
-              >
-                <MenuItem value="tts">
-                  {t('asset_translation_tool_tts', 'Text-to-speech')}
-                </MenuItem>
-                <MenuItem value="voice-changer">
-                  {t('asset_translation_tool_voice_changer', 'Voice changer')}
-                </MenuItem>
-              </Select>
-            </FormControl>
-
-            <TextField
-              size="small"
-              label={t('asset_translation_voice_id', 'Voice ID')}
-              value={voiceId}
-              onChange={(e) => setVoiceId(e.target.value)}
-              required
-              helperText={
-                defaultVoiceId && voiceId === defaultVoiceId
-                  ? t(
-                      'asset_translation_voice_id_default',
-                      'Default for this project or language — edit to use another voice.'
-                    )
-                  : undefined
-              }
-              data-cy="asset-version-voice-id"
-            />
-
-            <TextField
-              size="small"
-              label={t('asset_translation_model_id', 'Model ID')}
-              placeholder={DEFAULT_MODEL_PLACEHOLDER[tool]}
-              value={modelId}
-              onChange={(e) => setModelId(e.target.value)}
-              data-cy="asset-version-model-id"
-            />
-
-            {tool === 'voice-changer' && (
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={removeBackgroundNoise}
-                    onChange={(e) => setRemoveBackgroundNoise(e.target.checked)}
-                    data-cy="asset-version-remove-background-noise"
-                  />
-                }
-                label={t(
-                  'asset_translation_remove_background_noise',
-                  'Remove background noise'
-                )}
-              />
-            )}
-
-            <FormControl fullWidth size="small">
-              <InputLabel id="asset-version-base-label">
-                {t('asset_translation_base_file', 'Base file')}
-              </InputLabel>
-              <Select
-                labelId="asset-version-base-label"
-                value={baseVersionId}
-                label={t('asset_translation_base_file', 'Base file')}
-                onChange={(e) => setBaseVersionId(e.target.value)}
-                data-cy="asset-version-base-select"
-              >
-                <MenuItem value="og">
-                  {t('asset_translation_original', 'Original upload')}
-                </MenuItem>
-                {versions.map((v) => (
-                  <MenuItem key={v.id} value={String(v.id)}>
-                    {v.originalFilename} ({v.tool})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRunDialogOpen(false)}>
-            {t('asset_translation_cancel', 'Cancel')}
-          </Button>
-          <Button
-            variant="contained"
-            disabled={!voiceId.trim() || runTool.isLoading}
-            onClick={() => runTool.mutate(buildPayload())}
-            data-cy="asset-version-run-submit"
-          >
-            {runTool.isLoading ? (
-              <CircularProgress size={18} />
-            ) : (
-              t('asset_translation_run', 'Run')
-            )}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onSubmit={(payload) => runTool.mutate(payload)}
+      />
     </BaseProjectView>
   );
 };

@@ -28,6 +28,19 @@ export type BinaryAssetTranslationWithVersions = BinaryAssetTranslation & {
   versionCount: number;
 };
 
+export type Tool = 'tts' | 'voice-changer';
+
+export type RunPayload = {
+  tool: Tool;
+  params: Record<string, unknown>;
+  baseVersionId?: number;
+};
+
+export const TOOL_LABELS: Record<Tool, string> = {
+  tts: 'Text-to-speech',
+  'voice-changer': 'Voice changer',
+};
+
 export type BinaryAssetVoiceModel = {
   /** null = the project-wide default */
   languageId: number | null;

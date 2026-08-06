@@ -157,7 +157,9 @@ declare namespace DataCy {
         "billing-plan-subtitle": true;
         "billing-progress-label-item": true;
         "binary-asset-delete": true;
+        "binary-asset-delete-translation": true;
         "binary-asset-download-source": true;
+        "binary-asset-download-translation": true;
         "binary-asset-preview-audio": true;
         "binary-asset-preview-error": true;
         "binary-asset-preview-image": true;
@@ -165,6 +167,7 @@ declare namespace DataCy {
         "binary-asset-preview-unsupported": true;
         "binary-asset-preview-video": true;
         "binary-asset-replace-source": true;
+        "binary-asset-run-tool": true;
         "binary-asset-source": true;
         "binary-asset-transcript": true;
         "binary-asset-transcript-add": true;

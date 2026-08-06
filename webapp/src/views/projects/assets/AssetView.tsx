@@ -13,7 +13,14 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { Stars01 } from '@untitled-ui/icons-react';
+import {
+  Download01,
+  LayersThree01,
+  Stars01,
+  Trash01,
+  UploadCloud02,
+  Zap,
+} from '@untitled-ui/icons-react';
 import { useTranslate } from '@tolgee/react';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
 import { Link as RouterLink, useRouteMatch } from 'react-router-dom';
@@ -29,6 +36,9 @@ import { BinaryAssetPreview, previewKind } from './BinaryAssetPreview';
 import { AssetTranscript } from './AssetTranscript';
 import { TranscriptEditor } from './TranscriptEditor';
 import { BinaryAssetTranslationStatus } from './types';
+import { RunToolDialog } from './RunToolDialog';
+import { useRunErrorText } from './useRunErrorText';
+import { useRunTool } from './useRunTool';
 
 const statusColor = (status: BinaryAssetTranslationStatus) => {
   switch (status) {
@@ -57,10 +67,27 @@ export const AssetView = () => {
   const [generatingLanguageId, setGeneratingLanguageId] = useState<
     number | null
   >(null);
+  const [runLanguageId, setRunLanguageId] = useState<number | null>(null);
+  const runErrorText = useRunErrorText();
 
   const generateLanguage = useApiMutation({
     url: '/v2/projects/{projectId}/binary-assets/{assetId}/transcript/generate/{languageId}',
     method: 'post',
+  });
+
+  const runTool = useRunTool({
+    projectId: project.id,
+    assetId,
+    // the dialog only opens with a language selected; 0 is never submitted
+    languageId: runLanguageId ?? 0,
+    onSuccess: () => {
+      setRunLanguageId(null);
+      setError(null);
+    },
+    onError: (code) => {
+      setRunLanguageId(null);
+      setError(runErrorText(code));
+    },
   });
 
   const canEdit = satisfiesPermission('keys.edit');
@@ -396,9 +423,55 @@ export const AssetView = () => {
                         )}
                     </Box>
                   ) : (
-                    <Typography variant="caption" color="text.secondary">
-                      —
-                    </Typography>
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      <Typography variant="caption" color="text.secondary">
+                        —
+                      </Typography>
+                      {row.transcriptionAvailable &&
+                        row.status !== 'MISSING' &&
+                        satisfiesLanguageAccess(
+                          'translations.edit',
+                          row.languageId
+                        ) && (
+                          <Tooltip
+                            title={t(
+                              'binary_assets_transcript_generate_language',
+                              "Transcribe this language's audio with AI"
+                            )}
+                          >
+                            <span>
+                              <IconButton
+                                size="small"
+                                disabled={
+                                  generateLanguage.isLoading &&
+                                  generatingLanguageId === row.languageId
+                                }
+                                onClick={() => {
+                                  setGeneratingLanguageId(row.languageId);
+                                  generateLanguage.mutate(
+                                    {
+                                      path: {
+                                        projectId: project.id,
+                                        assetId: asset.id,
+                                        languageId: row.languageId,
+                                      },
+                                    },
+                                    { onSuccess: invalidate }
+                                  );
+                                }}
+                                data-cy="binary-asset-transcript-generate-language"
+                              >
+                                {generateLanguage.isLoading &&
+                                generatingLanguageId === row.languageId ? (
+                                  <CircularProgress size={16} />
+                                ) : (
+                                  <Stars01 width={16} height={16} />
+                                )}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        )}
+                    </Box>
                   )}
                 </TableCell>
               )}
@@ -409,48 +482,83 @@ export const AssetView = () => {
                   justifyContent="flex-end"
                   flexWrap="wrap"
                 >
-                  {row.status !== 'MISSING' && (
-                    <Button
-                      size="small"
-                      onClick={() => downloadTranslation(row.languageId)}
+                  {/* a run reads the uploaded file, so there must be one */}
+                  {canTranslate && row.status !== 'MISSING' && (
+                    <Tooltip
+                      title={t(
+                        'binary_assets_generate_audio',
+                        'Generate with AI (pipeline)'
+                      )}
                     >
-                      Download
-                    </Button>
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => setRunLanguageId(row.languageId)}
+                        data-cy="binary-asset-run-tool"
+                      >
+                        <Zap width={16} height={16} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {row.status !== 'MISSING' && (
+                    <Tooltip
+                      title={t('asset_translation_download', 'Download')}
+                    >
+                      <IconButton
+                        size="small"
+                        onClick={() => downloadTranslation(row.languageId)}
+                        data-cy="binary-asset-download-translation"
+                      >
+                        <Download01 width={16} height={16} />
+                      </IconButton>
+                    </Tooltip>
                   )}
                   {canTranslate && (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => {
-                        setUploadLanguageId(row.languageId);
-                        fileInputRef.current?.click();
-                      }}
-                      data-cy="binary-asset-upload-translation"
+                    <Tooltip
+                      title={
+                        row.status === 'MISSING'
+                          ? t('binary_assets_upload_translation', 'Upload')
+                          : t('binary_assets_replace_translation', 'Replace')
+                      }
                     >
-                      {row.status === 'MISSING' ? 'Upload' : 'Replace'}
-                    </Button>
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          setUploadLanguageId(row.languageId);
+                          fileInputRef.current?.click();
+                        }}
+                        data-cy="binary-asset-upload-translation"
+                      >
+                        <UploadCloud02 width={16} height={16} />
+                      </IconButton>
+                    </Tooltip>
                   )}
                   {canTranslate && row.status !== 'MISSING' && (
-                    <Button
-                      size="small"
-                      color="error"
-                      onClick={() => deleteTranslation.mutate(row.languageId)}
-                    >
-                      Delete
-                    </Button>
+                    <Tooltip title={t('binary_assets_delete', 'Delete')}>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => deleteTranslation.mutate(row.languageId)}
+                        data-cy="binary-asset-delete-translation"
+                      >
+                        <Trash01 width={16} height={16} />
+                      </IconButton>
+                    </Tooltip>
                   )}
-                  <Button
-                    size="small"
-                    component={RouterLink}
-                    to={LINKS.PROJECT_ASSET_TRANSLATION.build({
-                      [PARAMS.PROJECT_ID]: project.id,
-                      [PARAMS.ASSET_ID]: asset.id,
-                      [PARAMS.LANGUAGE_ID]: row.languageId,
-                    })}
-                    data-cy="binary-asset-translation-pipeline"
-                  >
-                    {t('asset_translation_pipeline', 'Pipeline')}
-                  </Button>
+                  <Tooltip title={t('asset_translation_pipeline', 'Pipeline')}>
+                    <IconButton
+                      size="small"
+                      component={RouterLink}
+                      to={LINKS.PROJECT_ASSET_TRANSLATION.build({
+                        [PARAMS.PROJECT_ID]: project.id,
+                        [PARAMS.ASSET_ID]: asset.id,
+                        [PARAMS.LANGUAGE_ID]: row.languageId,
+                      })}
+                      data-cy="binary-asset-translation-pipeline"
+                    >
+                      <LayersThree01 width={16} height={16} />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
               </TableCell>
             </TableRow>
@@ -464,6 +572,18 @@ export const AssetView = () => {
         hidden
         onChange={(e) => onFileChosen(e.target.files?.[0] ?? null)}
       />
+
+      {runLanguageId !== null && (
+        <RunToolDialog
+          projectId={project.id}
+          assetId={asset.id}
+          languageId={runLanguageId}
+          open
+          isLoading={runTool.isLoading}
+          onClose={() => setRunLanguageId(null)}
+          onSubmit={(payload) => runTool.mutate(payload)}
+        />
+      )}
     </BaseProjectView>
   );
 };
