@@ -104,6 +104,7 @@ declare module '@tolgee/web' {
     | 'asset_translation_model_id'
     | 'asset_translation_base_file'
     | 'binary_assets_all_languages'
+    | 'binary_assets_source_badge'
     | 'binary_assets_reviewed_confirm'
     | 'binary_assets_reviewed_undo'
     | 'binary_assets_transcript_add_source'

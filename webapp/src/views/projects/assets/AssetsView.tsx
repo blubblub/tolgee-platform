@@ -28,9 +28,7 @@ import {
 } from 'tg.service/http/useQueryApi';
 import { useInView } from 'react-intersection-observer';
 import { binaryAssetApi, visibleTranslations } from './binaryAssetApi';
-import { BinaryAssetPreview } from './BinaryAssetPreview';
 import { AssetLocalizedFiles } from './AssetLocalizedFiles';
-import { AssetSourceTranscript } from './AssetSourceTranscript';
 
 type MediaFilter = 'AUDIO' | 'VIDEO' | 'IMAGE';
 
@@ -349,22 +347,10 @@ const AssetsViewContent = () => {
                       {asset.name}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {asset.originalFilename} · {asset.sourceLanguageTag} r
-                      {asset.sourceRevision} · {asset.contentType}
+                      {/* the filename lives in the source row now */}
+                      {asset.sourceLanguageTag} r{asset.sourceRevision} ·{' '}
+                      {asset.contentType}
                     </Typography>
-                    <AssetSourceTranscript
-                      projectId={project.id}
-                      asset={asset}
-                    />
-                    <Box mt={1}>
-                      <BinaryAssetPreview
-                        projectId={project.id}
-                        assetId={asset.id}
-                        contentType={asset.contentType}
-                        filename={asset.originalFilename}
-                        compact
-                      />
-                    </Box>
                   </Box>
                   <Box display="flex" gap={1} alignItems="center">
                     <Chip
@@ -386,6 +372,11 @@ const AssetsViewContent = () => {
                     projectId={project.id}
                     asset={asset}
                     languageTags={selectedLanguages}
+                    sourceLanguageName={
+                      projectLanguages.find(
+                        (l) => l.tag === asset.sourceLanguageTag
+                      )?.name ?? asset.sourceLanguageTag
+                    }
                   />
                 </Box>
               </Box>

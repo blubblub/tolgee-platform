@@ -170,6 +170,7 @@ declare namespace DataCy {
         "binary-asset-review-toggle": true;
         "binary-asset-run-tool": true;
         "binary-asset-source": true;
+        "binary-asset-source-row": true;
         "binary-asset-transcript": true;
         "binary-asset-transcript-add": true;
         "binary-asset-transcript-cell": true;

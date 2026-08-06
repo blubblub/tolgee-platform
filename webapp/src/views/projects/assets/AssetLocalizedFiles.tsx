@@ -36,6 +36,7 @@ import {
   visibleTranslations,
 } from './binaryAssetApi';
 import { BinaryAssetPreview, previewKind } from './BinaryAssetPreview';
+import { AssetSourceTranscript } from './AssetSourceTranscript';
 import { TranscriptEditor } from './TranscriptEditor';
 import { BinaryAsset, BinaryAssetTranslationStatus } from './types';
 import { RunToolDialog } from './RunToolDialog';
@@ -58,6 +59,11 @@ type Props = {
   asset: BinaryAsset;
   /** Tags to show; empty or undefined means every target language. */
   languageTags?: string[];
+  /**
+   * Name of the source language. When set, the source is listed first as a bolded row — the detail
+   * page presents it separately instead, so it leaves this out.
+   */
+  sourceLanguageName?: string;
 };
 
 /**
@@ -68,13 +74,16 @@ export const AssetLocalizedFiles = ({
   projectId,
   asset,
   languageTags,
+  sourceLanguageName,
 }: Props) => {
   const { t } = useTranslate();
   const { satisfiesPermission, satisfiesLanguageAccess } =
     useProjectPermissions();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadLanguageId, setUploadLanguageId] = useState<number | null>(null);
+  const [uploadTarget, setUploadTarget] = useState<number | 'source' | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
   const [generatingLanguageId, setGeneratingLanguageId] = useState<
     number | null
@@ -90,6 +99,7 @@ export const AssetLocalizedFiles = ({
 
   const canTranslate = satisfiesPermission('translations.edit');
   const canReview = satisfiesPermission('translations.state-edit');
+  const canEditSource = satisfiesPermission('keys.edit');
 
   const rows = useMemo(
     () => visibleTranslations(asset, languageTags),
@@ -159,11 +169,24 @@ export const AssetLocalizedFiles = ({
     { onSuccess: invalidate }
   );
 
-  const onFileChosen = (file: File | null) => {
-    if (file && uploadLanguageId !== null) {
-      upsertTranslation.mutate({ languageId: uploadLanguageId, file });
+  const replaceSource = useMutation(
+    (file: File) => binaryAssetApi.replaceSource(projectId, asset.id, file),
+    {
+      onSuccess: () => {
+        setError(null);
+        invalidate();
+      },
+      onError: (e: any) => setError(e?.message || 'Upload failed'),
     }
-    setUploadLanguageId(null);
+  );
+
+  const onFileChosen = (file: File | null) => {
+    if (file && uploadTarget === 'source') {
+      replaceSource.mutate(file);
+    } else if (file && typeof uploadTarget === 'number') {
+      upsertTranslation.mutate({ languageId: uploadTarget, file });
+    }
+    setUploadTarget(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -217,7 +240,7 @@ export const AssetLocalizedFiles = ({
         </Typography>
       )}
 
-      {rows.length === 0 ? (
+      {rows.length === 0 && !sourceLanguageName ? (
         <Typography
           variant="body2"
           color="text.secondary"
@@ -251,6 +274,79 @@ export const AssetLocalizedFiles = ({
             </TableRow>
           </TableHead>
           <TableBody>
+            {sourceLanguageName && (
+              <TableRow data-cy="binary-asset-source-row">
+                <TableCell>
+                  <Typography variant="body2" fontWeight={700}>
+                    {sourceLanguageName} ({asset.sourceLanguageTag})
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={t('binary_assets_source_badge', 'ORIGINAL')}
+                  />
+                </TableCell>
+                <TableCell>
+                  <BinaryAssetPreview
+                    projectId={projectId}
+                    assetId={asset.id}
+                    contentType={asset.contentType}
+                    filename={asset.originalFilename}
+                    enabled={inView}
+                    compact
+                  />
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" fontWeight={700}>
+                    {asset.originalFilename} · {formatBytes(asset.byteSize)}
+                  </Typography>
+                </TableCell>
+                {hasTranscriptSupport && (
+                  <TableCell
+                    sx={{
+                      maxWidth: 260,
+                      minWidth: 180,
+                      whiteSpace: 'normal !important',
+                    }}
+                  >
+                    <AssetSourceTranscript
+                      projectId={projectId}
+                      asset={asset}
+                    />
+                  </TableCell>
+                )}
+                <TableCell>
+                  <Typography variant="caption" color="text.secondary">
+                    —
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Box display="flex" gap={1} justifyContent="flex-end">
+                    {canEditSource && (
+                      <Tooltip
+                        title={t(
+                          'binary_assets_replace_source',
+                          'Replace source'
+                        )}
+                      >
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setUploadTarget('source');
+                            fileInputRef.current?.click();
+                          }}
+                          data-cy="binary-asset-replace-source"
+                        >
+                          <UploadCloud02 width={16} height={16} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
+                </TableCell>
+              </TableRow>
+            )}
             {rows.map((row) => (
               <TableRow key={row.languageId}>
                 <TableCell>
@@ -442,7 +538,7 @@ export const AssetLocalizedFiles = ({
                         <IconButton
                           size="small"
                           onClick={() => {
-                            setUploadLanguageId(row.languageId);
+                            setUploadTarget(row.languageId);
                             fileInputRef.current?.click();
                           }}
                           data-cy="binary-asset-upload-translation"
