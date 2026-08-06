@@ -167,6 +167,7 @@ declare namespace DataCy {
         "binary-asset-preview-unsupported": true;
         "binary-asset-preview-video": true;
         "binary-asset-replace-source": true;
+        "binary-asset-review-toggle": true;
         "binary-asset-run-tool": true;
         "binary-asset-source": true;
         "binary-asset-transcript": true;
@@ -203,10 +204,13 @@ declare namespace DataCy {
         "binary-assets-help": true;
         "binary-assets-list": true;
         "binary-assets-list-item": true;
-        "binary-assets-list-transcript": true;
         "binary-assets-load-more": true;
         "binary-assets-name-input": true;
         "binary-assets-search": true;
+        "binary-assets-source-transcript": true;
+        "binary-assets-source-transcript-generate": true;
+        "binary-assets-source-transcript-input": true;
+        "binary-assets-source-transcript-placeholder": true;
         "binary-assets-type-filter": true;
         "branch-default-chip": true;
         "branch-name-input": true;

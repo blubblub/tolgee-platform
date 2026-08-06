@@ -415,6 +415,68 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
 
   @Test
   @ProjectJWTAuthTestMethod
+  fun `switching or deleting the final version drops the confirmation`() {
+    val assetId = createAsset("vox-review-version")
+    uploadTranslation(assetId, "de")
+    createTranscriptWithText(assetId, "Source.")
+    setTranslationForKey("transcript.vox-review-version", "de", "Quelle.")
+    val de = languageId("de")
+
+    val first = runTool(assetId, "de", "tts")
+    val second = runTool(assetId, "de", "tts")
+
+    chooseVersion(assetId, de, first)
+    confirm(assetId, de)
+    assertThat(isReviewed(assetId, de)).isTrue()
+
+    // a run on its own leaves the final alone, so the confirmation must survive it
+    runTool(assetId, "de", "tts")
+    assertThat(isReviewed(assetId, de)).isTrue()
+
+    chooseVersion(assetId, de, second)
+    assertThat(isReviewed(assetId, de)).isFalse()
+
+    confirm(assetId, de)
+    performProjectAuthDelete("binary-assets/$assetId/translations/$de/versions/$second", null)
+      .andIsNoContent
+    assertThat(isReviewed(assetId, de)).isFalse()
+  }
+
+  private fun chooseVersion(
+    assetId: Long,
+    languageId: Long,
+    versionId: Long?,
+  ) {
+    performProjectAuthPut(
+      "binary-assets/$assetId/translations/$languageId/versions/chosen-version",
+      mapOf("versionId" to versionId),
+    ).andIsOk
+  }
+
+  private fun confirm(
+    assetId: Long,
+    languageId: Long,
+  ) {
+    performProjectAuthPut(
+      "binary-assets/$assetId/translations/$languageId/reviewed",
+      mapOf("reviewed" to true),
+    ).andIsOk
+  }
+
+  private fun isReviewed(
+    assetId: Long,
+    languageId: Long,
+  ): Boolean =
+    jacksonObjectMapper()
+      .readTree(
+        performProjectAuthGet("binary-assets/$assetId").andIsOk.andReturn().response.contentAsString,
+      ).get("translations")
+      .first { it.get("languageId").asLong() == languageId }
+      .get("reviewed")
+      .asBoolean()
+
+  @Test
+  @ProjectJWTAuthTestMethod
   fun `deletes a version and deleting the translation works with versions present`() {
     val assetId = createAsset("vox-delete")
     uploadTranslation(assetId, "de")

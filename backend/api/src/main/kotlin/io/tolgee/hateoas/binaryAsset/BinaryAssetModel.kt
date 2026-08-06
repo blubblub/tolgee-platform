@@ -58,6 +58,8 @@ open class BinaryAssetTranslationModel(
   val transcriptState: String? = null,
   /** Whether this language's own audio can be transcribed — it has a file and a provider exists. */
   val transcriptionAvailable: Boolean = false,
+  /** The final file for this language has been confirmed; cleared by any change to what final is. */
+  val reviewed: Boolean = false,
   val chosenVersionId: Long? = null,
   /** Filename of the chosen version; null means the uploaded original is the final. */
   val chosenVersionFilename: String? = null,

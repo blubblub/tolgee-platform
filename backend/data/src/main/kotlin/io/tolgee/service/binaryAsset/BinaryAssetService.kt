@@ -137,6 +137,8 @@ class BinaryAssetService(
         ?: throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
     val previousKey = asset.storageKey
     val stored = storeNewBlob(projectId, file)
+    // every localization is now against an older source, so no confirmation still holds
+    asset.translations.forEach { it.reviewed = false }
     asset.sourceRevision += 1
     applySourceFile(asset, stored, file, uploader)
     val saved = binaryAssetRepository.save(asset)
@@ -171,6 +173,8 @@ class BinaryAssetService(
       existing ?: BinaryAssetTranslation(asset).also {
         it.language = entityManager.getReference(Language::class.java, languageId)
       }
+    // a new file is a new thing to confirm
+    translation.reviewed = false
     translation.sourceRevision = translatedAgainstSourceRevision
     translation.storageKey = stored.storageKey
     translation.originalFilename = sanitizeFilename(file.originalFilename)
@@ -183,6 +187,21 @@ class BinaryAssetService(
       deleteBlobBestEffort(previousKey)
     }
     return saved
+  }
+
+  /** Confirms (or un-confirms) the final file for one language. */
+  @Transactional
+  fun setTranslationReviewed(
+    projectId: Long,
+    assetId: Long,
+    languageId: Long,
+    reviewed: Boolean,
+  ): BinaryAssetTranslation {
+    val translation =
+      binaryAssetTranslationRepository.findByProjectAssetAndLanguage(projectId, assetId, languageId)
+        ?: throw NotFoundException(Message.BINARY_ASSET_TRANSLATION_NOT_FOUND)
+    translation.reviewed = reviewed
+    return binaryAssetTranslationRepository.save(translation)
   }
 
   @Transactional

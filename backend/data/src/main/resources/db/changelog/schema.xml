@@ -6025,4 +6025,12 @@
         <sql>CREATE UNIQUE INDEX bav_one_project_default ON binary_asset_voice (project_id) WHERE language_id IS NULL</sql>
     </changeSet>
 
+    <changeSet author="blubblub" id="1786026130000-1">
+        <addColumn tableName="binary_asset_translation">
+            <column defaultValueBoolean="false" name="reviewed" type="BOOLEAN">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
 </databaseChangeLog>

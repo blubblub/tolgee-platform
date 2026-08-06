@@ -9,7 +9,7 @@ import {
   Typography,
 } from '@mui/material';
 import { Plus } from '@untitled-ui/icons-react';
-import { T, useTranslate } from '@tolgee/react';
+import { useTranslate } from '@tolgee/react';
 import { useMutation, useQueryClient } from 'react-query';
 import { Link as RouterLink } from 'react-router-dom';
 
@@ -30,6 +30,7 @@ import { useInView } from 'react-intersection-observer';
 import { binaryAssetApi, visibleTranslations } from './binaryAssetApi';
 import { BinaryAssetPreview } from './BinaryAssetPreview';
 import { AssetLocalizedFiles } from './AssetLocalizedFiles';
+import { AssetSourceTranscript } from './AssetSourceTranscript';
 
 type MediaFilter = 'AUDIO' | 'VIDEO' | 'IMAGE';
 
@@ -351,20 +352,10 @@ const AssetsViewContent = () => {
                       {asset.originalFilename} · {asset.sourceLanguageTag} r
                       {asset.sourceRevision} · {asset.contentType}
                     </Typography>
-                    {asset.transcriptKeyId && (
-                      <Typography
-                        variant="body2"
-                        sx={{ mt: 0.5, fontStyle: 'italic' }}
-                        data-cy="binary-assets-list-transcript"
-                      >
-                        {asset.transcriptSourceText || (
-                          <T
-                            keyName="binary_assets_transcript_empty"
-                            defaultValue="No transcript text yet."
-                          />
-                        )}
-                      </Typography>
-                    )}
+                    <AssetSourceTranscript
+                      projectId={project.id}
+                      asset={asset}
+                    />
                     <Box mt={1}>
                       <BinaryAssetPreview
                         projectId={project.id}

@@ -531,6 +531,10 @@ export interface paths {
   "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/download-ticket": {
     post: operations["translationDownloadTicket"];
   };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/reviewed": {
+    /** Confirmation is cleared automatically whenever what 'final' points at changes — a new upload, a different chosen version, or a replaced source. */
+    put: operations["setTranslationReviewed"];
+  };
   "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/versions": {
     get: operations["list_12"];
   };
@@ -1766,6 +1770,9 @@ export interface components {
       /** Format: int64 */
       uploadedById?: number;
     };
+    BinaryAssetReviewRequest: {
+      reviewed: boolean;
+    };
     BinaryAssetTranscriptRequest: {
       /**
        * Format: int64
@@ -1788,6 +1795,7 @@ export interface components {
       languageName: string;
       languageTag: string;
       originalFilename?: string;
+      reviewed: boolean;
       sha256?: string;
       /** Format: int64 */
       sourceRevision?: number;
@@ -5483,6 +5491,7 @@ export interface components {
         | "BINARY_ASSET_SOURCE_REPLACE"
         | "BINARY_ASSET_TRANSLATION_UPSERT"
         | "BINARY_ASSET_TRANSLATION_DELETE"
+        | "BINARY_ASSET_TRANSLATION_REVIEW"
         | "BINARY_ASSET_TRANSCRIPT_LINK"
         | "BINARY_ASSET_TRANSCRIPT_UNLINK"
         | "BINARY_ASSET_TRANSCRIPT_GENERATE"
@@ -15458,6 +15467,53 @@ export interface operations {
         content: {
           "application/json": string;
         };
+      };
+    };
+  };
+  /** Confirmation is cleared automatically whenever what 'final' points at changes — a new upload, a different chosen version, or a replaced source. */
+  setTranslationReviewed: {
+    parameters: {
+      path: {
+        assetId: number;
+        languageId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BinaryAssetReviewRequest"];
       };
     };
   };

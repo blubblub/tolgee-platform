@@ -12,7 +12,13 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { Stars01, Trash01, UploadCloud02, Zap } from '@untitled-ui/icons-react';
+import {
+  CheckCircle,
+  Stars01,
+  Trash01,
+  UploadCloud02,
+  Zap,
+} from '@untitled-ui/icons-react';
 import { useTranslate } from '@tolgee/react';
 import { useMutation, useQueryClient } from 'react-query';
 import { Link as RouterLink } from 'react-router-dom';
@@ -83,6 +89,7 @@ export const AssetLocalizedFiles = ({
   });
 
   const canTranslate = satisfiesPermission('translations.edit');
+  const canReview = satisfiesPermission('translations.state-edit');
 
   const rows = useMemo(
     () => visibleTranslations(asset, languageTags),
@@ -98,6 +105,20 @@ export const AssetLocalizedFiles = ({
     url: '/v2/projects/{projectId}/binary-assets/{assetId}/transcript/generate/{languageId}',
     method: 'post',
   });
+
+  const setReviewed = useApiMutation({
+    url: '/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/reviewed',
+    method: 'put',
+  });
+
+  const toggleReviewed = (languageId: number, reviewed: boolean) =>
+    setReviewed.mutate(
+      {
+        path: { projectId, assetId: asset.id, languageId },
+        content: { 'application/json': { reviewed } },
+      },
+      { onSuccess: invalidate }
+    );
 
   const runTool = useRunTool({
     projectId,
@@ -362,6 +383,36 @@ export const AssetLocalizedFiles = ({
                 </TableCell>
                 <TableCell align="right">
                   <Box display="flex" gap={1} justifyContent="flex-end">
+                    {/* nothing to confirm until a file exists */}
+                    {canReview && row.status !== 'MISSING' && (
+                      <Tooltip
+                        title={
+                          row.reviewed
+                            ? t(
+                                'binary_assets_reviewed_undo',
+                                'Confirmed — click to reopen'
+                              )
+                            : t(
+                                'binary_assets_reviewed_confirm',
+                                'Confirm this final file'
+                              )
+                        }
+                      >
+                        <span>
+                          <IconButton
+                            size="small"
+                            color={row.reviewed ? 'success' : 'default'}
+                            disabled={setReviewed.isLoading}
+                            onClick={() =>
+                              toggleReviewed(row.languageId, !row.reviewed)
+                            }
+                            data-cy="binary-asset-review-toggle"
+                          >
+                            <CheckCircle width={16} height={16} />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    )}
                     {/* a run reads the uploaded file, so there must be one */}
                     {canTranslate && row.status !== 'MISSING' && (
                       <Tooltip

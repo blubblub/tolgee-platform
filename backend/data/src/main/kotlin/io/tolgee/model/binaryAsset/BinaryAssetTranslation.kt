@@ -63,6 +63,14 @@ class BinaryAssetTranslation(
   @Column(nullable = false, length = 64)
   lateinit var sha256: String
 
+  /**
+   * The final file for this language has been confirmed. Any change that alters what "final" points
+   * at — a new upload, a different chosen version, a replaced source — clears it back to false.
+   */
+  @ActivityLoggedProp
+  @Column(nullable = false)
+  var reviewed: Boolean = false
+
   @ManyToOne(fetch = FetchType.LAZY)
   var uploadedBy: UserAccount? = null
 

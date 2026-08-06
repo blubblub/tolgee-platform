@@ -136,6 +136,12 @@ class BinaryAssetTranslationVersionService(
       binaryAssetTranslationRepository.findByProjectAssetAndLanguage(projectId, assetId, languageId)
         ?: throw NotFoundException(Message.BINARY_ASSET_TRANSLATION_NOT_FOUND)
 
+    // a different final is a different thing to confirm, so the review has to be redone
+    val previousChosenId = translation.versions.firstOrNull { it.chosen }?.id
+    if (previousChosenId != versionId) {
+      translation.reviewed = false
+    }
+
     translation.versions.forEach { it.chosen = false }
 
     if (versionId != null) {
@@ -156,6 +162,12 @@ class BinaryAssetTranslationVersionService(
   ) {
     val version = getVersion(projectId, assetId, languageId, versionId)
     val storageKey = version.storageKey
+    if (version.chosen) {
+      // final falls back to the original upload — a different file than the one confirmed
+      val translation = version.translation
+      translation.reviewed = false
+      binaryAssetTranslationRepository.save(translation)
+    }
     binaryAssetTranslationVersionRepository.delete(version)
     binaryAssetTranslationVersionRepository.flush()
     binaryAssetService.deleteBlobBestEffort(storageKey)

@@ -6,6 +6,7 @@ import io.tolgee.activity.RequestActivity
 import io.tolgee.activity.data.ActivityType
 import io.tolgee.api.v2.controllers.IController
 import io.tolgee.constants.Message
+import io.tolgee.dtos.request.binaryAsset.BinaryAssetReviewRequest
 import io.tolgee.dtos.request.binaryAsset.BinaryAssetTranscriptRequest
 import io.tolgee.dtos.request.binaryAsset.BinaryAssetUpdateRequest
 import io.tolgee.exceptions.BadRequestException
@@ -317,6 +318,27 @@ class BinaryAssetController(
       filename = stream.filename,
       byteSize = stream.byteSize,
     )
+  }
+
+  @PutMapping("/{assetId}/translations/{languageId}/reviewed")
+  @Operation(
+    summary = "Confirm or un-confirm the final file for a language",
+    description =
+      "Confirmation is cleared automatically whenever what 'final' points at changes — a new " +
+        "upload, a different chosen version, or a replaced source.",
+  )
+  @RequiresProjectPermissions([Scope.TRANSLATIONS_STATE_EDIT])
+  @AllowApiAccess
+  @RequestActivity(ActivityType.BINARY_ASSET_TRANSLATION_REVIEW)
+  fun setTranslationReviewed(
+    @PathVariable assetId: Long,
+    @PathVariable languageId: Long,
+    @Valid @RequestBody dto: BinaryAssetReviewRequest,
+  ): BinaryAssetModel {
+    val projectId = projectHolder.project.id
+    securityService.checkLanguageStateChangePermission(projectId, listOf(languageId))
+    binaryAssetService.setTranslationReviewed(projectId, assetId, languageId, dto.reviewed)
+    return detailModel(projectId, assetId)
   }
 
   @DeleteMapping("/{assetId}/translations/{languageId}")

@@ -15,6 +15,8 @@ export type BinaryAssetTranslation = {
   transcriptText?: string | null;
   transcriptState?: string | null;
   transcriptionAvailable?: boolean;
+  /** The final file has been confirmed; any change to what final is clears it. */
+  reviewed?: boolean;
   /** null/absent means the uploaded original is the final */
   chosenVersionId?: number | null;
   chosenVersionFilename?: string | null;

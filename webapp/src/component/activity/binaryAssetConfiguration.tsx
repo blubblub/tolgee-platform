@@ -114,6 +114,17 @@ export const binaryAssetConfiguration: Record<
     },
     entities: { Translation: true },
   },
+  BINARY_ASSET_TRANSLATION_REVIEW: {
+    label() {
+      return (
+        <T
+          keyName="activity_binary_asset_translation_review"
+          defaultValue="Confirmed an asset translation"
+        />
+      );
+    },
+    entities: { BinaryAssetTranslation: true },
+  },
   BINARY_ASSET_TRANSLATION_VERSION_RUN: {
     label() {
       return (
