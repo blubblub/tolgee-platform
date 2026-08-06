@@ -22,7 +22,7 @@ import io.tolgee.security.authorization.RequiresProjectPermissions
 import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.binaryAsset.BinaryAssetTranscriptService
 import io.tolgee.service.binaryAsset.BinaryAssetTranslationVersionService
-import io.tolgee.service.language.LanguageService
+import io.tolgee.service.security.PermissionService
 import io.tolgee.service.security.SecurityService
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
@@ -63,7 +63,7 @@ class BinaryAssetController(
   private val binaryAssetModelAssembler: BinaryAssetModelAssembler,
   private val pagedAssembler: PagedResourcesAssembler<io.tolgee.model.binaryAsset.BinaryAsset>,
   private val projectHolder: ProjectHolder,
-  private val languageService: LanguageService,
+  private val permissionService: PermissionService,
   private val securityService: SecurityService,
   private val authenticationFacade: AuthenticationFacade,
   private val jwtService: JwtService,
@@ -80,8 +80,7 @@ class BinaryAssetController(
     val projectId = projectHolder.project.id
     val mediaTypes = BinaryAssetMediaType.parseList(filterMediaType)
     val page = binaryAssetService.getPage(projectId, pageable, search, mediaTypes)
-    val languages = languageService.findAll(projectId)
-    val visible = visibleLanguageIds(projectId)
+    val languages = permittedLanguages(projectId)
     // one query for the whole page rather than one per asset
     val transcripts =
       binaryAssetTranscriptService.getTranscriptTranslationsByKey(
@@ -95,7 +94,6 @@ class BinaryAssetController(
       binaryAssetModelAssembler.toListModel(
         asset,
         languages,
-        visible,
         transcripts[asset.transcriptKey?.id].orEmpty(),
         versionsByTranslation,
       )
@@ -413,14 +411,18 @@ class BinaryAssetController(
     val asset = binaryAssetService.get(projectId, assetId)
     return binaryAssetModelAssembler.toDetailModel(
       asset,
-      languageService.findAll(projectId),
-      visibleLanguageIds(projectId),
+      permittedLanguages(projectId),
       binaryAssetTranscriptService.getTranscriptTranslations(asset.transcriptKey?.id),
     )
   }
 
-  private fun visibleLanguageIds(projectId: Long): Set<Long>? {
-    // null = all project languages. Restricted users still only act on permitted languages via API checks.
-    return null
-  }
+  /**
+   * Only the languages this user may view. A translator scoped to one language must not see the
+   * other languages' files — the write endpoints check separately, but the rows must not leak here.
+   */
+  private fun permittedLanguages(projectId: Long) =
+    permissionService.getPermittedViewLanguages(
+      projectId,
+      authenticationFacade.authenticatedUser.id,
+    )
 }

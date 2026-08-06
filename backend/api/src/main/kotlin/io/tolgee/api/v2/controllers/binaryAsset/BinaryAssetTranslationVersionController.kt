@@ -23,7 +23,7 @@ import io.tolgee.security.authorization.RequiresProjectPermissions
 import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.binaryAsset.BinaryAssetTranscriptService
 import io.tolgee.service.binaryAsset.BinaryAssetTranslationVersionService
-import io.tolgee.service.language.LanguageService
+import io.tolgee.service.security.PermissionService
 import io.tolgee.service.security.SecurityService
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.CrossOrigin
@@ -54,7 +54,7 @@ class BinaryAssetTranslationVersionController(
   private val binaryAssetModelAssembler: BinaryAssetModelAssembler,
   private val binaryAssetTranslationVersionModelAssembler: BinaryAssetTranslationVersionModelAssembler,
   private val projectHolder: ProjectHolder,
-  private val languageService: LanguageService,
+  private val permissionService: PermissionService,
   private val securityService: SecurityService,
   private val authenticationFacade: AuthenticationFacade,
   private val jwtService: JwtService,
@@ -220,8 +220,8 @@ class BinaryAssetTranslationVersionController(
     val asset = binaryAssetService.get(projectId, assetId)
     return binaryAssetModelAssembler.toDetailModel(
       asset,
-      languageService.findAll(projectId),
-      null,
+      // only what this user may view — a scoped translator must not see other languages' files
+      permissionService.getPermittedViewLanguages(projectId, authenticationFacade.authenticatedUser.id),
       binaryAssetTranscriptService.getTranscriptTranslations(asset.transcriptKey?.id),
     )
   }

@@ -24,19 +24,20 @@ class BinaryAssetModelAssembler(
   /**
    * List rows carry their localized files too — the assets page edits them in place. Versions are
    * pre-fetched for the whole page so listing costs one version query, not one per asset.
+   *
+   * [targetLanguages] must already be the caller's permitted view languages: a translator scoped to
+   * one language must not see the other languages' files here either.
    */
   fun toListModel(
     asset: BinaryAsset,
     targetLanguages: Collection<LanguageDto>,
-    visibleLanguageIds: Set<Long>?,
     transcripts: Map<Long, BinaryAssetTranscriptService.TranscriptText> = emptyMap(),
     versionsByTranslation: Map<Long, List<BinaryAssetTranslationVersion>> = emptyMap(),
-  ): BinaryAssetModel = build(asset, targetLanguages, visibleLanguageIds, transcripts, versionsByTranslation)
+  ): BinaryAssetModel = build(asset, targetLanguages, transcripts, versionsByTranslation)
 
   fun toDetailModel(
     asset: BinaryAsset,
     targetLanguages: Collection<LanguageDto>,
-    visibleLanguageIds: Set<Long>?,
     transcripts: Map<Long, BinaryAssetTranscriptService.TranscriptText> = emptyMap(),
   ): BinaryAssetModel {
     val translationIds = asset.translations.map { it.id }
@@ -48,22 +49,17 @@ class BinaryAssetModelAssembler(
           .findByTranslationIdIn(translationIds)
           .groupBy { it.translation.id }
       }
-    return build(asset, targetLanguages, visibleLanguageIds, transcripts, versionsByTranslation)
+    return build(asset, targetLanguages, transcripts, versionsByTranslation)
   }
 
   private fun build(
     asset: BinaryAsset,
     targetLanguages: Collection<LanguageDto>,
-    visibleLanguageIds: Set<Long>?,
     transcripts: Map<Long, BinaryAssetTranscriptService.TranscriptText>,
     versionsByTranslation: Map<Long, List<BinaryAssetTranslationVersion>>,
   ): BinaryAssetModel {
     val byLang = asset.translations.associateBy { it.language.id }
-    val visibleTargets =
-      targetLanguages.filter { lang ->
-        lang.id != asset.sourceLanguage.id &&
-          (visibleLanguageIds == null || lang.id in visibleLanguageIds)
-      }
+    val visibleTargets = targetLanguages.filter { lang -> lang.id != asset.sourceLanguage.id }
     val translationModels =
       visibleTargets.map { lang ->
         toTranslationModel(
