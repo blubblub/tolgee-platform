@@ -30,6 +30,7 @@ class ProjectWithStatsFacade(
   fun getPagedModelWithStats(projects: Page<ProjectWithLanguagesView>): PagedModel<ProjectWithStatsModel> {
     val projectIds = projects.content.map { it.id }
     val totals = projectStatsService.getProjectsTotals(projectIds)
+    val assetTotals = projectStatsService.getProjectsAssetTotals(projectIds)
     val languages = languageService.getDtosOfProjects(projectIds)
     val allLanguageStats =
       languageStatsService
@@ -71,6 +72,8 @@ class ProjectWithStatsFacade(
               ),
             qaIssueCount = qaIssueCount,
             qaChecksStaleCount = qaChecksStaleCount,
+            assetCount = assetTotals[projectWithLanguagesView.id]?.assetCount ?: 0,
+            untranslatedAssetCount = assetTotals[projectWithLanguagesView.id]?.untranslatedAssetCount ?: 0,
           )
 
         val projectLanguages =

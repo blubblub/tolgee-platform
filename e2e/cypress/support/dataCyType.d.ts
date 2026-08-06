@@ -670,6 +670,7 @@ declare namespace DataCy {
         "project-dashboard-translated-percentage": true;
         "project-delete-button": true;
         "project-leave-button": true;
+        "project-list-assets-count": true;
         "project-list-languages": true;
         "project-list-more-button": true;
         "project-list-org-name": true;

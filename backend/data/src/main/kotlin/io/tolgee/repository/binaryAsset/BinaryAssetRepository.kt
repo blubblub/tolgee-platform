@@ -1,5 +1,6 @@
 package io.tolgee.repository.binaryAsset
 
+import io.tolgee.dtos.queryResults.BinaryAssetProjectStatsProjection
 import io.tolgee.dtos.queryResults.BinaryAssetStatsDto
 import io.tolgee.model.binaryAsset.BinaryAsset
 import jakarta.persistence.LockModeType
@@ -199,6 +200,44 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
     """,
   )
   fun getBinaryAssetStats(projectId: Long): BinaryAssetStatsDto
+
+  /**
+   * Asset totals for a whole page of projects in one query — the project list would otherwise cost
+   * a query per project. An asset counts as untranslated when it has fewer current target-language
+   * files than the project has target languages.
+   */
+  @Query(
+    nativeQuery = true,
+    value = """
+    with lang as (
+      select l.project_id, count(*) - 1 as target_count
+      from language l
+      where l.deleted_at is null and l.project_id in :projectIds
+      group by l.project_id
+    ),
+    per_asset as (
+      select a.project_id,
+             a.id,
+             count(t.id) filter (
+               where t.language_id <> a.source_language_id
+                 and t.source_revision = a.source_revision
+             ) as current_count
+      from binary_asset a
+      left join binary_asset_translation t on t.asset_id = a.id
+      where a.project_id in :projectIds
+      group by a.project_id, a.id
+    )
+    select pa.project_id as "projectId",
+           count(*) as "assetCount",
+           count(*) filter (
+             where pa.current_count < greatest(coalesce(l.target_count, 0), 0)
+           ) as "untranslatedAssetCount"
+    from per_asset pa
+    left join lang l on l.project_id = pa.project_id
+    group by pa.project_id
+    """,
+  )
+  fun getBinaryAssetStatsByProject(projectIds: Collection<Long>): List<BinaryAssetProjectStatsProjection>
 
   /**
    * There is no DB-level cascade from key, and deletion is ordered manually in application code,

@@ -160,7 +160,7 @@ export interface paths {
     post: operations["upload"];
   };
   "/v2/image-upload/{ids}": {
-    delete: operations["delete_20"];
+    delete: operations["delete_21"];
   };
   "/v2/invitations/{code}/accept": {
     get: operations["acceptInvitation"];
@@ -344,7 +344,7 @@ export interface paths {
   };
   "/v2/organizations/{organizationId}/translation-memories/{translationMemoryId}/entries": {
     /** Pagination is row-level: each STORED bucket (manual entries on a source collapse into one row; each TMX `tuid` is its own row) and each VIRTUAL origin (one row per project key) gets its own page item. The `targetLanguageTag` filter narrows the *cells* of a row to a subset of target languages; rows themselves still appear with empty cells so the user can add a translation. */
-    get: operations["list_4"];
+    get: operations["list_5"];
     post: operations["create_17"];
     /** For every entry ID in the payload, deletes the entire group that shares the same source text (and key). The request is deduplicated to distinct groups so passing multiple entries from the same row is a no-op past the first one. */
     delete: operations["deleteMultipleGroups"];
@@ -478,7 +478,7 @@ export interface paths {
     delete: operations["removeAvatar_1"];
   };
   "/v2/projects/{projectId}/batch-jobs": {
-    get: operations["list_5"];
+    get: operations["list_6"];
   };
   "/v2/projects/{projectId}/batch-jobs/{id}": {
     get: operations["get_23"];
@@ -491,8 +491,12 @@ export interface paths {
     /** Stores a bigMeta for a project */
     post: operations["store_2"];
   };
+  "/v2/projects/{projectId}/binary-asset-voices": {
+    get: operations["list"];
+    put: operations["set"];
+  };
   "/v2/projects/{projectId}/binary-assets": {
-    get: operations["list_3"];
+    get: operations["list_4"];
     post: operations["create_13"];
   };
   "/v2/projects/{projectId}/binary-assets/{assetId}": {
@@ -526,6 +530,21 @@ export interface paths {
   };
   "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/download-ticket": {
     post: operations["translationDownloadTicket"];
+  };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/versions": {
+    get: operations["list_12"];
+  };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/versions/chosen-version": {
+    put: operations["setChosen"];
+  };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/versions/run": {
+    post: operations["runTool"];
+  };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/versions/{versionId}": {
+    delete: operations["delete_20"];
+  };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/versions/{versionId}/download-ticket": {
+    post: operations["downloadTicket"];
   };
   "/v2/projects/{projectId}/branches": {
     get: operations["all"];
@@ -575,7 +594,7 @@ export interface paths {
     post: operations["setProtected"];
   };
   "/v2/projects/{projectId}/content-delivery-configs": {
-    get: operations["list_2"];
+    get: operations["list_3"];
     post: operations["create_10"];
   };
   "/v2/projects/{projectId}/content-delivery-configs/{id}": {
@@ -586,7 +605,7 @@ export interface paths {
     delete: operations["delete_5"];
   };
   "/v2/projects/{projectId}/content-storages": {
-    get: operations["list_1"];
+    get: operations["list_2"];
     post: operations["create_9"];
   };
   "/v2/projects/{projectId}/content-storages/test": {
@@ -774,7 +793,7 @@ export interface paths {
     get: operations["selectKeys_2"];
   };
   "/v2/projects/{projectId}/keys/trash": {
-    get: operations["list_9"];
+    get: operations["list_10"];
   };
   "/v2/projects/{projectId}/keys/trash/deleters": {
     get: operations["listDeleters"];
@@ -1098,7 +1117,7 @@ export interface paths {
   };
   "/v2/projects/{projectId}/translation-memories": {
     /** Always readable. When the TRANSLATION_MEMORY feature is not enabled for the organization, only the project-type assignment (if any) is returned so the settings page can still show the row that already drives in-project suggestions. */
-    get: operations["list_7"];
+    get: operations["list_8"];
   };
   "/v2/projects/{projectId}/translation-memories/project-tm-settings": {
     /** Sets TM-level flags on the project's own PROJECT-type TM. The shared-TM update endpoint rejects PROJECT TMs; this narrow endpoint exists so project admins can toggle the `writeOnlyReviewed` flag without org-level privileges. */
@@ -1200,7 +1219,7 @@ export interface paths {
     put: operations["setUsersPermissions_1"];
   };
   "/v2/projects/{projectId}/webhook-configs": {
-    get: operations["list"];
+    get: operations["list_1"];
     post: operations["create"];
   };
   "/v2/projects/{projectId}/webhook-configs/{id}": {
@@ -1759,6 +1778,10 @@ export interface components {
     BinaryAssetTranslationModel: {
       /** Format: int64 */
       byteSize?: number;
+      chosenVersionFilename?: string;
+      /** Format: int64 */
+      chosenVersionId?: number;
+      chosenVersionTool?: string;
       contentType?: string;
       /** Format: int64 */
       languageId: number;
@@ -1777,10 +1800,34 @@ export interface components {
       updatedAt?: string;
       /** Format: int64 */
       uploadedById?: number;
+      /** Format: int32 */
+      versionCount: number;
+    };
+    BinaryAssetTranslationVersionModel: {
+      /** Format: int64 */
+      byteSize: number;
+      chosen: boolean;
+      contentType: string;
+      /** Format: date-time */
+      createdAt?: string;
+      /** Format: int64 */
+      createdById?: number;
+      /** Format: int64 */
+      id: number;
+      originalFilename: string;
+      sha256: string;
+      tool: string;
+      toolParams?: string;
     };
     BinaryAssetUpdateRequest: {
       description?: string;
       name: string;
+    };
+    BinaryAssetVoiceModel: {
+      /** Format: int64 */
+      languageId?: number;
+      languageTag?: string;
+      voiceId: string;
     };
     BranchMergeChangeModel: {
       /** @description Languages changed by the merge */
@@ -3344,6 +3391,10 @@ export interface components {
         | "transcription_unauthorized"
         | "transcription_rate_limited"
         | "transcription_failed"
+        | "binary_asset_version_not_found"
+        | "binary_asset_tool_unknown"
+        | "binary_asset_tts_no_transcript"
+        | "binary_asset_tts_voice_id_required"
         | "file_empty"
         | "file_name_too_long"
         | "file_name_not_valid";
@@ -5435,6 +5486,9 @@ export interface components {
         | "BINARY_ASSET_TRANSCRIPT_LINK"
         | "BINARY_ASSET_TRANSCRIPT_UNLINK"
         | "BINARY_ASSET_TRANSCRIPT_GENERATE"
+        | "BINARY_ASSET_TRANSLATION_VERSION_RUN"
+        | "BINARY_ASSET_TRANSLATION_VERSION_CHOOSE"
+        | "BINARY_ASSET_TRANSLATION_VERSION_DELETE"
         | "KEY_TAGS_EDIT"
         | "KEY_NAME_EDIT"
         | "KEY_CHARACTER_LIMIT_EDIT"
@@ -5654,6 +5708,8 @@ export interface components {
     };
     ProjectStatistics: {
       /** Format: int64 */
+      assetCount: number;
+      /** Format: int64 */
       keyCount: number;
       /** Format: int64 */
       languageCount: number;
@@ -5664,6 +5720,8 @@ export interface components {
       /** Format: int64 */
       qaIssueCount: number;
       translationStatePercentages: { [key: string]: number };
+      /** Format: int64 */
+      untranslatedAssetCount: number;
     };
     ProjectStatsModel: {
       /** Format: int64 */
@@ -6347,6 +6405,12 @@ export interface components {
       /** Format: int64 */
       updatedAt: number;
     };
+    RunBinaryAssetToolRequest: {
+      /** Format: int64 */
+      baseVersionId?: number;
+      params?: { [key: string]: unknown };
+      tool: string;
+    };
     S3ContentStorageConfigDto: {
       accessKey?: string;
       bucketName: string;
@@ -6440,12 +6504,21 @@ export interface components {
       prices: components["schemas"]["PlanPricesModel"];
       public: boolean;
     };
+    SetBinaryAssetVoiceRequest: {
+      /** Format: int64 */
+      languageId?: number;
+      voiceId?: string;
+    };
     SetBranchProtectedModel: {
       /**
        * @description Whether the branch is protected
        * @example true
        */
       isProtected: boolean;
+    };
+    SetChosenVersionRequest: {
+      /** Format: int64 */
+      versionId?: number;
     };
     SetDisabledLanguagesRequest: {
       languageIds: number[];
@@ -7228,6 +7301,10 @@ export interface components {
         | "transcription_unauthorized"
         | "transcription_rate_limited"
         | "transcription_failed"
+        | "binary_asset_version_not_found"
+        | "binary_asset_tool_unknown"
+        | "binary_asset_tts_no_transcript"
+        | "binary_asset_tts_voice_id_required"
         | "file_empty"
         | "file_name_too_long"
         | "file_name_not_valid";
@@ -9809,7 +9886,7 @@ export interface operations {
       };
     };
   };
-  delete_20: {
+  delete_21: {
     parameters: {
       path: {
         ids: number[];
@@ -12604,7 +12681,7 @@ export interface operations {
     };
   };
   /** Pagination is row-level: each STORED bucket (manual entries on a source collapse into one row; each TMX `tuid` is its own row) and each VIRTUAL origin (one row per project key) gets its own page item. The `targetLanguageTag` filter narrows the *cells* of a row to a subset of target languages; rows themselves still appear with empty cells so the user can add a translation. */
-  list_4: {
+  list_5: {
     parameters: {
       path: {
         organizationId: number;
@@ -14530,7 +14607,7 @@ export interface operations {
       };
     };
   };
-  list_5: {
+  list_6: {
     parameters: {
       query: {
         /** Zero-based page index (0..N) */
@@ -14695,7 +14772,90 @@ export interface operations {
       };
     };
   };
-  list_3: {
+  list: {
+    parameters: {
+      path: {
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetVoiceModel"][];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  set: {
+    parameters: {
+      path: {
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetVoiceModel"][];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SetBinaryAssetVoiceRequest"];
+      };
+    };
+  };
+  list_4: {
     parameters: {
       query: {
         /** Zero-based page index (0..N) */
@@ -15265,6 +15425,219 @@ export interface operations {
       path: {
         assetId: number;
         languageId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetDownloadTicketModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  list_12: {
+    parameters: {
+      path: {
+        assetId: number;
+        languageId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetTranslationVersionModel"][];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  setChosen: {
+    parameters: {
+      path: {
+        assetId: number;
+        languageId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BinaryAssetModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SetChosenVersionRequest"];
+      };
+    };
+  };
+  runTool: {
+    parameters: {
+      path: {
+        assetId: number;
+        languageId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** Created */
+      201: {
+        content: {
+          "*/*": components["schemas"]["BinaryAssetTranslationVersionModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RunBinaryAssetToolRequest"];
+      };
+    };
+  };
+  delete_20: {
+    parameters: {
+      path: {
+        assetId: number;
+        languageId: number;
+        versionId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** No Content */
+      204: never;
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  downloadTicket: {
+    parameters: {
+      path: {
+        assetId: number;
+        languageId: number;
+        versionId: number;
         projectId: number;
       };
     };
@@ -16029,7 +16402,7 @@ export interface operations {
       };
     };
   };
-  list_2: {
+  list_3: {
     parameters: {
       query: {
         /** Zero-based page index (0..N) */
@@ -16278,7 +16651,7 @@ export interface operations {
       };
     };
   };
-  list_1: {
+  list_2: {
     parameters: {
       query: {
         /** Zero-based page index (0..N) */
@@ -18505,7 +18878,7 @@ export interface operations {
       };
     };
   };
-  list_9: {
+  list_10: {
     parameters: {
       query: {
         /** Zero-based page index (0..N) */
@@ -23711,7 +24084,7 @@ export interface operations {
     };
   };
   /** Always readable. When the TRANSLATION_MEMORY feature is not enabled for the organization, only the project-type assignment (if any) is returned so the settings page can still show the row that already drives in-project suggestions. */
-  list_7: {
+  list_8: {
     parameters: {
       path: {
         projectId: number;
@@ -25625,7 +25998,7 @@ export interface operations {
       };
     };
   };
-  list: {
+  list_1: {
     parameters: {
       query: {
         /** Zero-based page index (0..N) */

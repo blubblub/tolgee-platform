@@ -114,4 +114,37 @@ export const binaryAssetConfiguration: Record<
     },
     entities: { Translation: true },
   },
+  BINARY_ASSET_TRANSLATION_VERSION_RUN: {
+    label() {
+      return (
+        <T
+          keyName="activity_binary_asset_translation_version_run"
+          defaultValue="Ran a tool on an asset translation"
+        />
+      );
+    },
+    entities: { BinaryAssetTranslation: true },
+  },
+  BINARY_ASSET_TRANSLATION_VERSION_CHOOSE: {
+    label() {
+      return (
+        <T
+          keyName="activity_binary_asset_translation_version_choose"
+          defaultValue="Chose the final asset version"
+        />
+      );
+    },
+    entities: { BinaryAssetTranslation: true },
+  },
+  BINARY_ASSET_TRANSLATION_VERSION_DELETE: {
+    label() {
+      return (
+        <T
+          keyName="activity_binary_asset_translation_version_delete"
+          defaultValue="Deleted an asset version"
+        />
+      );
+    },
+    entities: { BinaryAssetTranslation: true },
+  },
 };

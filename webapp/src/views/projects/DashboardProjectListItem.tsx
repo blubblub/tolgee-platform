@@ -169,6 +169,7 @@ const DashboardProjectListItem = ({ variant = 'default', ...p }: Props) => {
   const hasStaleQaChecks = p.stats.qaChecksStaleCount > 0;
   const showQaBadge =
     isEnabled('QA_CHECKS') && (hasQaIssues || hasStaleQaChecks);
+  const { assetCount, untranslatedAssetCount } = p.stats;
 
   const content = (
     <StyledContainer
@@ -215,12 +216,39 @@ const DashboardProjectListItem = ({ variant = 'default', ...p }: Props) => {
         )}
       </StyledTitle>
       <StyledKeyCount>
-        <Typography variant="body1">
-          <T
-            keyName="project_list_keys_count"
-            params={{ keysCount: p.stats.keyCount.toString() }}
-          />
-        </Typography>
+        <Box display="flex" flexDirection="column" alignItems="inherit">
+          <Typography variant="body1">
+            <T
+              keyName="project_list_keys_count"
+              params={{ keysCount: p.stats.keyCount.toString() }}
+            />
+          </Typography>
+          {/* assets live outside the key/translation stats, so they need their own line */}
+          {Boolean(assetCount) && (
+            <Typography
+              variant="body2"
+              color={untranslatedAssetCount ? 'warning.main' : 'text.secondary'}
+              data-cy="project-list-assets-count"
+            >
+              {untranslatedAssetCount ? (
+                <T
+                  keyName="project_list_assets_untranslated"
+                  defaultValue="{untranslated} of {total, plural, one {# asset} other {# assets}} untranslated"
+                  params={{
+                    untranslated: untranslatedAssetCount,
+                    total: assetCount,
+                  }}
+                />
+              ) : (
+                <T
+                  keyName="project_list_assets_all_translated"
+                  defaultValue="{total, plural, one {# asset} other {# assets}}"
+                  params={{ total: assetCount }}
+                />
+              )}
+            </Typography>
+          )}
+        </Box>
       </StyledKeyCount>
       <StyledStats>
         <TranslationStatesBar stats={p.stats as any} labels={!isCompact} />

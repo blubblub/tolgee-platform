@@ -1,5 +1,6 @@
 package io.tolgee.service.project
 
+import io.tolgee.dtos.queryResults.BinaryAssetProjectStatsDto
 import io.tolgee.dtos.queryResults.LanguageStatsDto
 import io.tolgee.model.ILanguage
 import io.tolgee.model.Project
@@ -53,6 +54,21 @@ class ProjectStatsService(
         val date = LocalDate.parse(it[1] as String)
         LocalDate.from(date) to it[0] as Long
       }.toMap()
+  }
+
+  /** Asset totals for a page of projects, keyed by project id. Projects with no assets are absent. */
+  fun getProjectsAssetTotals(projectIds: Collection<Long>): Map<Long, BinaryAssetProjectStatsDto> {
+    if (projectIds.isEmpty()) return emptyMap()
+    return binaryAssetRepository
+      .getBinaryAssetStatsByProject(projectIds)
+      .associate {
+        it.getProjectId() to
+          BinaryAssetProjectStatsDto(
+            projectId = it.getProjectId(),
+            assetCount = it.getAssetCount(),
+            untranslatedAssetCount = it.getUntranslatedAssetCount(),
+          )
+      }
   }
 
   fun getProjectsTotals(projectIds: Iterable<Long>): Map<Long, ProjectTotals> {

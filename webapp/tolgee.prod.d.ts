@@ -103,6 +103,8 @@ declare module '@tolgee/web' {
     | 'asset_translation_model_id'
     | 'asset_translation_base_file'
     | 'binary_assets_all_languages'
+    | 'project_list_assets_all_translated'
+    | 'project_list_assets_untranslated'
     | 'binary_assets_choose_file'
     | 'binary_assets_count'
     | 'binary_assets_no_languages_selected'
