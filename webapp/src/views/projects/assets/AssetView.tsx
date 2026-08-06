@@ -317,6 +317,7 @@ export const AssetView = () => {
                 {t('binary_assets_transcript', 'Transcript')}
               </TableCell>
             )}
+            <TableCell>{t('binary_assets_final', 'Final')}</TableCell>
             <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
@@ -475,6 +476,41 @@ export const AssetView = () => {
                   )}
                 </TableCell>
               )}
+              <TableCell data-cy="binary-asset-final-cell">
+                {row.status === 'MISSING' ? (
+                  <Typography variant="caption" color="text.secondary">
+                    —
+                  </Typography>
+                ) : (
+                  <Typography
+                    variant="body2"
+                    component={RouterLink}
+                    to={LINKS.PROJECT_ASSET_TRANSLATION.build({
+                      [PARAMS.PROJECT_ID]: project.id,
+                      [PARAMS.ASSET_ID]: asset.id,
+                      [PARAMS.LANGUAGE_ID]: row.languageId,
+                    })}
+                    sx={{
+                      color: 'inherit',
+                      textDecoration: 'none',
+                      '&:hover': { textDecoration: 'underline' },
+                    }}
+                  >
+                    {/* no chosen version means the uploaded original is final */}
+                    {row.chosenVersionFilename ??
+                      t('binary_assets_final_original', 'Original')}
+                    {row.versionCount
+                      ? ` · ${t(
+                          'binary_assets_final_versions',
+                          '{count} versions',
+                          {
+                            count: row.versionCount,
+                          }
+                        )}`
+                      : ''}
+                  </Typography>
+                )}
+              </TableCell>
               <TableCell align="right">
                 <Box
                   display="flex"

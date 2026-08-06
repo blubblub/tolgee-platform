@@ -59,6 +59,9 @@ open class BinaryAssetTranslationModel(
   /** Whether this language's own audio can be transcribed — it has a file and a provider exists. */
   val transcriptionAvailable: Boolean = false,
   val chosenVersionId: Long? = null,
+  /** Filename of the chosen version; null means the uploaded original is the final. */
+  val chosenVersionFilename: String? = null,
+  val chosenVersionTool: String? = null,
   val versionCount: Int = 0,
 )
 

@@ -131,6 +131,8 @@ class BinaryAssetModelAssembler(
       transcriptState = transcript?.state,
       transcriptionAvailable = assetTranscribable && status != BinaryAssetTranslationStatus.MISSING,
       chosenVersionId = chosen?.id,
+      chosenVersionFilename = chosen?.originalFilename,
+      chosenVersionTool = chosen?.tool,
       versionCount = versions.size,
     )
   }

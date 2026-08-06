@@ -377,6 +377,9 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
     val de = chosenTree.get("translations").first { it.get("languageTag").asText() == "de" }
     assertThat(de.get("chosenVersionId").asLong()).isEqualTo(first)
     assertThat(de.get("versionCount").asInt()).isEqualTo(2)
+    // the assets list shows which file is final without fetching every version
+    assertThat(de.get("chosenVersionFilename").asText()).isEqualTo("de-tts.mp3")
+    assertThat(de.get("chosenVersionTool").asText()).isEqualTo("tts")
 
     performProjectAuthPut(
       "binary-assets/$assetId/translations/${languageId("de")}/versions/chosen-version",

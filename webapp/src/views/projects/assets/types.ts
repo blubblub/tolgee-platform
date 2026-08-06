@@ -15,6 +15,11 @@ export type BinaryAssetTranslation = {
   transcriptText?: string | null;
   transcriptState?: string | null;
   transcriptionAvailable?: boolean;
+  /** null/absent means the uploaded original is the final */
+  chosenVersionId?: number | null;
+  chosenVersionFilename?: string | null;
+  chosenVersionTool?: string | null;
+  versionCount?: number;
 };
 
 export type BinaryAsset = {
