@@ -502,7 +502,7 @@ export const AssetView = () => {
                     {row.versionCount
                       ? ` · ${t(
                           'binary_assets_final_versions',
-                          '{count} versions',
+                          '{count, plural, one {# version} other {# versions}}',
                           {
                             count: row.versionCount,
                           }
