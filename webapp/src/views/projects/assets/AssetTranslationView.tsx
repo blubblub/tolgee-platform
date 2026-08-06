@@ -263,6 +263,11 @@ const AssetTranslationContent = () => {
     window.location.href = ticket.url;
   };
 
+  const downloadSource = async () => {
+    const ticket = await binaryAssetApi.sourceTicket(project.id, assetId);
+    window.location.href = ticket.url;
+  };
+
   const downloadTranslation = async () => {
     const ticket = await binaryAssetApi.translationTicket(
       project.id,
@@ -378,6 +383,41 @@ const AssetTranslationContent = () => {
         border={1}
         borderColor="divider"
         borderRadius={1}
+        data-cy="asset-translation-source-card"
+      >
+        <Typography fontWeight={600} mb={1}>
+          {t('asset_translation_source', 'Source ({tag})', {
+            tag: asset.sourceLanguageTag,
+          })}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" mb={1}>
+          {asset.originalFilename} · {formatBytes(asset.byteSize)}
+        </Typography>
+        <Box mb={1.5}>
+          <BinaryAssetPreview
+            projectId={project.id}
+            assetId={asset.id}
+            languageId={null}
+            contentType={asset.contentType}
+            filename={asset.originalFilename}
+          />
+        </Box>
+        <Button
+          size="small"
+          startIcon={<Download01 width={16} height={16} />}
+          onClick={downloadSource}
+          data-cy="asset-translation-source-download"
+        >
+          {t('asset_translation_download', 'Download')}
+        </Button>
+      </Box>
+
+      <Box
+        mb={3}
+        p={2}
+        border={1}
+        borderColor="divider"
+        borderRadius={1}
         data-cy="asset-translation-og-card"
       >
         <Box
@@ -427,29 +467,49 @@ const AssetTranslationContent = () => {
             }
           />
         </Box>
-        <Box display="flex" gap={1} flexWrap="wrap">
-          <Button
-            size="small"
-            startIcon={<Download01 width={16} height={16} />}
-            onClick={downloadTranslation}
-            disabled={translation?.status === 'MISSING'}
-            data-cy="asset-translation-og-download"
-          >
-            {t('asset_translation_download', 'Download')}
-          </Button>
-          {canEdit && (
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          flexWrap="wrap"
+          gap={1}
+        >
+          <Box display="flex" gap={1} flexWrap="wrap">
             <Button
               size="small"
-              variant="outlined"
-              onClick={() => {
-                // prefill the project/language default — the field stays editable
-                setVoiceId(defaultVoiceId);
-                setRunDialogOpen(true);
-              }}
-              data-cy="asset-version-run-tool"
+              startIcon={<Download01 width={16} height={16} />}
+              onClick={downloadTranslation}
+              disabled={translation?.status === 'MISSING'}
+              data-cy="asset-translation-og-download"
             >
-              {t('asset_translation_run_tool', 'Run tool')}
+              {t('asset_translation_download', 'Download')}
             </Button>
+            {canEdit && (
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => {
+                  // prefill the project/language default — the field stays editable
+                  setVoiceId(defaultVoiceId);
+                  setRunDialogOpen(true);
+                }}
+                data-cy="asset-version-run-tool"
+              >
+                {t('asset_translation_run_tool', 'Run tool')}
+              </Button>
+            )}
+          </Box>
+          {canChooseFinal && (
+            <FormControlLabel
+              control={
+                <Radio
+                  checked={chosenVersionId === null}
+                  onChange={() => setChosenVersion.mutate(null)}
+                  data-cy="asset-translation-choose-original"
+                />
+              }
+              label={t('asset_translation_final_label', 'Final')}
+            />
           )}
         </Box>
       </Box>
@@ -607,24 +667,6 @@ const AssetTranslationContent = () => {
               </Box>
             );
           })}
-        </Box>
-      )}
-
-      {canChooseFinal && (
-        <Box mt={2}>
-          <FormControlLabel
-            control={
-              <Radio
-                checked={chosenVersionId === null}
-                onChange={() => setChosenVersion.mutate(null)}
-                data-cy="asset-translation-choose-original"
-              />
-            }
-            label={t(
-              'asset_translation_original_final_label',
-              'Original is final'
-            )}
-          />
         </Box>
       )}
 

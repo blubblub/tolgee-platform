@@ -106,6 +106,8 @@ declare namespace DataCy {
         "asset-translation-og-download": true;
         "asset-translation-og-final-badge": true;
         "asset-translation-outdated-badge": true;
+        "asset-translation-source-card": true;
+        "asset-translation-source-download": true;
         "asset-version-base-select": true;
         "asset-version-choose-final": true;
         "asset-version-delete": true;
