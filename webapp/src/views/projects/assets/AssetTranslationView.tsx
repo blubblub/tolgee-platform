@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
+  AlertTitle,
   Box,
   Button,
   Checkbox,
@@ -37,9 +39,11 @@ import {
   binaryAssetApi,
   BinaryAssetTranslationVersionModel,
   BinaryAssetTranslationWithVersions,
+  resolveDefaultVoice,
 } from './binaryAssetApi';
 import { BinaryAssetPreview } from './BinaryAssetPreview';
 import { BinaryAssetTranslation } from './types';
+import { useRunErrorText } from './useRunErrorText';
 
 const formatBytes = (n: number) => {
   if (n < 1024) return `${n} B`;
@@ -66,6 +70,17 @@ const parseToolParams = (
 };
 
 type Tool = 'tts' | 'voice-changer';
+
+type RunPayload = {
+  tool: Tool;
+  params: Record<string, unknown>;
+  baseVersionId?: number;
+};
+
+const TOOL_LABELS: Record<Tool, string> = {
+  tts: 'Text-to-speech',
+  'voice-changer': 'Voice changer',
+};
 
 const DEFAULT_MODEL_PLACEHOLDER: Record<Tool, string> = {
   tts: 'eleven_multilingual_v2',
@@ -94,6 +109,11 @@ const AssetTranslationContent = () => {
   const [modelId, setModelId] = useState('');
   const [removeBackgroundNoise, setRemoveBackgroundNoise] = useState(false);
   const [baseVersionId, setBaseVersionId] = useState<string>('og');
+  const [failedRun, setFailedRun] = useState<{
+    payload: RunPayload;
+    code?: string;
+  } | null>(null);
+  const runErrorText = useRunErrorText();
 
   const canView = satisfiesPermission('translations.view');
   const canEdit = satisfiesLanguageAccess('translations.edit', languageId);
@@ -110,6 +130,14 @@ const AssetTranslationContent = () => {
     () => binaryAssetApi.listVersions(project.id, assetId, languageId),
     { enabled: canView }
   );
+
+  const voicesQuery = useQuery(
+    ['binary-asset-voices', project.id],
+    () => binaryAssetApi.listVoices(project.id),
+    { enabled: canView }
+  );
+
+  const defaultVoiceId = resolveDefaultVoice(voicesQuery.data, languageId);
 
   const translation = useMemo(() => {
     const tr = assetQuery.data?.translations?.find(
@@ -148,14 +176,12 @@ const AssetTranslationContent = () => {
           variant: 'success',
         });
       },
-      onError: (e: any) => {
+      onError: () => {
         actions.showMessage({
-          text:
-            e?.message ||
-            t(
-              'asset_translation_final_set_failed',
-              'Failed to set final version.'
-            ),
+          text: t(
+            'asset_translation_final_set_failed',
+            'Failed to set final version.'
+          ),
           variant: 'error',
         });
       },
@@ -173,14 +199,12 @@ const AssetTranslationContent = () => {
           variant: 'success',
         });
       },
-      onError: (e: any) => {
+      onError: () => {
         actions.showMessage({
-          text:
-            e?.message ||
-            t(
-              'asset_translation_version_delete_failed',
-              'Failed to delete version.'
-            ),
+          text: t(
+            'asset_translation_version_delete_failed',
+            'Failed to delete version.'
+          ),
           variant: 'error',
         });
       },
@@ -188,21 +212,13 @@ const AssetTranslationContent = () => {
   );
 
   const runTool = useMutation(
-    () =>
-      binaryAssetApi.runTool(project.id, assetId, languageId, {
-        tool,
-        params: {
-          voiceId,
-          ...(modelId ? { modelId } : {}),
-          ...(tool === 'voice-changer' ? { removeBackgroundNoise } : {}),
-        },
-        baseVersionId:
-          baseVersionId === 'og' ? undefined : Number(baseVersionId),
-      }),
+    (payload: RunPayload) =>
+      binaryAssetApi.runTool(project.id, assetId, languageId, payload),
     {
       onSuccess: () => {
         invalidate();
         setRunDialogOpen(false);
+        setFailedRun(null);
         setVoiceId('');
         setModelId('');
         setRemoveBackgroundNoise(false);
@@ -215,15 +231,27 @@ const AssetTranslationContent = () => {
           variant: 'success',
         });
       },
-      onError: (e: any) => {
+      onError: (e: any, payload) => {
+        // keep it on the page — a toast is gone before you can read it
+        setFailedRun({ payload, code: e?.code });
+        setRunDialogOpen(false);
         actions.showMessage({
-          text:
-            e?.message || t('asset_translation_tool_failed', 'Tool failed.'),
+          text: runErrorText(e?.code),
           variant: 'error',
         });
       },
     }
   );
+
+  const buildPayload = (): RunPayload => ({
+    tool,
+    params: {
+      voiceId,
+      ...(modelId ? { modelId } : {}),
+      ...(tool === 'voice-changer' ? { removeBackgroundNoise } : {}),
+    },
+    baseVersionId: baseVersionId === 'og' ? undefined : Number(baseVersionId),
+  });
 
   const downloadVersion = async (versionId: number) => {
     const ticket = await binaryAssetApi.versionTicket(
@@ -413,7 +441,11 @@ const AssetTranslationContent = () => {
             <Button
               size="small"
               variant="outlined"
-              onClick={() => setRunDialogOpen(true)}
+              onClick={() => {
+                // prefill the project/language default — the field stays editable
+                setVoiceId(defaultVoiceId);
+                setRunDialogOpen(true);
+              }}
               data-cy="asset-version-run-tool"
             >
               {t('asset_translation_run_tool', 'Run tool')}
@@ -421,6 +453,39 @@ const AssetTranslationContent = () => {
           )}
         </Box>
       </Box>
+
+      {failedRun && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => setFailedRun(null)}
+          action={
+            canEdit && (
+              <Button
+                size="small"
+                color="inherit"
+                disabled={runTool.isLoading}
+                onClick={() => runTool.mutate(failedRun.payload)}
+                data-cy="asset-version-run-retry"
+              >
+                {runTool.isLoading ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  t('asset_translation_retry', 'Retry')
+                )}
+              </Button>
+            )
+          }
+          data-cy="asset-version-run-error"
+        >
+          <AlertTitle>
+            {t('asset_translation_run_failed_title', '{tool} failed', {
+              tool: TOOL_LABELS[failedRun.payload.tool],
+            })}
+          </AlertTitle>
+          {runErrorText(failedRun.code)}
+        </Alert>
+      )}
 
       <Typography fontWeight={600} mb={1}>
         {t('asset_translation_versions', 'Versions')}
@@ -601,6 +666,14 @@ const AssetTranslationContent = () => {
               value={voiceId}
               onChange={(e) => setVoiceId(e.target.value)}
               required
+              helperText={
+                defaultVoiceId && voiceId === defaultVoiceId
+                  ? t(
+                      'asset_translation_voice_id_default',
+                      'Default for this project or language — edit to use another voice.'
+                    )
+                  : undefined
+              }
               data-cy="asset-version-voice-id"
             />
 
@@ -659,7 +732,7 @@ const AssetTranslationContent = () => {
           <Button
             variant="contained"
             disabled={!voiceId.trim() || runTool.isLoading}
-            onClick={() => runTool.mutate()}
+            onClick={() => runTool.mutate(buildPayload())}
             data-cy="asset-version-run-submit"
           >
             {runTool.isLoading ? (

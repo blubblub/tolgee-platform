@@ -410,6 +410,11 @@ export class LINKS {
 
   static PROJECT_LANGUAGES_MT = Link.ofParent(LINKS.PROJECT_LANGUAGES, 'mt');
 
+  static PROJECT_LANGUAGES_VOICES = Link.ofParent(
+    LINKS.PROJECT_LANGUAGES,
+    'voices'
+  );
+
   static PROJECT_EDIT_LANGUAGE = Link.ofParent(
     LINKS.PROJECT_LANGUAGES,
     'language/' + p(PARAMS.LANGUAGE_ID)

@@ -27,6 +27,7 @@ class ElevenLabsVoiceChangerTool(
 
     val voiceId =
       params["voiceId"]?.toString()?.takeIf { it.isNotBlank() }
+        ?: context.defaultVoiceId
         ?: throw BadRequestException(Message.BINARY_ASSET_TTS_VOICE_ID_REQUIRED)
 
     val modelId =

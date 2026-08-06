@@ -282,6 +282,54 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
 
   @Test
   @ProjectJWTAuthTestMethod
+  fun `falls back to the language default voice, then the project default`() {
+    val assetId = createAsset("vox-default-voice")
+    uploadTranslation(assetId, "de")
+    createTranscriptWithText(assetId, "Source.")
+    setTranslationForKey("transcript.vox-default-voice", "de", "Quelle.")
+    val de = languageId("de")
+
+    performProjectAuthPut(
+      "binary-asset-voices",
+      mutableMapOf<String, Any?>("languageId" to null, "voiceId" to "voice-project"),
+    ).andIsOk
+
+    // no voiceId param -> project default
+    runTool(assetId, "de", "tts", params = emptyMap())
+    verify(voiceClient).synthesize(any(), eq("voice-project"), any())
+
+    performProjectAuthPut(
+      "binary-asset-voices",
+      mutableMapOf<String, Any?>("languageId" to de, "voiceId" to "voice-de"),
+    ).andIsOk
+
+    // language default wins over the project default
+    runTool(assetId, "de", "tts", params = emptyMap())
+    verify(voiceClient).synthesize(any(), eq("voice-de"), any())
+
+    // an explicit param still wins over both
+    runTool(assetId, "de", "tts", params = mapOf("voiceId" to "voice-explicit"))
+    verify(voiceClient).synthesize(any(), eq("voice-explicit"), any())
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `still rejects a run with no param and no default`() {
+    val assetId = createAsset("vox-no-default-voice")
+    uploadTranslation(assetId, "de")
+    createTranscriptWithText(assetId, "Source.")
+    setTranslationForKey("transcript.vox-no-default-voice", "de", "Quelle.")
+
+    performProjectAuthPost(
+      "binary-assets/$assetId/translations/${languageId("de")}/versions/run",
+      mapOf("tool" to "tts", "params" to mapOf<String, Any?>()),
+    ).andIsBadRequest.andAssertThatJson {
+      node("code").isEqualTo("binary_asset_tts_voice_id_required")
+    }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
   fun `rejects unknown tool`() {
     val assetId = createAsset("vox-unknown")
     uploadTranslation(assetId, "de")

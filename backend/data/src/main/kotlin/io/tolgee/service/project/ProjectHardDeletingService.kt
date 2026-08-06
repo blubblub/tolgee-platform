@@ -15,6 +15,7 @@ import io.tolgee.service.GlossaryCleanupService
 import io.tolgee.service.PromptService
 import io.tolgee.service.bigMeta.BigMetaService
 import io.tolgee.service.binaryAsset.BinaryAssetService
+import io.tolgee.service.binaryAsset.BinaryAssetVoiceService
 import io.tolgee.service.branching.BranchService
 import io.tolgee.service.dataImport.ImportService
 import io.tolgee.service.dataImport.ImportSettingsService
@@ -49,6 +50,7 @@ class ProjectHardDeletingService(
   private val keyService: KeyService,
   private val screenshotService: ScreenshotService,
   private val binaryAssetService: BinaryAssetService,
+  private val binaryAssetVoiceService: BinaryAssetVoiceService,
   private val avatarService: AvatarService,
   private val batchJobService: BatchJobService,
   private val bigMetaService: BigMetaService,
@@ -114,6 +116,9 @@ class ProjectHardDeletingService(
       traceLogMeasureTime("deleteProject: delete binary assets") {
         binaryAssetService.deleteAllByProject(projectId)
       }
+
+      // FKs project and language — must go before either is deleted
+      binaryAssetVoiceService.deleteAllByProjectId(projectId)
 
       mtServiceConfigService.deleteAllByProjectId(projectId)
 

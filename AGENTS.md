@@ -439,3 +439,18 @@ Both model ids are per-run overridable from the pipeline dialog; the properties
 only set the default. The pipeline UI lives at
 `/projects/{id}/assets/{assetId}/translations/{languageId}` — reached from the
 asset page, there is no separate asset-translations list page.
+
+**Default voices** live in `binary_asset_voice`, shaped like `MtServiceConfig`:
+a row with no language is the project default, a row with one overrides it.
+Resolution is `params.voiceId` → language → project → `BINARY_ASSET_TTS_VOICE_ID_REQUIRED`,
+done once in `BinaryAssetTranslationVersionService.runTool` and handed to the
+tools via `BinaryAssetToolContext.defaultVoiceId`. Managed under **Languages →
+Voices** (`GET`/`PUT /v2/projects/{id}/binary-asset-voices`; read needs
+`translations.view`, write `languages.edit`).
+
+`BinaryAssetVoiceService` deliberately injects no `ProjectService`/`LanguageService`
+— project deletion calls into it and that would close a bean cycle, so it sets
+FKs through `EntityManager.getReference` and the controller checks that the
+language belongs to the project. Its FKs to `project` and `language` mean
+cleanup must stay wired into `ProjectHardDeletingService`, `ProjectContentClearer`,
+and `LanguageHardDeleter`.

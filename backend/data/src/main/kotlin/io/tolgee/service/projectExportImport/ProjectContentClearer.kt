@@ -30,6 +30,7 @@ import io.tolgee.repository.qa.ProjectQaConfigRepository
 import io.tolgee.service.AiPlaygroundResultService
 import io.tolgee.service.bigMeta.BigMetaService
 import io.tolgee.service.binaryAsset.BinaryAssetService
+import io.tolgee.service.binaryAsset.BinaryAssetVoiceService
 import io.tolgee.service.branching.BranchService
 import io.tolgee.service.dataImport.ImportService
 import io.tolgee.service.dataImport.ImportSettingsService
@@ -72,6 +73,7 @@ class ProjectContentClearer(
   private val branchService: BranchService,
   private val projectQaConfigRepository: ProjectQaConfigRepository,
   private val binaryAssetService: BinaryAssetService,
+  private val binaryAssetVoiceService: BinaryAssetVoiceService,
 ) : Logging {
   fun clear(project: Project) {
     val projectId = project.id
@@ -89,6 +91,8 @@ class ProjectContentClearer(
     projectRepository.saveAndFlush(project)
 
     mtServiceConfigService.deleteAllByProjectId(projectId)
+    // FKs project and language — must go before languages are deleted below
+    binaryAssetVoiceService.deleteAllByProjectId(projectId)
     aiPlaygroundResultService.deleteResultsByProject(projectId)
     // translation_label rows FK translation; clearing labels drops the join before translations are deleted.
     labelService.deleteLabelsByProjectId(projectId)

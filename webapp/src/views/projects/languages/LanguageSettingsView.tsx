@@ -7,6 +7,7 @@ import { Link, useRouteMatch } from 'react-router-dom';
 
 import { BaseProjectView } from '../BaseProjectView';
 import { MachineTranslation } from './MachineTranslation/MachineTranslation';
+import { Voices } from './Voices/Voices';
 import { LanguageEditDialog } from './LanguageEdit/LanguageEditDialog';
 import { QuickStartHighlightInPortal } from 'tg.component/layout/QuickStartGuide/QuickStartHighlightInPortal';
 
@@ -28,6 +29,7 @@ export const LanguageSettingsView = () => {
   const pageLanguages = useRouteMatch(LINKS.PROJECT_LANGUAGES.template);
   const pageEditLanguage = useRouteMatch(LINKS.PROJECT_EDIT_LANGUAGE.template);
   const pageMT = useRouteMatch(LINKS.PROJECT_LANGUAGES_MT.template);
+  const pageVoices = useRouteMatch(LINKS.PROJECT_LANGUAGES_VOICES.template);
 
   const isInIndex = pageLanguages?.isExact || pageEditLanguage?.isExact;
 
@@ -49,7 +51,15 @@ export const LanguageSettingsView = () => {
     >
       <StyledTabWrapper>
         <StyledTabs
-          value={isInIndex ? 'languages' : pageMT?.isExact ? 'mt' : undefined}
+          value={
+            isInIndex
+              ? 'languages'
+              : pageMT?.isExact
+              ? 'mt'
+              : pageVoices?.isExact
+              ? 'voices'
+              : undefined
+          }
         >
           <Tab
             value="languages"
@@ -71,6 +81,15 @@ export const LanguageSettingsView = () => {
             data-cy="languages-menu-machine-translation"
             sx={{ overflow: 'visible' }}
           />
+          <Tab
+            value="voices"
+            component={Link}
+            to={LINKS.PROJECT_LANGUAGES_VOICES.build({
+              [PARAMS.PROJECT_ID]: project.id,
+            })}
+            label={t('languages_menu_voices', 'Voices')}
+            data-cy="languages-menu-voices"
+          />
         </StyledTabs>
       </StyledTabWrapper>
 
@@ -78,6 +97,8 @@ export const LanguageSettingsView = () => {
         <ProjectLanguages />
       ) : pageMT?.isExact ? (
         <MachineTranslation />
+      ) : pageVoices?.isExact ? (
+        <Voices />
       ) : null}
 
       {pageEditLanguage?.isExact && <LanguageEditDialog />}

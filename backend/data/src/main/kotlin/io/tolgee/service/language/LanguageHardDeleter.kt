@@ -8,6 +8,7 @@ import io.tolgee.repository.TranslationRepository
 import io.tolgee.repository.qa.LanguageQaConfigRepository
 import io.tolgee.service.AiPlaygroundResultService
 import io.tolgee.service.binaryAsset.BinaryAssetService
+import io.tolgee.service.binaryAsset.BinaryAssetVoiceService
 import io.tolgee.service.task.ITaskService
 import io.tolgee.service.translation.TranslationSuggestionService
 import jakarta.persistence.EntityManager
@@ -30,6 +31,7 @@ class LanguageHardDeleter(
     val allTranslations = getAllTranslations(languageWithData)
     val tasks = getAllTasks(languageWithData)
     binaryAssetService.deleteTranslationsForLanguage(language.id)
+    binaryAssetVoiceService.deleteAllByLanguageId(language.id)
     translationSuggestionService.deleteAllByLanguage(language.id)
     translationRepository.deleteAll(allTranslations)
     taskService.deleteAll(tasks)
@@ -115,5 +117,9 @@ class LanguageHardDeleter(
 
   private val binaryAssetService by lazy {
     applicationContext.getBean(BinaryAssetService::class.java)
+  }
+
+  private val binaryAssetVoiceService by lazy {
+    applicationContext.getBean(BinaryAssetVoiceService::class.java)
   }
 }

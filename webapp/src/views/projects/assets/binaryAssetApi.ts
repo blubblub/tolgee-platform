@@ -28,6 +28,22 @@ export type BinaryAssetTranslationWithVersions = BinaryAssetTranslation & {
   versionCount: number;
 };
 
+export type BinaryAssetVoiceModel = {
+  /** null = the project-wide default */
+  languageId: number | null;
+  languageTag: string | null;
+  voiceId: string;
+};
+
+/** Language default beats project default; a per-run voiceId beats both (resolved on the server). */
+export const resolveDefaultVoice = (
+  voices: BinaryAssetVoiceModel[] | undefined,
+  languageId: number
+) =>
+  voices?.find((v) => v.languageId === languageId)?.voiceId ??
+  voices?.find((v) => v.languageId === null)?.voiceId ??
+  '';
+
 export const binaryAssetApi = {
   list(
     projectId: number,
@@ -158,6 +174,18 @@ export const binaryAssetApi = {
       `${base(
         projectId
       )}/${assetId}/translations/${languageId}/versions/${versionId}`
+    );
+  },
+  listVoices(projectId: number): Promise<BinaryAssetVoiceModel[]> {
+    return apiV2HttpService.get(`projects/${projectId}/binary-asset-voices`);
+  },
+  setVoice(
+    projectId: number,
+    body: { languageId: number | null; voiceId: string | null }
+  ): Promise<BinaryAssetVoiceModel[]> {
+    return apiV2HttpService.put(
+      `projects/${projectId}/binary-asset-voices`,
+      body
     );
   },
   versionTicket(

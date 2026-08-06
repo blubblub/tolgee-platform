@@ -118,6 +118,8 @@ declare namespace DataCy {
         "asset-version-remove-background-noise": true;
         "asset-version-row": true;
         "asset-version-run-dialog": true;
+        "asset-version-run-error": true;
+        "asset-version-run-retry": true;
         "asset-version-run-submit": true;
         "asset-version-run-tool": true;
         "asset-version-tool-select": true;
@@ -461,6 +463,7 @@ declare namespace DataCy {
         "languages-flag-selector-open-button": true;
         "languages-menu-machine-translation": true;
         "languages-menu-project-languages": true;
+        "languages-menu-voices": true;
         "languages-modify-apply-button": true;
         "languages-modify-cancel-button": true;
         "languages-prepared-language-box": true;
@@ -1074,6 +1077,7 @@ declare namespace DataCy {
         "user-profile": true;
         "user-switch-item": true;
         "user-switch-search": true;
+        "voices-settings": true;
         "webhook-auto-disabled-label": true;
         "webhook-form-cancel": true;
         "webhook-form-delete": true;

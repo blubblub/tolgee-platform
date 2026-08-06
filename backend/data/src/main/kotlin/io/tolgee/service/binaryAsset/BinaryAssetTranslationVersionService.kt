@@ -18,6 +18,7 @@ class BinaryAssetTranslationVersionService(
   private val binaryAssetTranslationVersionRepository: BinaryAssetTranslationVersionRepository,
   private val binaryAssetService: BinaryAssetService,
   private val binaryAssetToolService: BinaryAssetToolService,
+  private val binaryAssetVoiceService: BinaryAssetVoiceService,
 ) {
   @Transactional(readOnly = true)
   fun listVersions(
@@ -89,6 +90,7 @@ class BinaryAssetTranslationVersionService(
         asset = translation.asset,
         translation = translation,
         language = translation.language,
+        defaultVoiceId = binaryAssetVoiceService.resolve(projectId, languageId),
       )
 
     val output =
