@@ -21,37 +21,17 @@ class BinaryAssetModelAssembler(
     BinaryAssetController::class.java,
     BinaryAssetModel::class.java,
   ) {
+  /**
+   * List rows carry their localized files too — the assets page edits them in place. Versions are
+   * pre-fetched for the whole page so listing costs one version query, not one per asset.
+   */
   fun toListModel(
     asset: BinaryAsset,
     targetLanguages: Collection<LanguageDto>,
     visibleLanguageIds: Set<Long>?,
-    transcriptSourceText: String? = null,
-  ): BinaryAssetModel {
-    val byLang = asset.translations.associateBy { it.language.id }
-    val visibleTargets =
-      targetLanguages.filter { lang ->
-        lang.id != asset.sourceLanguage.id &&
-          (visibleLanguageIds == null || lang.id in visibleLanguageIds)
-      }
-    var current = 0
-    var outdated = 0
-    visibleTargets.forEach { lang ->
-      when (binaryAssetService.statusFor(asset, lang.id, byLang[lang.id])) {
-        BinaryAssetTranslationStatus.CURRENT -> current++
-        BinaryAssetTranslationStatus.OUTDATED -> outdated++
-        BinaryAssetTranslationStatus.MISSING -> {}
-      }
-    }
-    return baseModel(
-      asset,
-      current,
-      outdated,
-      visibleTargets.size,
-      null,
-      transcriptSourceText,
-      binaryAssetTranscriptService.canTranscribe(asset),
-    )
-  }
+    transcripts: Map<Long, BinaryAssetTranscriptService.TranscriptText> = emptyMap(),
+    versionsByTranslation: Map<Long, List<BinaryAssetTranslationVersion>> = emptyMap(),
+  ): BinaryAssetModel = build(asset, targetLanguages, visibleLanguageIds, transcripts, versionsByTranslation)
 
   fun toDetailModel(
     asset: BinaryAsset,
@@ -59,13 +39,7 @@ class BinaryAssetModelAssembler(
     visibleLanguageIds: Set<Long>?,
     transcripts: Map<Long, BinaryAssetTranscriptService.TranscriptText> = emptyMap(),
   ): BinaryAssetModel {
-    val byLang = asset.translations.associateBy { it.language.id }
-    val visibleTargets =
-      targetLanguages.filter { lang ->
-        lang.id != asset.sourceLanguage.id &&
-          (visibleLanguageIds == null || lang.id in visibleLanguageIds)
-      }
-    val translationIds = visibleTargets.mapNotNull { byLang[it.id]?.id }
+    val translationIds = asset.translations.map { it.id }
     val versionsByTranslation: Map<Long, List<BinaryAssetTranslationVersion>> =
       if (translationIds.isEmpty()) {
         emptyMap()
@@ -73,6 +47,22 @@ class BinaryAssetModelAssembler(
         binaryAssetTranslationVersionService
           .findByTranslationIdIn(translationIds)
           .groupBy { it.translation.id }
+      }
+    return build(asset, targetLanguages, visibleLanguageIds, transcripts, versionsByTranslation)
+  }
+
+  private fun build(
+    asset: BinaryAsset,
+    targetLanguages: Collection<LanguageDto>,
+    visibleLanguageIds: Set<Long>?,
+    transcripts: Map<Long, BinaryAssetTranscriptService.TranscriptText>,
+    versionsByTranslation: Map<Long, List<BinaryAssetTranslationVersion>>,
+  ): BinaryAssetModel {
+    val byLang = asset.translations.associateBy { it.language.id }
+    val visibleTargets =
+      targetLanguages.filter { lang ->
+        lang.id != asset.sourceLanguage.id &&
+          (visibleLanguageIds == null || lang.id in visibleLanguageIds)
       }
     val translationModels =
       visibleTargets.map { lang ->

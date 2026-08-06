@@ -1,55 +1,19 @@
 import { useRef, useState } from 'react';
-import {
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Tooltip,
-  Typography,
-} from '@mui/material';
-import {
-  Download01,
-  LayersThree01,
-  Stars01,
-  Trash01,
-  UploadCloud02,
-  Zap,
-} from '@untitled-ui/icons-react';
+import { Box, Button, Typography } from '@mui/material';
 import { useTranslate } from '@tolgee/react';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
-import { Link as RouterLink, useRouteMatch } from 'react-router-dom';
+import { useRouteMatch } from 'react-router-dom';
 
 import { BaseProjectView } from 'tg.views/projects/BaseProjectView';
 import { useProject } from 'tg.hooks/useProject';
 import { useProjectPermissions } from 'tg.hooks/useProjectPermissions';
 import { LINKS, PARAMS } from 'tg.constants/links';
 import { BoxLoading } from 'tg.component/common/BoxLoading';
-import { useApiMutation } from 'tg.service/http/useQueryApi';
-import { binaryAssetApi } from './binaryAssetApi';
+import { invalidateUrlPrefix } from 'tg.service/http/useQueryApi';
+import { binaryAssetApi, formatBytes } from './binaryAssetApi';
 import { BinaryAssetPreview, previewKind } from './BinaryAssetPreview';
 import { AssetTranscript } from './AssetTranscript';
-import { TranscriptEditor } from './TranscriptEditor';
-import { BinaryAssetTranslationStatus } from './types';
-import { RunToolDialog } from './RunToolDialog';
-import { useRunErrorText } from './useRunErrorText';
-import { useRunTool } from './useRunTool';
-
-const statusColor = (status: BinaryAssetTranslationStatus) => {
-  switch (status) {
-    case 'CURRENT':
-      return 'success';
-    case 'OUTDATED':
-      return 'warning';
-    default:
-      return 'default';
-  }
-};
+import { AssetLocalizedFiles } from './AssetLocalizedFiles';
 
 export const AssetView = () => {
   const project = useProject();
@@ -60,38 +24,9 @@ export const AssetView = () => {
     useProjectPermissions();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadLanguageId, setUploadLanguageId] = useState<
-    number | 'source' | null
-  >(null);
   const [error, setError] = useState<string | null>(null);
-  const [generatingLanguageId, setGeneratingLanguageId] = useState<
-    number | null
-  >(null);
-  const [runLanguageId, setRunLanguageId] = useState<number | null>(null);
-  const runErrorText = useRunErrorText();
-
-  const generateLanguage = useApiMutation({
-    url: '/v2/projects/{projectId}/binary-assets/{assetId}/transcript/generate/{languageId}',
-    method: 'post',
-  });
-
-  const runTool = useRunTool({
-    projectId: project.id,
-    assetId,
-    // the dialog only opens with a language selected; 0 is never submitted
-    languageId: runLanguageId ?? 0,
-    onSuccess: () => {
-      setRunLanguageId(null);
-      setError(null);
-    },
-    onError: (code) => {
-      setRunLanguageId(null);
-      setError(runErrorText(code));
-    },
-  });
 
   const canEdit = satisfiesPermission('keys.edit');
-  const canTranslate = satisfiesPermission('translations.edit');
   const canDelete = satisfiesPermission('keys.delete');
 
   const detailQuery = useQuery(['binary-asset', project.id, assetId], () =>
@@ -100,7 +35,7 @@ export const AssetView = () => {
 
   const invalidate = () => {
     queryClient.invalidateQueries(['binary-asset', project.id, assetId]);
-    queryClient.invalidateQueries(['binary-assets', project.id]);
+    invalidateUrlPrefix(queryClient, '/v2/projects/{projectId}/binary-assets');
   };
 
   const replaceSource = useMutation(
@@ -112,30 +47,6 @@ export const AssetView = () => {
       },
       onError: (e: any) => setError(e?.message || 'Upload failed'),
     }
-  );
-
-  const upsertTranslation = useMutation(
-    (vars: { languageId: number; file: File; revision: number }) =>
-      binaryAssetApi.upsertTranslation(
-        project.id,
-        assetId,
-        vars.languageId,
-        vars.file,
-        vars.revision
-      ),
-    {
-      onSuccess: () => {
-        setError(null);
-        invalidate();
-      },
-      onError: (e: any) => setError(e?.message || 'Upload failed'),
-    }
-  );
-
-  const deleteTranslation = useMutation(
-    (languageId: number) =>
-      binaryAssetApi.deleteTranslation(project.id, assetId, languageId),
-    { onSuccess: invalidate }
   );
 
   const deleteAsset = useMutation(
@@ -152,31 +63,6 @@ export const AssetView = () => {
   const downloadSource = async () => {
     const ticket = await binaryAssetApi.sourceTicket(project.id, assetId);
     window.location.href = ticket.url;
-  };
-
-  const downloadTranslation = async (languageId: number) => {
-    const ticket = await binaryAssetApi.translationTicket(
-      project.id,
-      assetId,
-      languageId
-    );
-    window.location.href = ticket.url;
-  };
-
-  const onFileChosen = (file: File | null) => {
-    if (!file || uploadLanguageId === null) return;
-    if (uploadLanguageId === 'source') {
-      replaceSource.mutate(file);
-    } else {
-      const revision = detailQuery.data?.sourceRevision ?? 1;
-      upsertTranslation.mutate({
-        languageId: uploadLanguageId,
-        file,
-        revision,
-      });
-    }
-    setUploadLanguageId(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   if (detailQuery.isLoading || !detailQuery.data) {
@@ -237,7 +123,7 @@ export const AssetView = () => {
           {asset.sourceRevision}
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={1}>
-          {asset.originalFilename} · {asset.byteSize} bytes ·{' '}
+          {asset.originalFilename} · {formatBytes(asset.byteSize)} ·{' '}
           {asset.contentType}
         </Typography>
         <Box mb={1.5}>
@@ -260,10 +146,7 @@ export const AssetView = () => {
             <Button
               size="small"
               variant="outlined"
-              onClick={() => {
-                setUploadLanguageId('source');
-                fileInputRef.current?.click();
-              }}
+              onClick={() => fileInputRef.current?.click()}
               data-cy="binary-asset-replace-source"
             >
               {t('binary_assets_replace_source', 'Replace source')}
@@ -305,321 +188,18 @@ export const AssetView = () => {
       <Typography fontWeight={600} mb={1}>
         {t('binary_assets_translations', 'Localized files')}
       </Typography>
-      <Table size="small" data-cy="binary-asset-translations">
-        <TableHead>
-          <TableRow>
-            <TableCell>Language</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Preview</TableCell>
-            <TableCell>File</TableCell>
-            {hasTranscriptSupport && (
-              <TableCell>
-                {t('binary_assets_transcript', 'Transcript')}
-              </TableCell>
-            )}
-            <TableCell>{t('binary_assets_final', 'Final')}</TableCell>
-            <TableCell align="right">Actions</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {(asset.translations ?? []).map((row) => (
-            <TableRow key={row.languageId}>
-              <TableCell>
-                {row.languageName} ({row.languageTag})
-              </TableCell>
-              <TableCell>
-                <Chip
-                  size="small"
-                  color={statusColor(row.status) as any}
-                  label={row.status}
-                />
-              </TableCell>
-              <TableCell sx={{ minWidth: 220 }}>
-                {row.status !== 'MISSING' ? (
-                  <BinaryAssetPreview
-                    projectId={project.id}
-                    assetId={asset.id}
-                    languageId={row.languageId}
-                    contentType={row.contentType}
-                    filename={row.originalFilename}
-                    compact
-                  />
-                ) : (
-                  <Typography variant="caption" color="text.secondary">
-                    —
-                  </Typography>
-                )}
-              </TableCell>
-              <TableCell>
-                {row.originalFilename
-                  ? `${row.originalFilename} · ${row.byteSize} B`
-                  : '—'}
-              </TableCell>
-              {hasTranscriptSupport && (
-                <TableCell
-                  sx={{ maxWidth: 260, minWidth: 180 }}
-                  data-cy="binary-asset-transcript-cell"
-                >
-                  {asset.transcriptKeyName ? (
-                    <Box display="flex" alignItems="flex-start" gap={0.5}>
-                      <Box flex={1} minWidth={0}>
-                        <TranscriptEditor
-                          projectId={project.id}
-                          keyName={asset.transcriptKeyName}
-                          languageTag={row.languageTag}
-                          value={row.transcriptText}
-                          canEdit={satisfiesLanguageAccess(
-                            'translations.edit',
-                            row.languageId
-                          )}
-                          placeholder={t(
-                            'binary_assets_transcript_add_translation',
-                            'Add translation'
-                          )}
-                          onSaved={invalidate}
-                        />
-                      </Box>
-                      {row.transcriptionAvailable &&
-                        satisfiesLanguageAccess(
-                          'translations.edit',
-                          row.languageId
-                        ) && (
-                          <Tooltip
-                            title={t(
-                              'binary_assets_transcript_generate_language',
-                              "Transcribe this language's audio with AI"
-                            )}
-                          >
-                            <span>
-                              <IconButton
-                                size="small"
-                                disabled={
-                                  generateLanguage.isLoading &&
-                                  generatingLanguageId === row.languageId
-                                }
-                                onClick={() => {
-                                  setGeneratingLanguageId(row.languageId);
-                                  generateLanguage.mutate(
-                                    {
-                                      path: {
-                                        projectId: project.id,
-                                        assetId: asset.id,
-                                        languageId: row.languageId,
-                                      },
-                                    },
-                                    { onSuccess: invalidate }
-                                  );
-                                }}
-                                data-cy="binary-asset-transcript-generate-language"
-                              >
-                                {generateLanguage.isLoading &&
-                                generatingLanguageId === row.languageId ? (
-                                  <CircularProgress size={16} />
-                                ) : (
-                                  <Stars01 width={16} height={16} />
-                                )}
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        )}
-                    </Box>
-                  ) : (
-                    <Box display="flex" alignItems="center" gap={0.5}>
-                      <Typography variant="caption" color="text.secondary">
-                        —
-                      </Typography>
-                      {row.transcriptionAvailable &&
-                        row.status !== 'MISSING' &&
-                        satisfiesLanguageAccess(
-                          'translations.edit',
-                          row.languageId
-                        ) && (
-                          <Tooltip
-                            title={t(
-                              'binary_assets_transcript_generate_language',
-                              "Transcribe this language's audio with AI"
-                            )}
-                          >
-                            <span>
-                              <IconButton
-                                size="small"
-                                disabled={
-                                  generateLanguage.isLoading &&
-                                  generatingLanguageId === row.languageId
-                                }
-                                onClick={() => {
-                                  setGeneratingLanguageId(row.languageId);
-                                  generateLanguage.mutate(
-                                    {
-                                      path: {
-                                        projectId: project.id,
-                                        assetId: asset.id,
-                                        languageId: row.languageId,
-                                      },
-                                    },
-                                    { onSuccess: invalidate }
-                                  );
-                                }}
-                                data-cy="binary-asset-transcript-generate-language"
-                              >
-                                {generateLanguage.isLoading &&
-                                generatingLanguageId === row.languageId ? (
-                                  <CircularProgress size={16} />
-                                ) : (
-                                  <Stars01 width={16} height={16} />
-                                )}
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        )}
-                    </Box>
-                  )}
-                </TableCell>
-              )}
-              <TableCell data-cy="binary-asset-final-cell">
-                {row.status === 'MISSING' ? (
-                  <Typography variant="caption" color="text.secondary">
-                    —
-                  </Typography>
-                ) : (
-                  <Typography
-                    variant="body2"
-                    component={RouterLink}
-                    to={LINKS.PROJECT_ASSET_TRANSLATION.build({
-                      [PARAMS.PROJECT_ID]: project.id,
-                      [PARAMS.ASSET_ID]: asset.id,
-                      [PARAMS.LANGUAGE_ID]: row.languageId,
-                    })}
-                    sx={{
-                      color: 'inherit',
-                      textDecoration: 'none',
-                      '&:hover': { textDecoration: 'underline' },
-                    }}
-                  >
-                    {/* no chosen version means the uploaded original is final */}
-                    {row.chosenVersionFilename ??
-                      t('binary_assets_final_original', 'Original')}
-                    {row.versionCount
-                      ? ` · ${t(
-                          'binary_assets_final_versions',
-                          '{count, plural, one {# version} other {# versions}}',
-                          {
-                            count: row.versionCount,
-                          }
-                        )}`
-                      : ''}
-                  </Typography>
-                )}
-              </TableCell>
-              <TableCell align="right">
-                <Box
-                  display="flex"
-                  gap={1}
-                  justifyContent="flex-end"
-                  flexWrap="wrap"
-                >
-                  {/* a run reads the uploaded file, so there must be one */}
-                  {canTranslate && row.status !== 'MISSING' && (
-                    <Tooltip
-                      title={t(
-                        'binary_assets_generate_audio',
-                        'Generate with AI (pipeline)'
-                      )}
-                    >
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => setRunLanguageId(row.languageId)}
-                        data-cy="binary-asset-run-tool"
-                      >
-                        <Zap width={16} height={16} />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                  {row.status !== 'MISSING' && (
-                    <Tooltip
-                      title={t('asset_translation_download', 'Download')}
-                    >
-                      <IconButton
-                        size="small"
-                        onClick={() => downloadTranslation(row.languageId)}
-                        data-cy="binary-asset-download-translation"
-                      >
-                        <Download01 width={16} height={16} />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                  {canTranslate && (
-                    <Tooltip
-                      title={
-                        row.status === 'MISSING'
-                          ? t('binary_assets_upload_translation', 'Upload')
-                          : t('binary_assets_replace_translation', 'Replace')
-                      }
-                    >
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          setUploadLanguageId(row.languageId);
-                          fileInputRef.current?.click();
-                        }}
-                        data-cy="binary-asset-upload-translation"
-                      >
-                        <UploadCloud02 width={16} height={16} />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                  {canTranslate && row.status !== 'MISSING' && (
-                    <Tooltip title={t('binary_assets_delete', 'Delete')}>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => deleteTranslation.mutate(row.languageId)}
-                        data-cy="binary-asset-delete-translation"
-                      >
-                        <Trash01 width={16} height={16} />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                  <Tooltip title={t('asset_translation_pipeline', 'Pipeline')}>
-                    <IconButton
-                      size="small"
-                      component={RouterLink}
-                      to={LINKS.PROJECT_ASSET_TRANSLATION.build({
-                        [PARAMS.PROJECT_ID]: project.id,
-                        [PARAMS.ASSET_ID]: asset.id,
-                        [PARAMS.LANGUAGE_ID]: row.languageId,
-                      })}
-                      data-cy="binary-asset-translation-pipeline"
-                    >
-                      <LayersThree01 width={16} height={16} />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <AssetLocalizedFiles projectId={project.id} asset={asset} />
 
       <input
         ref={fileInputRef}
         type="file"
         hidden
-        onChange={(e) => onFileChosen(e.target.files?.[0] ?? null)}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) replaceSource.mutate(file);
+          e.target.value = '';
+        }}
       />
-
-      {runLanguageId !== null && (
-        <RunToolDialog
-          projectId={project.id}
-          assetId={asset.id}
-          languageId={runLanguageId}
-          open
-          isLoading={runTool.isLoading}
-          onClose={() => setRunLanguageId(null)}
-          onSubmit={(payload) => runTool.mutate(payload)}
-        />
-      )}
     </BaseProjectView>
   );
 };

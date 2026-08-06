@@ -29,6 +29,7 @@ import {
   binaryAssetApi,
   BinaryAssetTranslationVersionModel,
   BinaryAssetTranslationWithVersions,
+  formatBytes,
   RunPayload,
   TOOL_LABELS,
 } from './binaryAssetApi';
@@ -37,12 +38,6 @@ import { BinaryAssetTranslation } from './types';
 import { RunToolDialog } from './RunToolDialog';
 import { useRunErrorText } from './useRunErrorText';
 import { useRunTool } from './useRunTool';
-
-const formatBytes = (n: number) => {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
-};
 
 const formatDate = (s: string) => new Date(s).toLocaleString();
 

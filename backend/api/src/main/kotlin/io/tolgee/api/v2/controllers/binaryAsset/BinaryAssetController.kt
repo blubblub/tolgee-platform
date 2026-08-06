@@ -21,6 +21,7 @@ import io.tolgee.security.authentication.JwtService
 import io.tolgee.security.authorization.RequiresProjectPermissions
 import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.binaryAsset.BinaryAssetTranscriptService
+import io.tolgee.service.binaryAsset.BinaryAssetTranslationVersionService
 import io.tolgee.service.language.LanguageService
 import io.tolgee.service.security.SecurityService
 import jakarta.servlet.http.HttpServletRequest
@@ -58,6 +59,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder
 class BinaryAssetController(
   private val binaryAssetService: BinaryAssetService,
   private val binaryAssetTranscriptService: BinaryAssetTranscriptService,
+  private val binaryAssetTranslationVersionService: BinaryAssetTranslationVersionService,
   private val binaryAssetModelAssembler: BinaryAssetModelAssembler,
   private val pagedAssembler: PagedResourcesAssembler<io.tolgee.model.binaryAsset.BinaryAsset>,
   private val projectHolder: ProjectHolder,
@@ -85,12 +87,17 @@ class BinaryAssetController(
       binaryAssetTranscriptService.getTranscriptTranslationsByKey(
         page.content.mapNotNull { it.transcriptKey?.id },
       )
+    val versionsByTranslation =
+      binaryAssetTranslationVersionService
+        .findByTranslationIdIn(page.content.flatMap { asset -> asset.translations.map { it.id } })
+        .groupBy { it.translation.id }
     return pagedAssembler.toModel(page) { asset ->
       binaryAssetModelAssembler.toListModel(
         asset,
         languages,
         visible,
-        transcripts[asset.transcriptKey?.id]?.get(asset.sourceLanguage.id)?.text,
+        transcripts[asset.transcriptKey?.id].orEmpty(),
+        versionsByTranslation,
       )
     }
   }

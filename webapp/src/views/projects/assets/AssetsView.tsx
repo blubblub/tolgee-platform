@@ -15,7 +15,11 @@ import { Link as RouterLink } from 'react-router-dom';
 
 import { BaseProjectView } from 'tg.views/projects/BaseProjectView';
 import { useProject } from 'tg.hooks/useProject';
+import { useProjectLanguages } from 'tg.hooks/useProjectLanguages';
+import { ProjectLanguagesProvider } from 'tg.hooks/ProjectLanguagesProvider';
 import { useProjectPermissions } from 'tg.hooks/useProjectPermissions';
+import { useUrlSearchState } from 'tg.hooks/useUrlSearchState';
+import { LanguagesSelect } from 'tg.component/common/form/LanguagesSelect/LanguagesSelect';
 import { LINKS, PARAMS } from 'tg.constants/links';
 import { BoxLoading } from 'tg.component/common/BoxLoading';
 import {
@@ -23,23 +27,33 @@ import {
   useApiInfiniteQuery,
 } from 'tg.service/http/useQueryApi';
 import { useInView } from 'react-intersection-observer';
-import { binaryAssetApi } from './binaryAssetApi';
+import { binaryAssetApi, visibleTranslations } from './binaryAssetApi';
 import { BinaryAssetPreview } from './BinaryAssetPreview';
+import { AssetLocalizedFiles } from './AssetLocalizedFiles';
 
 type MediaFilter = 'AUDIO' | 'VIDEO' | 'IMAGE';
 
 const PAGE_SIZE = 30;
 
-export const AssetsView = () => {
+/** Stable identity — useUrlSearchState memoizes on the default value. */
+const ALL_LANGUAGES: string[] = [];
+
+const AssetsViewContent = () => {
   const project = useProject();
   const { t } = useTranslate();
   const { satisfiesPermission } = useProjectPermissions();
   const queryClient = useQueryClient();
+  const projectLanguages = useProjectLanguages();
   const [search, setSearch] = useState('');
   const [mediaFilters, setMediaFilters] = useState<MediaFilter[]>([]);
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // shareable like the translations view: /assets?languages=de&languages=fr
+  const [selectedLanguages, setSelectedLanguages] = useUrlSearchState(
+    'languages',
+    { array: true, defaultVal: ALL_LANGUAGES }
+  );
 
   const canCreate = satisfiesPermission('keys.create');
 
@@ -116,6 +130,8 @@ export const AssetsView = () => {
     if (!mediaFilters.length) return null;
     return mediaFilters.join(', ');
   }, [mediaFilters]);
+
+  const hasFilters = mediaFilters.length > 0 || selectedLanguages.length > 0;
 
   return (
     <BaseProjectView
@@ -225,11 +241,20 @@ export const AssetsView = () => {
             {t('binary_assets_filter_image', 'Image')}
           </ToggleButton>
         </ToggleButtonGroup>
-        {mediaFilters.length > 0 && (
+        <LanguagesSelect
+          onChange={setSelectedLanguages}
+          value={selectedLanguages}
+          languages={projectLanguages}
+          context="assets"
+          enableEmpty
+          placeholder={t('binary_assets_all_languages', 'All languages')}
+        />
+        {hasFilters && (
           <Button
             size="small"
             onClick={() => {
               setMediaFilters([]);
+              setSelectedLanguages([]);
             }}
             data-cy="binary-assets-filter-clear"
           >
@@ -276,87 +301,105 @@ export const AssetsView = () => {
         <Box
           display="flex"
           flexDirection="column"
-          gap={1}
+          gap={2}
           data-cy="binary-assets-list"
         >
-          {assets.map((asset) => (
-            <Box
-              key={asset.id}
-              sx={{
-                p: 2,
-                border: 1,
-                borderColor: 'divider',
-                borderRadius: 1,
-              }}
-              data-cy="binary-assets-list-item"
-            >
+          {assets.map((asset) => {
+            // counts follow the language selection, so they match the rows below
+            const rows = visibleTranslations(asset, selectedLanguages);
+            const currentCount = rows.filter(
+              (r) => r.status === 'CURRENT'
+            ).length;
+            const outdatedCount = rows.filter(
+              (r) => r.status === 'OUTDATED'
+            ).length;
+            return (
               <Box
-                display="flex"
-                justifyContent="space-between"
-                gap={2}
-                flexWrap="wrap"
-                alignItems="flex-start"
+                key={asset.id}
+                sx={{
+                  p: 2,
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                }}
+                data-cy="binary-assets-list-item"
               >
-                <Box flex={1} minWidth={200}>
-                  <Typography
-                    fontWeight={600}
-                    component={RouterLink}
-                    to={LINKS.PROJECT_ASSET.build({
-                      [PARAMS.PROJECT_ID]: project.id,
-                      [PARAMS.ASSET_ID]: asset.id,
-                    })}
-                    sx={{
-                      color: 'inherit',
-                      textDecoration: 'none',
-                      '&:hover': { textDecoration: 'underline' },
-                    }}
-                  >
-                    {asset.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {asset.originalFilename} · {asset.sourceLanguageTag} r
-                    {asset.sourceRevision} · {asset.contentType}
-                  </Typography>
-                  {asset.transcriptKeyId && (
+                <Box
+                  display="flex"
+                  justifyContent="space-between"
+                  gap={2}
+                  flexWrap="wrap"
+                  alignItems="flex-start"
+                >
+                  <Box flex={1} minWidth={200}>
                     <Typography
-                      variant="body2"
-                      sx={{ mt: 0.5, fontStyle: 'italic' }}
-                      data-cy="binary-assets-list-transcript"
+                      fontWeight={600}
+                      component={RouterLink}
+                      to={LINKS.PROJECT_ASSET.build({
+                        [PARAMS.PROJECT_ID]: project.id,
+                        [PARAMS.ASSET_ID]: asset.id,
+                      })}
+                      sx={{
+                        color: 'inherit',
+                        textDecoration: 'none',
+                        '&:hover': { textDecoration: 'underline' },
+                      }}
                     >
-                      {asset.transcriptSourceText || (
-                        <T
-                          keyName="binary_assets_transcript_empty"
-                          defaultValue="No transcript text yet."
-                        />
-                      )}
+                      {asset.name}
                     </Typography>
-                  )}
-                  <Box mt={1}>
-                    <BinaryAssetPreview
-                      projectId={project.id}
-                      assetId={asset.id}
-                      contentType={asset.contentType}
-                      filename={asset.originalFilename}
-                      compact
-                    />
+                    <Typography variant="body2" color="text.secondary">
+                      {asset.originalFilename} · {asset.sourceLanguageTag} r
+                      {asset.sourceRevision} · {asset.contentType}
+                    </Typography>
+                    {asset.transcriptKeyId && (
+                      <Typography
+                        variant="body2"
+                        sx={{ mt: 0.5, fontStyle: 'italic' }}
+                        data-cy="binary-assets-list-transcript"
+                      >
+                        {asset.transcriptSourceText || (
+                          <T
+                            keyName="binary_assets_transcript_empty"
+                            defaultValue="No transcript text yet."
+                          />
+                        )}
+                      </Typography>
+                    )}
+                    <Box mt={1}>
+                      <BinaryAssetPreview
+                        projectId={project.id}
+                        assetId={asset.id}
+                        contentType={asset.contentType}
+                        filename={asset.originalFilename}
+                        compact
+                      />
+                    </Box>
                   </Box>
-                </Box>
-                <Box display="flex" gap={1} alignItems="center">
-                  <Chip
-                    size="small"
-                    label={`${asset.currentCount}/${asset.targetLanguageCount} current`}
-                  />
-                  {asset.outdatedCount > 0 && (
+                  <Box display="flex" gap={1} alignItems="center">
                     <Chip
                       size="small"
-                      color="warning"
-                      label={`${asset.outdatedCount} outdated`}
+                      label={`${currentCount}/${rows.length} current`}
                     />
-                  )}
+                    {outdatedCount > 0 && (
+                      <Chip
+                        size="small"
+                        color="warning"
+                        label={`${outdatedCount} outdated`}
+                      />
+                    )}
+                  </Box>
+                </Box>
+
+                <Box mt={2}>
+                  <AssetLocalizedFiles
+                    projectId={project.id}
+                    asset={asset}
+                    languageTags={selectedLanguages}
+                  />
                 </Box>
               </Box>
-            </Box>
-          ))}
+            );
+          })}
         </Box>
       )}
 
@@ -374,3 +417,9 @@ export const AssetsView = () => {
     </BaseProjectView>
   );
 };
+
+export const AssetsView = () => (
+  <ProjectLanguagesProvider>
+    <AssetsViewContent />
+  </ProjectLanguagesProvider>
+);

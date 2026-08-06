@@ -1,4 +1,5 @@
-import { binaryAssetApi } from './binaryAssetApi';
+import { binaryAssetApi, visibleTranslations } from './binaryAssetApi';
+import { BinaryAsset } from './types';
 
 const calls: string[] = [];
 
@@ -41,5 +42,35 @@ describe('binaryAssetApi pipeline paths', () => {
       `${prefix}/4`,
       `${prefix}/4/download-ticket`,
     ]);
+  });
+});
+
+describe('visibleTranslations', () => {
+  const asset = {
+    translations: [
+      { languageId: 1, languageTag: 'de', languageName: 'German' },
+      { languageId: 2, languageTag: 'fr', languageName: 'French' },
+    ],
+  } as BinaryAsset;
+
+  it('keeps only the selected languages', () => {
+    expect(
+      visibleTranslations(asset, ['fr']).map((r) => r.languageTag)
+    ).toEqual(['fr']);
+  });
+
+  it('shows every language when the selection is empty', () => {
+    expect(visibleTranslations(asset, []).map((r) => r.languageTag)).toEqual([
+      'de',
+      'fr',
+    ]);
+    expect(visibleTranslations(asset).map((r) => r.languageTag)).toEqual([
+      'de',
+      'fr',
+    ]);
+  });
+
+  it('survives an asset with no localized files', () => {
+    expect(visibleTranslations({} as BinaryAsset, ['de'])).toEqual([]);
   });
 });

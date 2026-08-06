@@ -145,7 +145,9 @@ export const BinaryAssetPreview = ({
         controls
         preload="metadata"
         src={src}
-        sx={{ width: '100%', maxWidth: compact ? 320 : 480, height: 36 }}
+        // narrow enough to keep the table readable, wide enough that Chrome still
+        // renders the overflow menu — that menu is the only download affordance
+        sx={{ width: compact ? 230 : '100%', maxWidth: 480, height: 36 }}
         onClick={(e) => e.stopPropagation()}
         data-cy="binary-asset-preview-audio"
       />

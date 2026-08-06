@@ -57,6 +57,23 @@ export const resolveDefaultVoice = (
   voices?.find((v) => v.languageId === null)?.voiceId ??
   '';
 
+export const formatBytes = (n: number) => {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+};
+
+/** The asset's localized files narrowed to `languageTags`; empty or undefined means all of them. */
+export const visibleTranslations = (
+  asset: BinaryAsset,
+  languageTags?: string[]
+) => {
+  const all = asset.translations ?? [];
+  return languageTags?.length
+    ? all.filter((row) => languageTags.includes(row.languageTag))
+    : all;
+};
+
 export const binaryAssetApi = {
   list(
     projectId: number,

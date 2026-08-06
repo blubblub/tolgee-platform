@@ -56,6 +56,10 @@ class BinaryAssetControllerTest : ProjectAuthControllerTest("/v2/projects/") {
     performProjectAuthGet("binary-assets").andIsOk.andAssertThatJson {
       node("_embedded.binaryAssets").isArray.hasSize(1)
       node("_embedded.binaryAssets[0].name").isEqualTo("hero-banner")
+      // the assets page edits localized files in place, so list rows carry them
+      node("_embedded.binaryAssets[0].translations").isArray.hasSize(1)
+      node("_embedded.binaryAssets[0].translations[0].languageTag").isEqualTo("de")
+      node("_embedded.binaryAssets[0].translations[0].status").isEqualTo("MISSING")
     }
 
     performProjectAuthGet("binary-assets/$assetId").andIsOk.andAssertThatJson {
