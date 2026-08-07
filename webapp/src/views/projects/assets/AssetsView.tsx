@@ -40,9 +40,19 @@ const ALL_LANGUAGES: string[] = [];
 const AssetsViewContent = () => {
   const project = useProject();
   const { t } = useTranslate();
-  const { satisfiesPermission } = useProjectPermissions();
+  const { satisfiesPermission, satisfiesLanguageAccess } =
+    useProjectPermissions();
   const queryClient = useQueryClient();
   const projectLanguages = useProjectLanguages();
+  // the project's full language list is not permission-filtered, but the rows are — offering a
+  // language the user cannot view would just filter the page down to nothing
+  const selectableLanguages = useMemo(
+    () =>
+      projectLanguages.filter((l) =>
+        satisfiesLanguageAccess('translations.view', l.id)
+      ),
+    [projectLanguages]
+  );
   const [search, setSearch] = useState('');
   const [mediaFilters, setMediaFilters] = useState<MediaFilter[]>([]);
   const [name, setName] = useState('');
@@ -243,7 +253,7 @@ const AssetsViewContent = () => {
         <LanguagesSelect
           onChange={setSelectedLanguages}
           value={selectedLanguages}
-          languages={projectLanguages}
+          languages={selectableLanguages}
           context="assets"
           enableEmpty
           placeholder={t('binary_assets_all_languages', 'All languages')}
@@ -320,6 +330,9 @@ const AssetsViewContent = () => {
                   border: 1,
                   borderColor: 'divider',
                   borderRadius: 1,
+                  // a flex item defaults to min-width:auto, so a wide table would
+                  // stretch the card and the whole page instead of scrolling inside
+                  minWidth: 0,
                 }}
                 data-cy="binary-assets-list-item"
               >

@@ -95,7 +95,6 @@ export const AssetSourceTranscript = ({ projectId, asset }: Props) => {
         alignItems="flex-start"
         gap={0.5}
         mt={0.5}
-        maxWidth={520}
         data-cy="binary-assets-source-transcript"
       >
         <Box flex={1} minWidth={0}>

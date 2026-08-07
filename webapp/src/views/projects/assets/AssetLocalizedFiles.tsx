@@ -253,317 +253,326 @@ export const AssetLocalizedFiles = ({
           )}
         </Typography>
       ) : (
-        <Table
-          size="small"
-          data-cy="binary-asset-translations"
-          // every column hugs its content; File takes the slack so nothing else wraps
-          sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}
-        >
-          <TableHead>
-            <TableRow>
-              <TableCell>Language</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Preview</TableCell>
-              <TableCell sx={{ width: '100%' }}>File</TableCell>
-              {hasTranscriptSupport && (
-                <TableCell>
-                  {t('binary_assets_transcript', 'Transcript')}
-                </TableCell>
-              )}
-              <TableCell>{t('binary_assets_final', 'Final')}</TableCell>
-              <TableCell align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {sourceLanguageName && (
-              <TableRow data-cy="binary-asset-source-row">
-                <TableCell>
-                  <Typography variant="body2" fontWeight={700}>
-                    {sourceLanguageName} ({asset.sourceLanguageTag})
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    size="small"
-                    variant="outlined"
-                    label={t('binary_assets_source_badge', 'ORIGINAL')}
-                  />
-                </TableCell>
-                <TableCell>
-                  <BinaryAssetPreview
-                    projectId={projectId}
-                    assetId={asset.id}
-                    contentType={asset.contentType}
-                    filename={asset.originalFilename}
-                    enabled={inView}
-                    compact
-                  />
-                </TableCell>
-                <TableCell>
-                  <Tooltip title={asset.originalFilename}>
-                    <Typography variant="body2" fontWeight={700}>
-                      {truncateMiddle(asset.originalFilename)} ·{' '}
-                      {formatBytes(asset.byteSize)}
-                    </Typography>
-                  </Tooltip>
+        <Box sx={{ overflowX: 'auto', maxWidth: '100%', minWidth: 0 }}>
+          <Table
+            size="small"
+            data-cy="binary-asset-translations"
+            // every column hugs its content; the transcript takes the slack
+            sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}
+          >
+            <TableHead>
+              <TableRow>
+                <TableCell>Language</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Preview</TableCell>
+                <TableCell
+                  sx={hasTranscriptSupport ? undefined : { width: '100%' }}
+                >
+                  File
                 </TableCell>
                 {hasTranscriptSupport && (
-                  <TableCell
-                    sx={{
-                      maxWidth: 260,
-                      minWidth: 180,
-                      whiteSpace: 'normal !important',
-                    }}
-                  >
-                    <AssetSourceTranscript
-                      projectId={projectId}
-                      asset={asset}
-                    />
+                  <TableCell sx={{ width: '100%' }}>
+                    {t('binary_assets_transcript', 'Transcript')}
                   </TableCell>
                 )}
-                <TableCell>
-                  <Typography variant="caption" color="text.secondary">
-                    —
-                  </Typography>
-                </TableCell>
-                <TableCell align="right">
-                  <Box display="flex" gap={1} justifyContent="flex-end">
-                    {canEditSource && (
-                      <Tooltip
-                        title={t(
-                          'binary_assets_replace_source',
-                          'Replace source'
-                        )}
-                      >
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            setUploadTarget('source');
-                            fileInputRef.current?.click();
-                          }}
-                          data-cy="binary-asset-replace-source"
-                        >
-                          <UploadCloud02 width={16} height={16} />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </Box>
-                </TableCell>
+                <TableCell>{t('binary_assets_final', 'Final')}</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
-            )}
-            {rows.map((row) => (
-              <TableRow key={row.languageId}>
-                <TableCell>
-                  <Tooltip title={t('asset_translation_pipeline', 'Pipeline')}>
-                    <Typography
-                      variant="body2"
-                      component={RouterLink}
-                      to={LINKS.PROJECT_ASSET_TRANSLATION.build({
-                        [PARAMS.PROJECT_ID]: projectId,
-                        [PARAMS.ASSET_ID]: asset.id,
-                        [PARAMS.LANGUAGE_ID]: row.languageId,
-                      })}
-                      sx={{
-                        color: 'inherit',
-                        textDecoration: 'none',
-                        '&:hover': { textDecoration: 'underline' },
-                      }}
-                      data-cy="binary-asset-translation-pipeline"
-                    >
-                      {row.languageName} ({row.languageTag})
+            </TableHead>
+            <TableBody>
+              {sourceLanguageName && (
+                <TableRow data-cy="binary-asset-source-row">
+                  <TableCell>
+                    <Typography variant="body2" fontWeight={700}>
+                      {sourceLanguageName} ({asset.sourceLanguageTag})
                     </Typography>
-                  </Tooltip>
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    size="small"
-                    color={statusColor(row.status) as any}
-                    label={row.status}
-                  />
-                </TableCell>
-                <TableCell>
-                  {row.status !== 'MISSING' ? (
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={t('binary_assets_source_badge', 'ORIGINAL')}
+                    />
+                  </TableCell>
+                  <TableCell>
                     <BinaryAssetPreview
                       projectId={projectId}
                       assetId={asset.id}
-                      languageId={row.languageId}
-                      contentType={row.contentType}
-                      filename={row.originalFilename}
+                      contentType={asset.contentType}
+                      filename={asset.originalFilename}
                       enabled={inView}
                       compact
                     />
-                  ) : (
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip title={asset.originalFilename}>
+                      <Typography variant="body2" fontWeight={700}>
+                        {truncateMiddle(asset.originalFilename)} ·{' '}
+                        {formatBytes(asset.byteSize)}
+                      </Typography>
+                    </Tooltip>
+                  </TableCell>
+                  {hasTranscriptSupport && (
+                    <TableCell
+                      sx={{
+                        minWidth: 200,
+                        whiteSpace: 'normal !important',
+                      }}
+                    >
+                      <AssetSourceTranscript
+                        projectId={projectId}
+                        asset={asset}
+                      />
+                    </TableCell>
+                  )}
+                  <TableCell>
                     <Typography variant="caption" color="text.secondary">
                       —
                     </Typography>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {row.originalFilename ? (
-                    <Tooltip title={row.originalFilename}>
-                      <Typography variant="body2">
-                        {truncateMiddle(row.originalFilename)} ·{' '}
-                        {formatBytes(row.byteSize ?? 0)}
-                      </Typography>
-                    </Tooltip>
-                  ) : (
-                    '—'
-                  )}
-                </TableCell>
-                {hasTranscriptSupport && (
-                  <TableCell
-                    // the editor needs room to wrap, unlike every other column
-                    sx={{
-                      maxWidth: 260,
-                      minWidth: 180,
-                      whiteSpace: 'normal !important',
-                    }}
-                    data-cy="binary-asset-transcript-cell"
-                  >
-                    <Box display="flex" alignItems="flex-start" gap={0.5}>
-                      {asset.transcriptKeyName ? (
-                        <Box flex={1} minWidth={0}>
-                          <TranscriptEditor
-                            projectId={projectId}
-                            keyName={asset.transcriptKeyName}
-                            languageTag={row.languageTag}
-                            value={row.transcriptText}
-                            canEdit={satisfiesLanguageAccess(
-                              'translations.edit',
-                              row.languageId
-                            )}
-                            placeholder={t(
-                              'binary_assets_transcript_add_translation',
-                              'Add translation'
-                            )}
-                            onSaved={invalidate}
-                          />
-                        </Box>
-                      ) : (
-                        <Typography variant="caption" color="text.secondary">
-                          —
-                        </Typography>
-                      )}
-                      {transcribeButton(
-                        row.languageId,
-                        row.transcriptionAvailable
+                  </TableCell>
+                  <TableCell align="right">
+                    <Box display="flex" gap={1} justifyContent="flex-end">
+                      {canEditSource && (
+                        <Tooltip
+                          title={t(
+                            'binary_assets_replace_source',
+                            'Replace source'
+                          )}
+                        >
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setUploadTarget('source');
+                              fileInputRef.current?.click();
+                            }}
+                            data-cy="binary-asset-replace-source"
+                          >
+                            <UploadCloud02 width={16} height={16} />
+                          </IconButton>
+                        </Tooltip>
                       )}
                     </Box>
                   </TableCell>
-                )}
-                <TableCell data-cy="binary-asset-final-cell">
-                  {row.status === 'MISSING' ? (
-                    <Typography variant="caption" color="text.secondary">
-                      —
-                    </Typography>
-                  ) : (
-                    /* the final file itself — a chosen pipeline version, else the upload */
-                    <BinaryAssetPreview
-                      projectId={projectId}
-                      assetId={asset.id}
-                      languageId={row.languageId}
-                      versionId={row.chosenVersionId}
-                      contentType={
-                        row.chosenVersionId ? undefined : row.contentType
-                      }
-                      filename={
-                        row.chosenVersionFilename ?? row.originalFilename
-                      }
-                      enabled={inView}
-                      compact
-                    />
-                  )}
-                </TableCell>
-                <TableCell align="right">
-                  <Box display="flex" gap={1} justifyContent="flex-end">
-                    {/* nothing to confirm until a file exists */}
-                    {canReview && row.status !== 'MISSING' && (
-                      <Tooltip
-                        title={
-                          row.reviewed
-                            ? t(
-                                'binary_assets_reviewed_undo',
-                                'Confirmed — click to reopen'
-                              )
-                            : t(
-                                'binary_assets_reviewed_confirm',
-                                'Confirm this final file'
-                              )
-                        }
+                </TableRow>
+              )}
+              {rows.map((row) => (
+                <TableRow key={row.languageId}>
+                  <TableCell>
+                    <Tooltip
+                      title={t('asset_translation_pipeline', 'Pipeline')}
+                    >
+                      <Typography
+                        variant="body2"
+                        component={RouterLink}
+                        to={LINKS.PROJECT_ASSET_TRANSLATION.build({
+                          [PARAMS.PROJECT_ID]: projectId,
+                          [PARAMS.ASSET_ID]: asset.id,
+                          [PARAMS.LANGUAGE_ID]: row.languageId,
+                        })}
+                        sx={{
+                          color: 'inherit',
+                          textDecoration: 'none',
+                          '&:hover': { textDecoration: 'underline' },
+                        }}
+                        data-cy="binary-asset-translation-pipeline"
                       >
-                        <span>
+                        {row.languageName} ({row.languageTag})
+                      </Typography>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      color={statusColor(row.status) as any}
+                      label={row.status}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {row.status !== 'MISSING' ? (
+                      <BinaryAssetPreview
+                        projectId={projectId}
+                        assetId={asset.id}
+                        languageId={row.languageId}
+                        contentType={row.contentType}
+                        filename={row.originalFilename}
+                        enabled={inView}
+                        compact
+                      />
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        —
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {row.originalFilename ? (
+                      <Tooltip title={row.originalFilename}>
+                        <Typography variant="body2">
+                          {truncateMiddle(row.originalFilename)} ·{' '}
+                          {formatBytes(row.byteSize ?? 0)}
+                        </Typography>
+                      </Tooltip>
+                    ) : (
+                      '—'
+                    )}
+                  </TableCell>
+                  {hasTranscriptSupport && (
+                    <TableCell
+                      // the editor needs room to wrap, unlike every other column
+                      sx={{
+                        minWidth: 200,
+                        whiteSpace: 'normal !important',
+                      }}
+                      data-cy="binary-asset-transcript-cell"
+                    >
+                      <Box display="flex" alignItems="flex-start" gap={0.5}>
+                        {asset.transcriptKeyName ? (
+                          <Box flex={1} minWidth={0}>
+                            <TranscriptEditor
+                              projectId={projectId}
+                              keyName={asset.transcriptKeyName}
+                              languageTag={row.languageTag}
+                              value={row.transcriptText}
+                              canEdit={satisfiesLanguageAccess(
+                                'translations.edit',
+                                row.languageId
+                              )}
+                              placeholder={t(
+                                'binary_assets_transcript_add_translation',
+                                'Add translation'
+                              )}
+                              onSaved={invalidate}
+                            />
+                          </Box>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">
+                            —
+                          </Typography>
+                        )}
+                        {transcribeButton(
+                          row.languageId,
+                          row.transcriptionAvailable
+                        )}
+                      </Box>
+                    </TableCell>
+                  )}
+                  <TableCell data-cy="binary-asset-final-cell">
+                    {row.status === 'MISSING' ? (
+                      <Typography variant="caption" color="text.secondary">
+                        —
+                      </Typography>
+                    ) : (
+                      /* the final file itself — a chosen pipeline version, else the upload */
+                      <BinaryAssetPreview
+                        projectId={projectId}
+                        assetId={asset.id}
+                        languageId={row.languageId}
+                        versionId={row.chosenVersionId}
+                        contentType={
+                          row.chosenVersionId ? undefined : row.contentType
+                        }
+                        filename={
+                          row.chosenVersionFilename ?? row.originalFilename
+                        }
+                        enabled={inView}
+                        compact
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell align="right">
+                    <Box display="flex" gap={1} justifyContent="flex-end">
+                      {/* nothing to confirm until a file exists */}
+                      {canReview && row.status !== 'MISSING' && (
+                        <Tooltip
+                          title={
+                            row.reviewed
+                              ? t(
+                                  'binary_assets_reviewed_undo',
+                                  'Confirmed — click to reopen'
+                                )
+                              : t(
+                                  'binary_assets_reviewed_confirm',
+                                  'Confirm this final file'
+                                )
+                          }
+                        >
+                          <span>
+                            <IconButton
+                              size="small"
+                              color={row.reviewed ? 'success' : 'default'}
+                              disabled={setReviewed.isLoading}
+                              onClick={() =>
+                                toggleReviewed(row.languageId, !row.reviewed)
+                              }
+                              data-cy="binary-asset-review-toggle"
+                            >
+                              <CheckCircle width={16} height={16} />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
+                      {/* a run reads the uploaded file, so there must be one */}
+                      {canTranslate && row.status !== 'MISSING' && (
+                        <Tooltip
+                          title={t(
+                            'binary_assets_generate_audio',
+                            'Generate with AI (pipeline)'
+                          )}
+                        >
                           <IconButton
                             size="small"
-                            color={row.reviewed ? 'success' : 'default'}
-                            disabled={setReviewed.isLoading}
-                            onClick={() =>
-                              toggleReviewed(row.languageId, !row.reviewed)
-                            }
-                            data-cy="binary-asset-review-toggle"
+                            color="primary"
+                            onClick={() => setRunLanguageId(row.languageId)}
+                            data-cy="binary-asset-run-tool"
                           >
-                            <CheckCircle width={16} height={16} />
+                            <Zap width={16} height={16} />
                           </IconButton>
-                        </span>
-                      </Tooltip>
-                    )}
-                    {/* a run reads the uploaded file, so there must be one */}
-                    {canTranslate && row.status !== 'MISSING' && (
-                      <Tooltip
-                        title={t(
-                          'binary_assets_generate_audio',
-                          'Generate with AI (pipeline)'
-                        )}
-                      >
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() => setRunLanguageId(row.languageId)}
-                          data-cy="binary-asset-run-tool"
-                        >
-                          <Zap width={16} height={16} />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                    {canTranslate && (
-                      <Tooltip
-                        title={
-                          row.status === 'MISSING'
-                            ? t('binary_assets_upload_translation', 'Upload')
-                            : t('binary_assets_replace_translation', 'Replace')
-                        }
-                      >
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            setUploadTarget(row.languageId);
-                            fileInputRef.current?.click();
-                          }}
-                          data-cy="binary-asset-upload-translation"
-                        >
-                          <UploadCloud02 width={16} height={16} />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                    {canTranslate && row.status !== 'MISSING' && (
-                      <Tooltip title={t('binary_assets_delete', 'Delete')}>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() =>
-                            deleteTranslation.mutate(row.languageId)
+                        </Tooltip>
+                      )}
+                      {canTranslate && (
+                        <Tooltip
+                          title={
+                            row.status === 'MISSING'
+                              ? t('binary_assets_upload_translation', 'Upload')
+                              : t(
+                                  'binary_assets_replace_translation',
+                                  'Replace'
+                                )
                           }
-                          data-cy="binary-asset-delete-translation"
                         >
-                          <Trash01 width={16} height={16} />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </Box>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setUploadTarget(row.languageId);
+                              fileInputRef.current?.click();
+                            }}
+                            data-cy="binary-asset-upload-translation"
+                          >
+                            <UploadCloud02 width={16} height={16} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      {canTranslate && row.status !== 'MISSING' && (
+                        <Tooltip title={t('binary_assets_delete', 'Delete')}>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() =>
+                              deleteTranslation.mutate(row.languageId)
+                            }
+                            data-cy="binary-asset-delete-translation"
+                          >
+                            <Trash01 width={16} height={16} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Box>
       )}
 
       <input
