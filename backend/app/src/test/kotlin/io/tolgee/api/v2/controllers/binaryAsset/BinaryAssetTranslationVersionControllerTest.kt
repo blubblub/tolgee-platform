@@ -183,7 +183,7 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
         node("[0].byteSize").isEqualTo(mp3Bytes.size)
         node("[0].sha256").isString.hasSize(64)
         node("[0].contentType").isEqualTo("audio/mpeg")
-        node("[0].originalFilename").isEqualTo("de-tts.mp3")
+        node("[0].originalFilename").isEqualTo("vox-tts-og-tts.mp3")
       }
 
     assertThat(listVersions(assetId, "de")).containsExactly(versionId)
@@ -218,13 +218,13 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
         node("[0].tool").isEqualTo("voice-changer")
         node("[0].byteSize").isEqualTo(voiceChangedBytes.size)
         node("[0].contentType").isEqualTo("audio/mpeg")
-        node("[0].originalFilename").isEqualTo("de-voice.mp3")
+        node("[0].originalFilename").isEqualTo("vox-changer-voice.mp3")
       }
 
     // no params given -> configured default model, noise removal off
     verify(voiceClient).changeVoice(
       any(),
-      eq("de.mp3"),
+      eq("vox-changer.mp3"),
       any(),
       eq("voice-1"),
       eq("eleven_multilingual_sts_v2"),
@@ -258,7 +258,7 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
     assertThat(listVersions(assetId, "de")).containsExactly(ttsVersion, changed)
     verify(voiceClient).changeVoice(
       any(),
-      eq("de-tts.mp3"),
+      eq("vox-changer-chain-tts.mp3"),
       any(),
       eq("voice-9"),
       eq("eleven_english_sts_v2"),
@@ -378,7 +378,7 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
     assertThat(de.get("chosenVersionId").asLong()).isEqualTo(first)
     assertThat(de.get("versionCount").asInt()).isEqualTo(2)
     // the assets list shows which file is final without fetching every version
-    assertThat(de.get("chosenVersionFilename").asText()).isEqualTo("de-tts.mp3")
+    assertThat(de.get("chosenVersionFilename").asText()).isEqualTo("vox-chosen-tts.mp3")
     assertThat(de.get("chosenVersionTool").asText()).isEqualTo("tts")
 
     performProjectAuthPut(

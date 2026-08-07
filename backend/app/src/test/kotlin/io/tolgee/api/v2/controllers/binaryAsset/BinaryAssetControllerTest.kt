@@ -1,7 +1,9 @@
 package io.tolgee.api.v2.controllers.binaryAsset
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.tolgee.ProjectAuthControllerTest
 import io.tolgee.component.fileStorage.LocalFileStorage
+import io.tolgee.fixtures.AuthorizedRequestFactory
 import io.tolgee.fixtures.andAssertThatJson
 import io.tolgee.fixtures.andIsCreated
 import io.tolgee.fixtures.andIsOk
@@ -9,8 +11,10 @@ import io.tolgee.testing.annotations.ProjectJWTAuthTestMethod
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.mock.web.MockMultipartFile
+import org.springframework.test.web.servlet.ResultActions
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
@@ -93,5 +97,113 @@ class BinaryAssetControllerTest : ProjectAuthControllerTest("/v2/projects/") {
     performProjectAuthGet("binary-assets").andIsOk.andAssertThatJson {
       node("page.totalElements").isEqualTo(0)
     }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `localized file is stored under the original filename regardless of the uploaded name`() {
+    val assetId = createAsset(filename = "intro.mp3", contentType = "audio/mpeg")
+    val germanId = languageId("de")
+
+    uploadTranslation(assetId, germanId, uploadedFilename = "Aufnahme final (2).m4a")
+      .andIsOk.andAssertThatJson {
+        node("translations[0].languageTag").isEqualTo("de")
+        node("translations[0].status").isEqualTo("CURRENT")
+        node("translations[0].originalFilename").isEqualTo("intro.mp3")
+      }
+
+    // replacing the localized file with a differently named one changes nothing
+    uploadTranslation(assetId, germanId, uploadedFilename = "de-final-v3.wav")
+      .andIsOk.andAssertThatJson {
+        node("translations[0].originalFilename").isEqualTo("intro.mp3")
+      }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `replacing the source re-anchors the filename to the new original file`() {
+    val assetId = createAsset(filename = "intro.mp3", contentType = "audio/mpeg")
+
+    putMultipart(
+      "binary-assets/$assetId/source",
+      MockMultipartFile("file", "intro-v2.wav", "audio/wav", byteArrayOf(4, 5, 6)),
+    ).andIsOk.andAssertThatJson {
+      node("originalFilename").isEqualTo("intro-v2.wav")
+      node("sourceRevision").isEqualTo(2)
+    }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `source filename without extension gets one from the content type`() {
+    val create =
+      performProjectAuthMultipart(
+        url = "binary-assets",
+        files =
+          listOf(
+            MockMultipartFile("name", null, MediaType.TEXT_PLAIN_VALUE, "voiceover".toByteArray()),
+            MockMultipartFile("file", "voiceover", "audio/mpeg", byteArrayOf(1, 2, 3)),
+          ),
+      ).andIsCreated
+
+    create.andAssertThatJson {
+      node("originalFilename").isEqualTo("voiceover.mp3")
+    }
+
+    val noMapping =
+      performProjectAuthMultipart(
+        url = "binary-assets",
+        files =
+          listOf(
+            MockMultipartFile("name", null, MediaType.TEXT_PLAIN_VALUE, "project".toByteArray()),
+            MockMultipartFile("file", "project", "application/octet-stream", byteArrayOf(1, 2, 3)),
+          ),
+      ).andIsCreated
+
+    noMapping.andAssertThatJson {
+      node("originalFilename").isEqualTo("project")
+    }
+  }
+
+  private fun createAsset(
+    filename: String,
+    contentType: String,
+  ): Long {
+    val create =
+      performProjectAuthMultipart(
+        url = "binary-assets",
+        files =
+          listOf(
+            MockMultipartFile("name", null, MediaType.TEXT_PLAIN_VALUE, "asset".toByteArray()),
+            MockMultipartFile("file", filename, contentType, byteArrayOf(1, 2, 3)),
+          ),
+      ).andIsCreated.andReturn()
+    return jacksonObjectMapper().readTree(create.response.contentAsString).get("id").asLong()
+  }
+
+  private fun uploadTranslation(
+    assetId: Long,
+    languageId: Long,
+    uploadedFilename: String,
+  ): ResultActions =
+    putMultipart(
+      "binary-assets/$assetId/translations/$languageId",
+      MockMultipartFile("file", uploadedFilename, "application/octet-stream", byteArrayOf(7, 8, 9)),
+      MockMultipartFile("translatedAgainstSourceRevision", null, MediaType.TEXT_PLAIN_VALUE, "1".toByteArray()),
+    )
+
+  private fun putMultipart(
+    url: String,
+    vararg parts: MockMultipartFile,
+  ): ResultActions {
+    val builder = MockMvcRequestBuilders.multipart(HttpMethod.PUT, "/v2/projects/${project.id}/$url")
+    parts.forEach { builder.file(it) }
+    return mvc.perform(AuthorizedRequestFactory.addToken(builder))
+  }
+
+  private fun languageId(tag: String): Long {
+    val response = performProjectAuthGet("languages?size=100").andIsOk.andReturn()
+    val languages = jacksonObjectMapper().readTree(response.response.contentAsString).at("/_embedded/languages")
+    return languages.first { it.get("tag").asText() == tag }.get("id").asLong()
   }
 }

@@ -177,7 +177,9 @@ class BinaryAssetService(
     translation.reviewed = false
     translation.sourceRevision = translatedAgainstSourceRevision
     translation.storageKey = stored.storageKey
-    translation.originalFilename = sanitizeFilename(file.originalFilename)
+    // every localized file is named after the asset's original file, whatever name the
+    // uploaded file had on the uploader's machine
+    translation.originalFilename = asset.originalFilename
     translation.contentType = resolveContentType(file)
     translation.byteSize = stored.info.byteSize
     translation.sha256 = stored.info.sha256
@@ -346,7 +348,7 @@ class BinaryAssetService(
     uploader: UserAccount?,
   ) {
     asset.storageKey = stored.storageKey
-    asset.originalFilename = sanitizeFilename(file.originalFilename)
+    asset.originalFilename = resolveFilename(file)
     asset.contentType = resolveContentType(file)
     asset.byteSize = stored.info.byteSize
     asset.sha256 = stored.info.sha256
@@ -453,6 +455,20 @@ class BinaryAssetService(
     }
   }
 
+  /**
+   * Canonical filename for an asset's original file. Uses the uploaded file's name; when it
+   * carries no extension (clipboard pastes, extension-less files), derives one from the
+   * content type so downloads and media-type sniffing keep working.
+   */
+  private fun resolveFilename(file: MultipartFile): String {
+    val name = sanitizeFilename(file.originalFilename)
+    if (name.contains('.')) {
+      return name
+    }
+    val extension = EXTENSION_BY_CONTENT_TYPE[file.contentType?.substringBefore(';')?.trim()?.lowercase()]
+    return if (extension != null) "$name.$extension" else name
+  }
+
   private fun sanitizeFilename(original: String?): String {
     val name =
       original
@@ -484,6 +500,37 @@ class BinaryAssetService(
     val byteSize: Long,
     val storageKey: String,
   )
+
+  companion object {
+    /** Content types seen for asset uploads whose original name may carry no extension. */
+    private val EXTENSION_BY_CONTENT_TYPE =
+      mapOf(
+        "audio/mpeg" to "mp3",
+        "audio/wav" to "wav",
+        "audio/x-wav" to "wav",
+        "audio/mp4" to "m4a",
+        "audio/x-m4a" to "m4a",
+        "audio/aac" to "aac",
+        "audio/ogg" to "ogg",
+        "audio/opus" to "opus",
+        "audio/flac" to "flac",
+        "audio/webm" to "webm",
+        "video/mp4" to "mp4",
+        "video/quicktime" to "mov",
+        "video/webm" to "webm",
+        "video/x-matroska" to "mkv",
+        "image/png" to "png",
+        "image/jpeg" to "jpg",
+        "image/webp" to "webp",
+        "image/gif" to "gif",
+        "image/svg+xml" to "svg",
+        "image/vnd.adobe.photoshop" to "psd",
+        "application/pdf" to "pdf",
+        "text/plain" to "txt",
+        "text/csv" to "csv",
+        "application/json" to "json",
+      )
+  }
 
   internal data class StoredBlob(
     val storageKey: String,
