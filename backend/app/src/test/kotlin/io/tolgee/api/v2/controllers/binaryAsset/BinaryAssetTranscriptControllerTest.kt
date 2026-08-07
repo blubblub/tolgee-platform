@@ -68,6 +68,42 @@ class BinaryAssetTranscriptControllerTest : ProjectAuthControllerTest("/v2/proje
 
   @Test
   @ProjectJWTAuthTestMethod
+  @Transactional
+  fun `seeds the transcript in the given language instead of the source`() {
+    val assetId = createAsset("vox-de-seed")
+
+    performProjectAuthPost(
+      "binary-assets/$assetId/transcript",
+      mapOf("text" to "Der Apfel ist rot.", "languageTag" to "de"),
+    ).andIsOk
+      .andAssertThatJson {
+        node("transcriptKeyName").isEqualTo("transcript.vox-de-seed")
+        node("translations[0].languageTag").isEqualTo("de")
+        node("translations[0].transcriptText").isEqualTo("Der Apfel ist rot.")
+      }
+
+    val asset = binaryAssetRepository.findByProjectIdAndId(project.id, assetId)!!
+    val key = keyService.get(asset.transcriptKey!!.id)
+    // nothing seeded into the source language — only the language the user typed into
+    assertThat(key.translations.map { it.language.tag }).containsExactly("de")
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `rejects a seed language that is not in the project`() {
+    val assetId = createAsset("vox-bad-seed")
+
+    performProjectAuthPost(
+      "binary-assets/$assetId/transcript",
+      mapOf("text" to "Bonjour.", "languageTag" to "fr"),
+    ).andIsNotFound
+      .andAssertThatJson {
+        node("code").isEqualTo("language_not_found")
+      }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
   fun `creates an empty transcript when no text is given`() {
     val assetId = createAsset("vox-empty")
 

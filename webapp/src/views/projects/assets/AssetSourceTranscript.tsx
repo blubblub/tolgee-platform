@@ -1,12 +1,4 @@
-import { useState } from 'react';
-import {
-  Box,
-  CircularProgress,
-  IconButton,
-  TextField,
-  Tooltip,
-  Typography,
-} from '@mui/material';
+import { Box, CircularProgress, IconButton, Tooltip } from '@mui/material';
 import { Stars01 } from '@untitled-ui/icons-react';
 import { useTranslate } from '@tolgee/react';
 import { useQueryClient } from 'react-query';
@@ -17,6 +9,7 @@ import {
   useApiMutation,
 } from 'tg.service/http/useQueryApi';
 import { TranscriptEditor } from './TranscriptEditor';
+import { TranscriptAddInline } from './TranscriptAddInline';
 import { BinaryAsset } from './types';
 
 type Props = {
@@ -33,8 +26,6 @@ export const AssetSourceTranscript = ({ projectId, asset }: Props) => {
   const { satisfiesPermission, satisfiesLanguageAccess } =
     useProjectPermissions();
   const queryClient = useQueryClient();
-  const [draft, setDraft] = useState('');
-  const [editing, setEditing] = useState(false);
 
   const path = { projectId, assetId: asset.id };
 
@@ -128,51 +119,20 @@ export const AssetSourceTranscript = ({ projectId, asset }: Props) => {
       mt={0.5}
       data-cy="binary-assets-source-transcript"
     >
-      {editing ? (
-        <TextField
-          size="small"
-          autoFocus
-          fullWidth
-          multiline
-          placeholder={t(
-            'binary_assets_transcript_text_placeholder',
-            'What is said in this file'
-          )}
-          value={draft}
-          disabled={addTranscript.isLoading}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => {
-            if (!draft.trim()) {
-              setEditing(false);
-              return;
-            }
-            addTranscript.mutate(
-              {
-                path,
-                content: { 'application/json': { text: draft.trim() } },
-              },
-              {
-                onSuccess: () => {
-                  setEditing(false);
-                  setDraft('');
-                  invalidate();
-                },
-              }
-            );
-          }}
-          data-cy="binary-assets-source-transcript-input"
-        />
-      ) : (
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          onClick={() => setEditing(true)}
-          sx={{ fontStyle: 'italic', cursor: 'text', flex: 1 }}
-          data-cy="binary-assets-source-transcript-placeholder"
-        >
-          {t('binary_assets_transcript_add_source', 'Add transcript')}
-        </Typography>
-      )}
+      <TranscriptAddInline
+        creating={addTranscript.isLoading}
+        placeholderDataCy="binary-assets-source-transcript-placeholder"
+        inputDataCy="binary-assets-source-transcript-input"
+        onCreate={(text) =>
+          addTranscript.mutate(
+            {
+              path,
+              content: { 'application/json': { text } },
+            },
+            { onSuccess: invalidate }
+          )
+        }
+      />
       {transcribeButton(false)}
     </Box>
   );

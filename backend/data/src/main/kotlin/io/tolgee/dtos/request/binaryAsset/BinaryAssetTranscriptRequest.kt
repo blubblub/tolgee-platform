@@ -10,11 +10,17 @@ import jakarta.validation.constraints.Size
 data class BinaryAssetTranscriptRequest(
   @Schema(
     description =
-      "Initial transcript text in the asset's source language. " +
+      "Initial transcript text, in the asset's source language unless languageTag says otherwise. " +
         "Creates a new key owned by this asset. Mutually exclusive with keyId.",
   )
   @field:Size(max = 10000)
   val text: String? = null,
+  @Schema(
+    description =
+      "Language tag the initial text is in. Defaults to the asset's source language. " +
+        "Only meaningful together with text; must be a language of this project.",
+  )
+  val languageTag: String? = null,
   @Schema(
     description =
       "Id of an existing key in this project to use as the transcript. " +

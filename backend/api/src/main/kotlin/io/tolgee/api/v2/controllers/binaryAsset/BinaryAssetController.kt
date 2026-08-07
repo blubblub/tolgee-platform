@@ -172,7 +172,7 @@ class BinaryAssetController(
       }
       binaryAssetTranscriptService.link(projectId, assetId, keyId)
     } else {
-      binaryAssetTranscriptService.create(projectId, assetId, dto.text)
+      binaryAssetTranscriptService.create(projectId, assetId, dto.text, dto.languageTag)
     }
     return detailModel(projectId, assetId)
   }

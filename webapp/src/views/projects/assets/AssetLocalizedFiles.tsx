@@ -36,9 +36,10 @@ import {
   truncateMiddle,
   visibleTranslations,
 } from './binaryAssetApi';
-import { BinaryAssetPreview, previewKind } from './BinaryAssetPreview';
+import { BinaryAssetPreview } from './BinaryAssetPreview';
 import { AssetSourceTranscript } from './AssetSourceTranscript';
 import { TranscriptEditor } from './TranscriptEditor';
+import { TranscriptAddInline } from './TranscriptAddInline';
 import { BinaryAsset, BinaryAssetTranslationStatus } from './types';
 import { RunToolDialog } from './RunToolDialog';
 import { useRunErrorText } from './useRunErrorText';
@@ -101,6 +102,7 @@ export const AssetLocalizedFiles = ({
   const canTranslate = satisfiesPermission('translations.edit');
   const canReview = satisfiesPermission('translations.state-edit');
   const canEditSource = satisfiesPermission('keys.edit');
+  const canCreateTranscript = satisfiesPermission('keys.create');
 
   const rows = useMemo(
     () => visibleTranslations(asset, languageTags),
@@ -114,6 +116,11 @@ export const AssetLocalizedFiles = ({
 
   const generateLanguage = useApiMutation({
     url: '/v2/projects/{projectId}/binary-assets/{assetId}/transcript/generate/{languageId}',
+    method: 'post',
+  });
+
+  const addTranscript = useApiMutation({
+    url: '/v2/projects/{projectId}/binary-assets/{assetId}/transcript',
     method: 'post',
   });
 
@@ -199,11 +206,6 @@ export const AssetLocalizedFiles = ({
     );
   };
 
-  // transcripts only make sense for something spoken
-  const hasTranscriptSupport = ['audio', 'video'].includes(
-    previewKind(asset.contentType, asset.originalFilename)
-  );
-
   const transcribeButton = (languageId: number, available?: boolean) =>
     available &&
     satisfiesLanguageAccess('translations.edit', languageId) && (
@@ -265,16 +267,11 @@ export const AssetLocalizedFiles = ({
                 <TableCell>Language</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Preview</TableCell>
-                <TableCell
-                  sx={hasTranscriptSupport ? undefined : { width: '100%' }}
-                >
-                  File
+                <TableCell>File</TableCell>
+                {/* any asset may carry a transcript; only AI transcription is speech-gated */}
+                <TableCell sx={{ width: '100%' }}>
+                  {t('binary_assets_transcript', 'Transcript')}
                 </TableCell>
-                {hasTranscriptSupport && (
-                  <TableCell sx={{ width: '100%' }}>
-                    {t('binary_assets_transcript', 'Transcript')}
-                  </TableCell>
-                )}
                 <TableCell>{t('binary_assets_final', 'Final')}</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
@@ -312,19 +309,17 @@ export const AssetLocalizedFiles = ({
                       </Typography>
                     </Tooltip>
                   </TableCell>
-                  {hasTranscriptSupport && (
-                    <TableCell
-                      sx={{
-                        minWidth: 200,
-                        whiteSpace: 'normal !important',
-                      }}
-                    >
-                      <AssetSourceTranscript
-                        projectId={projectId}
-                        asset={asset}
-                      />
-                    </TableCell>
-                  )}
+                  <TableCell
+                    sx={{
+                      minWidth: 200,
+                      whiteSpace: 'normal !important',
+                    }}
+                  >
+                    <AssetSourceTranscript
+                      projectId={projectId}
+                      asset={asset}
+                    />
+                  </TableCell>
                   <TableCell>
                     <Typography variant="caption" color="text.secondary">
                       —
@@ -416,46 +411,70 @@ export const AssetLocalizedFiles = ({
                       '—'
                     )}
                   </TableCell>
-                  {hasTranscriptSupport && (
-                    <TableCell
-                      // the editor needs room to wrap, unlike every other column
-                      sx={{
-                        minWidth: 200,
-                        whiteSpace: 'normal !important',
-                      }}
-                      data-cy="binary-asset-transcript-cell"
-                    >
-                      <Box display="flex" alignItems="flex-start" gap={0.5}>
+                  <TableCell
+                    // the editor needs room to wrap, unlike every other column
+                    sx={{
+                      minWidth: 200,
+                      whiteSpace: 'normal !important',
+                    }}
+                    data-cy="binary-asset-transcript-cell"
+                  >
+                    <Box display="flex" alignItems="flex-start" gap={0.5}>
+                      <Box flex={1} minWidth={0}>
                         {asset.transcriptKeyName ? (
-                          <Box flex={1} minWidth={0}>
-                            <TranscriptEditor
-                              projectId={projectId}
-                              keyName={asset.transcriptKeyName}
-                              languageTag={row.languageTag}
-                              value={row.transcriptText}
-                              canEdit={satisfiesLanguageAccess(
-                                'translations.edit',
-                                row.languageId
-                              )}
-                              placeholder={t(
-                                'binary_assets_transcript_add_translation',
-                                'Add translation'
-                              )}
-                              onSaved={invalidate}
-                            />
-                          </Box>
+                          <TranscriptEditor
+                            projectId={projectId}
+                            keyName={asset.transcriptKeyName}
+                            languageTag={row.languageTag}
+                            value={row.transcriptText}
+                            canEdit={satisfiesLanguageAccess(
+                              'translations.edit',
+                              row.languageId
+                            )}
+                            placeholder={t(
+                              'binary_assets_transcript_add_translation',
+                              'Add translation'
+                            )}
+                            onSaved={invalidate}
+                          />
+                        ) : canCreateTranscript ? (
+                          // no key yet — typing here creates one seeded in this language,
+                          // whether or not the language has a file uploaded
+                          <TranscriptAddInline
+                            creating={addTranscript.isLoading}
+                            placeholderDataCy="binary-asset-language-transcript-placeholder"
+                            inputDataCy="binary-asset-language-transcript-input"
+                            placeholder={t(
+                              'binary_assets_transcript_add_translation',
+                              'Add translation'
+                            )}
+                            onCreate={(text) =>
+                              addTranscript.mutate(
+                                {
+                                  path: { projectId, assetId: asset.id },
+                                  content: {
+                                    'application/json': {
+                                      text,
+                                      languageTag: row.languageTag,
+                                    },
+                                  },
+                                },
+                                { onSuccess: invalidate }
+                              )
+                            }
+                          />
                         ) : (
                           <Typography variant="caption" color="text.secondary">
                             —
                           </Typography>
                         )}
-                        {transcribeButton(
-                          row.languageId,
-                          row.transcriptionAvailable
-                        )}
                       </Box>
-                    </TableCell>
-                  )}
+                      {transcribeButton(
+                        row.languageId,
+                        row.transcriptionAvailable
+                      )}
+                    </Box>
+                  </TableCell>
                   <TableCell data-cy="binary-asset-final-cell">
                     {row.status === 'MISSING' ? (
                       <Typography variant="caption" color="text.secondary">

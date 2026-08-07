@@ -1779,7 +1779,9 @@ export interface components {
        * @description Id of an existing key in this project to use as the transcript. The key is not deleted when the asset is. Mutually exclusive with text.
        */
       keyId?: number;
-      /** @description Initial transcript text in the asset's source language. Creates a new key owned by this asset. Mutually exclusive with keyId. */
+      /** @description Language tag the initial text is in. Defaults to the asset's source language. Only meaningful together with text; must be a language of this project. */
+      languageTag?: string;
+      /** @description Initial transcript text, in the asset's source language unless languageTag says otherwise. Creates a new key owned by this asset. Mutually exclusive with keyId. */
       text?: string;
     };
     BinaryAssetTranslationModel: {

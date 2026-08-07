@@ -11,7 +11,7 @@ import { LINKS, PARAMS } from 'tg.constants/links';
 import { BoxLoading } from 'tg.component/common/BoxLoading';
 import { invalidateUrlPrefix } from 'tg.service/http/useQueryApi';
 import { binaryAssetApi, formatBytes } from './binaryAssetApi';
-import { BinaryAssetPreview, previewKind } from './BinaryAssetPreview';
+import { BinaryAssetPreview } from './BinaryAssetPreview';
 import { AssetTranscript } from './AssetTranscript';
 import { AssetLocalizedFiles } from './AssetLocalizedFiles';
 
@@ -74,10 +74,6 @@ export const AssetView = () => {
   }
 
   const asset = detailQuery.data;
-  // transcripts only make sense for something spoken
-  const hasTranscriptSupport = ['audio', 'video'].includes(
-    previewKind(asset.contentType, asset.originalFilename)
-  );
 
   return (
     <BaseProjectView
@@ -171,20 +167,18 @@ export const AssetView = () => {
         </Box>
       </Box>
 
-      {hasTranscriptSupport && (
-        <AssetTranscript
-          asset={asset}
-          projectId={project.id}
-          canCreate={satisfiesPermission('keys.create')}
-          canEdit={canEdit}
-          canEditSource={satisfiesLanguageAccess(
-            'translations.edit',
-            asset.sourceLanguageId
-          )}
-          onChange={invalidate}
-        />
-      )}
-
+      {/* any asset may carry a transcript; only AI transcription is limited to speech */}
+      <AssetTranscript
+        asset={asset}
+        projectId={project.id}
+        canCreate={satisfiesPermission('keys.create')}
+        canEdit={canEdit}
+        canEditSource={satisfiesLanguageAccess(
+          'translations.edit',
+          asset.sourceLanguageId
+        )}
+        onChange={invalidate}
+      />
       <Typography fontWeight={600} mb={1}>
         {t('binary_assets_translations', 'Localized files')}
       </Typography>

@@ -72,18 +72,26 @@ class BinaryAssetTranscriptService(
     projectId: Long,
     assetId: Long,
     text: String?,
+    languageTag: String? = null,
   ): BinaryAsset {
     val asset = lockAsset(projectId, assetId)
     if (asset.transcriptKey != null) {
       throw BadRequestException(Message.BINARY_ASSET_TRANSCRIPT_EXISTS)
     }
     val project = projectService.get(projectId)
+    // the inline editor on the assets page seeds whatever language the user typed into
+    val seedTag = languageTag?.takeIf { it.isNotBlank() } ?: asset.sourceLanguage.tag
+    val seedTranslations =
+      text?.takeIf { it.isNotBlank() }?.let {
+        languageService.getByTag(seedTag, project)
+        mapOf(seedTag to it)
+      }
     val key =
       keyService.create(
         project,
         CreateKeyDto(
           name = TRANSCRIPT_KEY_PREFIX + asset.name,
-          translations = text?.takeIf { it.isNotBlank() }?.let { mapOf(asset.sourceLanguage.tag to it) },
+          translations = seedTranslations,
           tags = listOf(TRANSCRIPT_TAG),
         ),
       )
@@ -214,7 +222,10 @@ class BinaryAssetTranscriptService(
   /** True when this instance can transcribe this asset: provider configured and the file is speech. */
   fun canTranscribe(asset: BinaryAsset): Boolean = transcriptionClient.isConfigured && isTranscribable(asset)
 
-  /** Only speech has a transcript. Mirrors the audio/video gate the UI applies. */
+  /**
+   * AI transcription is only offered for speech. A transcript key itself can be attached to any
+   * asset type — this gates only the "transcribe with AI" affordances.
+   */
   private fun isTranscribable(asset: BinaryAsset): Boolean {
     val type = asset.contentType.lowercase()
     if (type.startsWith("audio/") || type.startsWith("video/")) return true
