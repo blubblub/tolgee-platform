@@ -33,6 +33,7 @@ import {
 import {
   binaryAssetApi,
   formatBytes,
+  truncateMiddle,
   visibleTranslations,
 } from './binaryAssetApi';
 import { BinaryAssetPreview, previewKind } from './BinaryAssetPreview';
@@ -299,9 +300,12 @@ export const AssetLocalizedFiles = ({
                   />
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" fontWeight={700}>
-                    {asset.originalFilename} · {formatBytes(asset.byteSize)}
-                  </Typography>
+                  <Tooltip title={asset.originalFilename}>
+                    <Typography variant="body2" fontWeight={700}>
+                      {truncateMiddle(asset.originalFilename)} ·{' '}
+                      {formatBytes(asset.byteSize)}
+                    </Typography>
+                  </Tooltip>
                 </TableCell>
                 {hasTranscriptSupport && (
                   <TableCell
@@ -395,11 +399,16 @@ export const AssetLocalizedFiles = ({
                   )}
                 </TableCell>
                 <TableCell>
-                  {row.originalFilename
-                    ? `${row.originalFilename} · ${formatBytes(
-                        row.byteSize ?? 0
-                      )}`
-                    : '—'}
+                  {row.originalFilename ? (
+                    <Tooltip title={row.originalFilename}>
+                      <Typography variant="body2">
+                        {truncateMiddle(row.originalFilename)} ·{' '}
+                        {formatBytes(row.byteSize ?? 0)}
+                      </Typography>
+                    </Tooltip>
+                  ) : (
+                    '—'
+                  )}
                 </TableCell>
                 {hasTranscriptSupport && (
                   <TableCell
@@ -448,33 +457,21 @@ export const AssetLocalizedFiles = ({
                       —
                     </Typography>
                   ) : (
-                    <Typography
-                      variant="body2"
-                      component={RouterLink}
-                      to={LINKS.PROJECT_ASSET_TRANSLATION.build({
-                        [PARAMS.PROJECT_ID]: projectId,
-                        [PARAMS.ASSET_ID]: asset.id,
-                        [PARAMS.LANGUAGE_ID]: row.languageId,
-                      })}
-                      sx={{
-                        color: 'inherit',
-                        textDecoration: 'none',
-                        '&:hover': { textDecoration: 'underline' },
-                      }}
-                    >
-                      {/* no chosen version means the uploaded original is final */}
-                      {row.chosenVersionFilename ??
-                        t('binary_assets_final_original', 'Original')}
-                      {row.versionCount
-                        ? ` · ${t(
-                            'binary_assets_final_versions',
-                            '{count, plural, one {# version} other {# versions}}',
-                            {
-                              count: row.versionCount,
-                            }
-                          )}`
-                        : ''}
-                    </Typography>
+                    /* the final file itself — a chosen pipeline version, else the upload */
+                    <BinaryAssetPreview
+                      projectId={projectId}
+                      assetId={asset.id}
+                      languageId={row.languageId}
+                      versionId={row.chosenVersionId}
+                      contentType={
+                        row.chosenVersionId ? undefined : row.contentType
+                      }
+                      filename={
+                        row.chosenVersionFilename ?? row.originalFilename
+                      }
+                      enabled={inView}
+                      compact
+                    />
                   )}
                 </TableCell>
                 <TableCell align="right">

@@ -57,6 +57,17 @@ export const resolveDefaultVoice = (
   voices?.find((v) => v.languageId === null)?.voiceId ??
   '';
 
+/**
+ * Elide the middle of a filename so the tail — which carries the distinguishing part and the
+ * extension — stays readable. CSS ellipsis can only cut the end, which is the useless half here.
+ */
+export const truncateMiddle = (name: string, max = 26) => {
+  if (name.length <= max) return name;
+  const tail = Math.ceil((max - 1) / 2);
+  const head = max - 1 - tail;
+  return `${name.slice(0, head)}…${name.slice(-tail)}`;
+};
+
 export const formatBytes = (n: number) => {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;

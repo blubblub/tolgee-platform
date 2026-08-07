@@ -38,6 +38,8 @@ type Props = {
   projectId: number;
   assetId: number;
   languageId?: number | null;
+  /** Preview a pipeline version instead of the uploaded file. Needs languageId. */
+  versionId?: number | null;
   contentType?: string | null;
   filename?: string | null;
   /** Compact player for list rows */
@@ -54,6 +56,7 @@ export const BinaryAssetPreview = ({
   projectId,
   assetId,
   languageId,
+  versionId,
   contentType,
   filename,
   compact = false,
@@ -79,6 +82,13 @@ export const BinaryAssetPreview = ({
         const ticket =
           languageId == null
             ? await binaryAssetApi.sourceTicket(projectId, assetId)
+            : versionId != null
+            ? await binaryAssetApi.versionTicket(
+                projectId,
+                assetId,
+                languageId,
+                versionId
+              )
             : await binaryAssetApi.translationTicket(
                 projectId,
                 assetId,
@@ -99,7 +109,16 @@ export const BinaryAssetPreview = ({
     return () => {
       cancelled = true;
     };
-  }, [projectId, assetId, languageId, kind, enabled, contentType, filename]);
+  }, [
+    projectId,
+    assetId,
+    languageId,
+    versionId,
+    kind,
+    enabled,
+    contentType,
+    filename,
+  ]);
 
   if (kind === 'unknown') {
     return (
