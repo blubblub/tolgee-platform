@@ -95,6 +95,9 @@ export const AssetLocalizedFiles = ({
   const [regeneratingLanguageId, setRegeneratingLanguageId] = useState<
     number | null
   >(null);
+  // react-query v3 snapshots the mutation callbacks when mutate() runs — before the submit-time
+  // state updates land — so the success handler must read the language through a ref, not state
+  const regeneratingRef = useRef<number | null>(null);
   const runErrorText = useRunErrorText();
 
   // a page of assets would otherwise ask for a download ticket per language before anyone scrolls
@@ -161,17 +164,19 @@ export const AssetLocalizedFiles = ({
           path: {
             projectId,
             assetId: asset.id,
-            languageId: regeneratingLanguageId ?? 0,
+            languageId: regeneratingRef.current ?? 0,
           },
           content: { 'application/json': { versionId: version.id } },
         },
         {
           onSuccess: () => {
             invalidate();
+            regeneratingRef.current = null;
             setRegeneratingLanguageId(null);
           },
           onError: () => {
             invalidate();
+            regeneratingRef.current = null;
             setRegeneratingLanguageId(null);
             setError(
               t(
@@ -184,6 +189,7 @@ export const AssetLocalizedFiles = ({
       );
     },
     onError: (code) => {
+      regeneratingRef.current = null;
       setRegeneratingLanguageId(null);
       setRunLanguageId(null);
       setError(runErrorText(code));
@@ -665,6 +671,7 @@ export const AssetLocalizedFiles = ({
           onClose={() => setRunLanguageId(null)}
           onSubmit={(payload) => {
             // close right away — progress shows in the row, not behind a modal
+            regeneratingRef.current = runLanguageId;
             setRegeneratingLanguageId(runLanguageId);
             setRunLanguageId(null);
             runTool.mutate(payload);
