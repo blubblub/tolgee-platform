@@ -87,6 +87,10 @@ export const AssetLocalizedFiles = ({
   const [uploadTarget, setUploadTarget] = useState<number | 'source' | null>(
     null
   );
+  // which row's File cell spins for a drop-upload; null = idle (one at a time)
+  const [dropUploading, setDropUploading] = useState<number | 'source' | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
   const [generatingLanguageId, setGeneratingLanguageId] = useState<
     number | null
@@ -242,6 +246,17 @@ export const AssetLocalizedFiles = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const onFileDropped = (target: number | 'source', file: File) => {
+    // same mutations as the upload button, plus a spinner in that row's File cell
+    setDropUploading(target);
+    const onSettled = () => setDropUploading(null);
+    if (target === 'source') {
+      replaceSource.mutate(file, { onSettled });
+    } else {
+      upsertTranslation.mutate({ languageId: target, file }, { onSettled });
+    }
+  };
+
   const generateTranscript = (languageId: number) => {
     setGeneratingLanguageId(languageId);
     generateLanguage.mutate(
@@ -346,15 +361,26 @@ export const AssetLocalizedFiles = ({
                     />
                   </TableCell>
                   <FileDropTableCell
-                    active={canEditSource}
-                    onFile={(file) => replaceSource.mutate(file)}
+                    active={canEditSource && dropUploading === null}
+                    onFile={(file) => onFileDropped('source', file)}
                   >
-                    <Tooltip title={asset.originalFilename}>
-                      <Typography variant="body2" fontWeight={700}>
-                        {truncateMiddle(asset.originalFilename)} ·{' '}
-                        {formatBytes(asset.byteSize)}
-                      </Typography>
-                    </Tooltip>
+                    {dropUploading === 'source' ? (
+                      <Box
+                        display="flex"
+                        alignItems="center"
+                        py={0.5}
+                        data-cy="binary-asset-file-uploading"
+                      >
+                        <CircularProgress size={18} />
+                      </Box>
+                    ) : (
+                      <Tooltip title={asset.originalFilename}>
+                        <Typography variant="body2" fontWeight={700}>
+                          {truncateMiddle(asset.originalFilename)} ·{' '}
+                          {formatBytes(asset.byteSize)}
+                        </Typography>
+                      </Tooltip>
+                    )}
                   </FileDropTableCell>
                   <TableCell
                     sx={{
@@ -447,15 +473,19 @@ export const AssetLocalizedFiles = ({
                     )}
                   </TableCell>
                   <FileDropTableCell
-                    active={canTranslate}
-                    onFile={(file) =>
-                      upsertTranslation.mutate({
-                        languageId: row.languageId,
-                        file,
-                      })
-                    }
+                    active={canTranslate && dropUploading === null}
+                    onFile={(file) => onFileDropped(row.languageId, file)}
                   >
-                    {row.originalFilename ? (
+                    {dropUploading === row.languageId ? (
+                      <Box
+                        display="flex"
+                        alignItems="center"
+                        py={0.5}
+                        data-cy="binary-asset-file-uploading"
+                      >
+                        <CircularProgress size={18} />
+                      </Box>
+                    ) : row.originalFilename ? (
                       <Tooltip title={row.originalFilename}>
                         <Typography variant="body2">
                           {truncateMiddle(row.originalFilename)} ·{' '}
