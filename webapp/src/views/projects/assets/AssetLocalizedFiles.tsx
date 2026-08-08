@@ -37,6 +37,7 @@ import {
   visibleTranslations,
 } from './binaryAssetApi';
 import { BinaryAssetPreview } from './BinaryAssetPreview';
+import { FileDropTableCell } from './FileDropTableCell';
 import { AssetSourceTranscript } from './AssetSourceTranscript';
 import { TranscriptEditor } from './TranscriptEditor';
 import { TranscriptAddInline } from './TranscriptAddInline';
@@ -344,14 +345,17 @@ export const AssetLocalizedFiles = ({
                       compact
                     />
                   </TableCell>
-                  <TableCell>
+                  <FileDropTableCell
+                    active={canEditSource}
+                    onFile={(file) => replaceSource.mutate(file)}
+                  >
                     <Tooltip title={asset.originalFilename}>
                       <Typography variant="body2" fontWeight={700}>
                         {truncateMiddle(asset.originalFilename)} ·{' '}
                         {formatBytes(asset.byteSize)}
                       </Typography>
                     </Tooltip>
-                  </TableCell>
+                  </FileDropTableCell>
                   <TableCell
                     sx={{
                       minWidth: 200,
@@ -442,7 +446,15 @@ export const AssetLocalizedFiles = ({
                       </Typography>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <FileDropTableCell
+                    active={canTranslate}
+                    onFile={(file) =>
+                      upsertTranslation.mutate({
+                        languageId: row.languageId,
+                        file,
+                      })
+                    }
+                  >
                     {row.originalFilename ? (
                       <Tooltip title={row.originalFilename}>
                         <Typography variant="body2">
@@ -453,7 +465,7 @@ export const AssetLocalizedFiles = ({
                     ) : (
                       '—'
                     )}
-                  </TableCell>
+                  </FileDropTableCell>
                   <TableCell
                     // the editor needs room to wrap, unlike every other column
                     sx={{

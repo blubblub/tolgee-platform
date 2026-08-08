@@ -159,6 +159,7 @@ declare namespace DataCy {
         "binary-asset-delete": true;
         "binary-asset-delete-translation": true;
         "binary-asset-download-source": true;
+        "binary-asset-file-drop": true;
         "binary-asset-final-cell": true;
         "binary-asset-language-transcript-input": true;
         "binary-asset-language-transcript-placeholder": true;
