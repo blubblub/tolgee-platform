@@ -30,6 +30,9 @@ const DEFAULT_MODEL_PLACEHOLDER: Record<Tool, string> = {
   'voice-changer': 'eleven_multilingual_sts_v2',
 };
 
+/** The everyday regeneration tool — preselected on every open and listed first. */
+const DEFAULT_TOOL: Tool = 'voice-changer';
+
 type Props = {
   projectId: number;
   assetId: number;
@@ -54,7 +57,7 @@ export const RunToolDialog = ({
   onSubmit,
 }: Props) => {
   const { t } = useTranslate();
-  const [tool, setTool] = useState<Tool>('tts');
+  const [tool, setTool] = useState<Tool>(DEFAULT_TOOL);
   const [voiceId, setVoiceId] = useState('');
   const [modelId, setModelId] = useState('');
   const [removeBackgroundNoise, setRemoveBackgroundNoise] = useState(false);
@@ -78,6 +81,7 @@ export const RunToolDialog = ({
   // prefill on open — the field stays editable, so a one-off voice still wins
   useEffect(() => {
     if (open) {
+      setTool(DEFAULT_TOOL);
       setVoiceId(defaultVoiceId);
       setBaseVersionId('og');
     }
@@ -107,11 +111,11 @@ export const RunToolDialog = ({
               onChange={(e) => setTool(e.target.value as Tool)}
               data-cy="asset-version-tool-select"
             >
-              <MenuItem value="tts">
-                {t('asset_translation_tool_tts', 'Text-to-speech')}
-              </MenuItem>
               <MenuItem value="voice-changer">
                 {t('asset_translation_tool_voice_changer', 'Voice changer')}
+              </MenuItem>
+              <MenuItem value="tts">
+                {t('asset_translation_tool_tts', 'Text-to-speech')}
               </MenuItem>
             </Select>
           </FormControl>

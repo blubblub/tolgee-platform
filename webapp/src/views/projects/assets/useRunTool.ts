@@ -1,12 +1,16 @@
 import { useMutation, useQueryClient } from 'react-query';
 
-import { binaryAssetApi, RunPayload } from './binaryAssetApi';
+import {
+  binaryAssetApi,
+  BinaryAssetTranslationVersionModel,
+  RunPayload,
+} from './binaryAssetApi';
 
 type Options = {
   projectId: number;
   assetId: number;
   languageId: number;
-  onSuccess?: () => void;
+  onSuccess?: (version: BinaryAssetTranslationVersionModel) => void;
   /** `code` is the backend Message code — feed it to useRunErrorText. */
   onError?: (code: string | undefined, payload: RunPayload) => void;
 };
@@ -28,7 +32,7 @@ export const useRunTool = ({
     (payload: RunPayload) =>
       binaryAssetApi.runTool(projectId, assetId, languageId, payload),
     {
-      onSuccess: () => {
+      onSuccess: (version) => {
         queryClient.invalidateQueries(['binary-asset', projectId, assetId]);
         queryClient.invalidateQueries([
           'binary-asset-versions',
@@ -41,7 +45,7 @@ export const useRunTool = ({
           '/v2/projects/{projectId}/binary-assets',
           { projectId },
         ]);
-        onSuccess?.();
+        onSuccess?.(version);
       },
       onError: (e: any, payload) => onError?.(e?.code, payload),
     }

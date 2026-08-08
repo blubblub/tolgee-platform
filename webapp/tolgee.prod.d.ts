@@ -134,6 +134,7 @@ declare module '@tolgee/web' {
     | 'binary_assets_name'
     | 'binary_assets_replace_source'
     | 'binary_assets_search'
+    | 'binary_assets_set_final_failed'
     | 'binary_assets_source'
     | 'binary_assets_title'
     | 'binary_assets_transcript'

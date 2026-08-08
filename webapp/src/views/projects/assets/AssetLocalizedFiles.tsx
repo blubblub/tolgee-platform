@@ -91,6 +91,10 @@ export const AssetLocalizedFiles = ({
     number | null
   >(null);
   const [runLanguageId, setRunLanguageId] = useState<number | null>(null);
+  // from submit until the new version is chosen + refreshed — the Final cell spins meanwhile
+  const [regeneratingLanguageId, setRegeneratingLanguageId] = useState<
+    number | null
+  >(null);
   const runErrorText = useRunErrorText();
 
   // a page of assets would otherwise ask for a download ticket per language before anyone scrolls
@@ -138,16 +142,49 @@ export const AssetLocalizedFiles = ({
       { onSuccess: invalidate }
     );
 
+  const chooseFinal = useApiMutation({
+    url: '/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/versions/chosen-version',
+    method: 'put',
+  });
+
   const runTool = useRunTool({
     projectId,
     assetId: asset.id,
     // the dialog only opens with a language selected; 0 is never submitted
     languageId: runLanguageId ?? 0,
-    onSuccess: () => {
+    onSuccess: (version) => {
       setRunLanguageId(null);
       setError(null);
+      // a regeneration from the table is meant to become the final right away
+      chooseFinal.mutate(
+        {
+          path: {
+            projectId,
+            assetId: asset.id,
+            languageId: regeneratingLanguageId ?? 0,
+          },
+          content: { 'application/json': { versionId: version.id } },
+        },
+        {
+          onSuccess: () => {
+            invalidate();
+            setRegeneratingLanguageId(null);
+          },
+          onError: () => {
+            invalidate();
+            setRegeneratingLanguageId(null);
+            setError(
+              t(
+                'binary_assets_set_final_failed',
+                'The new version finished, but setting it as the final file failed — pick it on the pipeline page.'
+              )
+            );
+          },
+        }
+      );
     },
     onError: (code) => {
+      setRegeneratingLanguageId(null);
       setRunLanguageId(null);
       setError(runErrorText(code));
     },
@@ -476,7 +513,16 @@ export const AssetLocalizedFiles = ({
                     </Box>
                   </TableCell>
                   <TableCell data-cy="binary-asset-final-cell">
-                    {row.status === 'MISSING' ? (
+                    {regeneratingLanguageId === row.languageId ? (
+                      <Box
+                        display="flex"
+                        alignItems="center"
+                        py={0.5}
+                        data-cy="binary-asset-regenerating"
+                      >
+                        <CircularProgress size={18} />
+                      </Box>
+                    ) : row.status === 'MISSING' ? (
                       <Typography variant="caption" color="text.secondary">
                         —
                       </Typography>
@@ -538,14 +584,22 @@ export const AssetLocalizedFiles = ({
                             'Generate with AI (pipeline)'
                           )}
                         >
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            onClick={() => setRunLanguageId(row.languageId)}
-                            data-cy="binary-asset-run-tool"
-                          >
-                            <Zap width={16} height={16} />
-                          </IconButton>
+                          <span>
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              // one run at a time keeps the chosen-final chain unambiguous
+                              disabled={regeneratingLanguageId !== null}
+                              onClick={() => setRunLanguageId(row.languageId)}
+                              data-cy="binary-asset-run-tool"
+                            >
+                              {regeneratingLanguageId === row.languageId ? (
+                                <CircularProgress size={16} />
+                              ) : (
+                                <Zap width={16} height={16} />
+                              )}
+                            </IconButton>
+                          </span>
                         </Tooltip>
                       )}
                       {canTranslate && (
@@ -609,7 +663,12 @@ export const AssetLocalizedFiles = ({
           open
           isLoading={runTool.isLoading}
           onClose={() => setRunLanguageId(null)}
-          onSubmit={(payload) => runTool.mutate(payload)}
+          onSubmit={(payload) => {
+            // close right away — progress shows in the row, not behind a modal
+            setRegeneratingLanguageId(runLanguageId);
+            setRunLanguageId(null);
+            runTool.mutate(payload);
+          }}
         />
       )}
     </Box>
