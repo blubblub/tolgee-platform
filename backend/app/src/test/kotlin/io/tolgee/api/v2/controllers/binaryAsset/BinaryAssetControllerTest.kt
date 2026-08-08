@@ -165,16 +165,46 @@ class BinaryAssetControllerTest : ProjectAuthControllerTest("/v2/projects/") {
     }
   }
 
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `list page stays stable when an asset is updated between fetches`() {
+    // Regression: the list query had no ORDER BY, so a write that moves the row physically
+    // (e.g. the ✨ transcribe button linking a transcript key) shifted the page window and
+    // pulled a never-seen asset into view — looking exactly like the click created an asset.
+    val ids =
+      (1..35).map {
+        createAsset(filename = "vox-$it.mp3", contentType = "audio/mpeg", name = "vox-$it")
+      }
+
+    fun pageOne(): Pair<List<Long>, Long> {
+      val response = performProjectAuthGet("binary-assets?size=30").andIsOk.andReturn()
+      val tree = jacksonObjectMapper().readTree(response.response.contentAsString)
+      val assets = tree.at("/_embedded/binaryAssets").map { it.get("id").asLong() }
+      return assets to tree.at("/page/totalElements").asLong()
+    }
+
+    val (before, totalBefore) = pageOne()
+    assertThat(before).hasSize(30)
+
+    // the same write the ✨ transcribe button performs: links a transcript key to the asset
+    performProjectAuthPost("binary-assets/${ids.first()}/transcript", mapOf("text" to "hi")).andIsOk
+
+    val (after, totalAfter) = pageOne()
+    assertThat(totalAfter).isEqualTo(totalBefore)
+    assertThat(after).containsExactlyElementsOf(before)
+  }
+
   private fun createAsset(
     filename: String,
     contentType: String,
+    name: String = "asset",
   ): Long {
     val create =
       performProjectAuthMultipart(
         url = "binary-assets",
         files =
           listOf(
-            MockMultipartFile("name", null, MediaType.TEXT_PLAIN_VALUE, "asset".toByteArray()),
+            MockMultipartFile("name", null, MediaType.TEXT_PLAIN_VALUE, name.toByteArray()),
             MockMultipartFile("file", filename, contentType, byteArrayOf(1, 2, 3)),
           ),
       ).andIsCreated.andReturn()

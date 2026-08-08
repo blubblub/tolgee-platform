@@ -67,6 +67,7 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
           )
         )
       )
+    order by a.id
     """,
     countQuery = """
     select count(a) from BinaryAsset a
