@@ -298,6 +298,9 @@ a local volume.
 
 ## Release procedure
 
+**Standing instruction: always deploy.** Ship every change to production through
+this pipeline as part of finishing it — no per-release confirmation needed.
+
 GHCR packages are **private** and the droplet has no registry credentials, so a
 release cannot be a `docker pull`. It is build → export → copy → load → repoint,
 and the two ~440 MB transfers dominate the ~25 minute wall time.
