@@ -50,10 +50,13 @@ import { RecordAudioDialog } from './RecordAudioDialog';
 import { useRunErrorText } from './useRunErrorText';
 import { useRunTool } from './useRunTool';
 
-const statusColor = (status: BinaryAssetTranslationStatus) => {
+const statusColor = (
+  status: BinaryAssetTranslationStatus,
+  reviewed = false
+) => {
   switch (status) {
     case 'CURRENT':
-      return 'success';
+      return reviewed ? 'success' : 'warning';
     case 'OUTDATED':
       return 'warning';
     default:
@@ -121,7 +124,12 @@ export const AssetLocalizedFiles = ({
   });
 
   const canTranslate = satisfiesPermission('translations.edit');
-  const canReview = satisfiesPermission('translations.state-edit');
+  const canReview = (languageId: number) =>
+    satisfiesLanguageAccess('translations.state-edit', languageId);
+  const reviewLabel = (reviewed?: boolean) =>
+    reviewed
+      ? t('binary_assets_reviewed_undo', 'Confirmed — click to reopen')
+      : t('binary_assets_reviewed_confirm', 'Confirm this final file');
   const canEditSource = satisfiesPermission('keys.edit');
   const canCreateTranscript = satisfiesPermission('keys.create');
   // recording produces an audio take, so only offer it where an audio file would land
@@ -348,30 +356,30 @@ export const AssetLocalizedFiles = ({
     target: number | 'source',
     final = false,
     disabled = false
-  ) => (
-    <Tooltip
-      title={
-        final
-          ? t('binary_assets_record_final', 'Record a new final version')
-          : t('binary_assets_record_audio', 'Record audio')
-      }
-    >
-      <span>
-        <IconButton
-          size="small"
-          disabled={disabled}
-          onClick={() => setRecordTarget({ target, final })}
-          data-cy={
-            final
-              ? 'binary-asset-final-record-audio'
-              : 'binary-asset-preview-record-audio'
-          }
-        >
-          <Microphone01 width={16} height={16} />
-        </IconButton>
-      </span>
-    </Tooltip>
-  );
+  ) => {
+    const label = final
+      ? t('binary_assets_record_final', 'Record a new final version')
+      : t('binary_assets_record_audio', 'Record audio');
+    return (
+      <Tooltip title={label}>
+        <span>
+          <IconButton
+            size="small"
+            aria-label={label}
+            disabled={disabled}
+            onClick={() => setRecordTarget({ target, final })}
+            data-cy={
+              final
+                ? 'binary-asset-final-record-audio'
+                : 'binary-asset-preview-record-audio'
+            }
+          >
+            <Microphone01 width={16} height={16} />
+          </IconButton>
+        </span>
+      </Tooltip>
+    );
+  };
 
   return (
     <Box ref={inViewRef}>
@@ -431,7 +439,6 @@ export const AssetLocalizedFiles = ({
                   </TableCell>
                   <TableCell>
                     <Box display="flex" alignItems="center" gap={0.5}>
-                      {canEditSource && recordable && recordButton('source')}
                       <BinaryAssetPreview
                         projectId={projectId}
                         assetId={asset.id}
@@ -440,6 +447,7 @@ export const AssetLocalizedFiles = ({
                         enabled={inView}
                         compact
                       />
+                      {canEditSource && recordable && recordButton('source')}
                     </Box>
                   </TableCell>
                   <FileDropTableCell
@@ -537,18 +545,22 @@ export const AssetLocalizedFiles = ({
                   <TableCell>
                     <Chip
                       size="small"
-                      color={statusColor(row.status) as any}
-                      label={row.status}
+                      color={statusColor(row.status, row.reviewed) as any}
+                      label={
+                        row.status === 'CURRENT'
+                          ? row.reviewed
+                            ? t('translation_state_reviewed', 'Reviewed')
+                            : t(
+                                'binary_assets_status_needs_review',
+                                'Needs Review'
+                              )
+                          : row.status
+                      }
+                      data-cy="binary-asset-status"
                     />
                   </TableCell>
                   <TableCell>
                     <Box display="flex" alignItems="center" gap={0.5}>
-                      {satisfiesLanguageAccess(
-                        'translations.edit',
-                        row.languageId
-                      ) &&
-                        recordable &&
-                        recordButton(row.languageId)}
                       {row.status !== 'MISSING' ? (
                         <BinaryAssetPreview
                           projectId={projectId}
@@ -564,6 +576,12 @@ export const AssetLocalizedFiles = ({
                           —
                         </Typography>
                       )}
+                      {satisfiesLanguageAccess(
+                        'translations.edit',
+                        row.languageId
+                      ) &&
+                        recordable &&
+                        recordButton(row.languageId)}
                     </Box>
                   </TableCell>
                   <FileDropTableCell
@@ -678,20 +696,6 @@ export const AssetLocalizedFiles = ({
                       </Typography>
                     ) : (
                       <Box display="flex" alignItems="center" gap={0.5}>
-                        {recordable &&
-                          satisfiesLanguageAccess(
-                            'translations.edit',
-                            row.languageId
-                          ) &&
-                          satisfiesLanguageAccess(
-                            'translations.state-edit',
-                            row.languageId
-                          ) &&
-                          recordButton(
-                            row.languageId,
-                            true,
-                            regeneratingLanguageId !== null
-                          )}
                         {/* a chosen pipeline/uploaded version, else the OG upload */}
                         <BinaryAssetPreview
                           projectId={projectId}
@@ -707,41 +711,42 @@ export const AssetLocalizedFiles = ({
                           enabled={inView}
                           compact
                         />
+                        {recordable &&
+                          satisfiesLanguageAccess(
+                            'translations.edit',
+                            row.languageId
+                          ) &&
+                          canReview(row.languageId) &&
+                          recordButton(
+                            row.languageId,
+                            true,
+                            regeneratingLanguageId !== null
+                          )}
                       </Box>
                     )}
                   </TableCell>
                   <TableCell align="right">
                     <Box display="flex" gap={1} justifyContent="flex-end">
                       {/* nothing to confirm until a file exists */}
-                      {canReview && row.status !== 'MISSING' && (
-                        <Tooltip
-                          title={
-                            row.reviewed
-                              ? t(
-                                  'binary_assets_reviewed_undo',
-                                  'Confirmed — click to reopen'
-                                )
-                              : t(
-                                  'binary_assets_reviewed_confirm',
-                                  'Confirm this final file'
-                                )
-                          }
-                        >
-                          <span>
-                            <IconButton
-                              size="small"
-                              color={row.reviewed ? 'success' : 'default'}
-                              disabled={setReviewed.isLoading}
-                              onClick={() =>
-                                toggleReviewed(row.languageId, !row.reviewed)
-                              }
-                              data-cy="binary-asset-review-toggle"
-                            >
-                              <CheckCircle width={16} height={16} />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      )}
+                      {canReview(row.languageId) &&
+                        row.status === 'CURRENT' && (
+                          <Tooltip title={reviewLabel(row.reviewed)}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                color={row.reviewed ? 'success' : 'default'}
+                                disabled={setReviewed.isLoading}
+                                aria-label={reviewLabel(row.reviewed)}
+                                onClick={() =>
+                                  toggleReviewed(row.languageId, !row.reviewed)
+                                }
+                                data-cy="binary-asset-review-toggle"
+                              >
+                                <CheckCircle width={16} height={16} />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        )}
                       {/* a run reads the uploaded file, so there must be one */}
                       {canTranslate && row.status !== 'MISSING' && (
                         <Tooltip

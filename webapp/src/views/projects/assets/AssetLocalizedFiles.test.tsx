@@ -8,7 +8,7 @@ import { binaryAssetApi } from './binaryAssetApi';
 import { BinaryAsset } from './types';
 
 const permissions = vi.hoisted(() => ({
-  satisfiesPermission: vi.fn(() => false),
+  satisfiesPermission: vi.fn((_permission: string) => false),
   satisfiesLanguageAccess: vi.fn(
     (_permission: string, languageId: number) => languageId === 2
   ),
@@ -54,7 +54,9 @@ vi.mock('react-intersection-observer', () => ({
   useInView: () => ({ ref: vi.fn(), inView: false }),
 }));
 
-vi.mock('./BinaryAssetPreview', () => ({ BinaryAssetPreview: () => null }));
+vi.mock('./BinaryAssetPreview', () => ({
+  BinaryAssetPreview: () => <span data-cy="binary-asset-preview-audio" />,
+}));
 vi.mock('./AssetSourceTranscript', () => ({
   AssetSourceTranscript: () => null,
 }));
@@ -139,12 +141,16 @@ describe('AssetLocalizedFiles recording integration', () => {
   let container: HTMLDivElement;
   let queryClient: QueryClient;
 
-  const render = (value = asset) => {
+  const render = (value = asset, sourceLanguageName?: string) => {
     act(() => {
       root.render(
         <QueryClientProvider client={queryClient}>
           <MemoryRouter>
-            <AssetLocalizedFiles projectId={7} asset={value} />
+            <AssetLocalizedFiles
+              projectId={7}
+              asset={value}
+              sourceLanguageName={sourceLanguageName}
+            />
           </MemoryRouter>
         </QueryClientProvider>
       );
@@ -238,9 +244,33 @@ describe('AssetLocalizedFiles recording integration', () => {
   });
 
   it('puts record controls beside the Preview and Final players', () => {
-    render();
+    permissions.satisfiesPermission.mockImplementation(
+      (permission) => permission === 'keys.edit'
+    );
+    render(asset, 'English');
     const languageRow = row('French');
     const cells = languageRow.children;
+    const previewPlayer = cells[2].querySelector(
+      '[data-cy="binary-asset-preview-audio"]'
+    )!;
+    const previewRecorder = cells[2].querySelector(
+      '[data-cy="binary-asset-preview-record-audio"]'
+    )!;
+    const finalPlayer = cells[5].querySelector(
+      '[data-cy="binary-asset-preview-audio"]'
+    )!;
+    const finalRecorder = cells[5].querySelector(
+      '[data-cy="binary-asset-final-record-audio"]'
+    )!;
+    const sourcePreviewCell = container.querySelector(
+      '[data-cy="binary-asset-source-row"]'
+    )!.children[2];
+    const sourcePlayer = sourcePreviewCell.querySelector(
+      '[data-cy="binary-asset-preview-audio"]'
+    )!;
+    const sourceRecorder = sourcePreviewCell.querySelector(
+      '[data-cy="binary-asset-preview-record-audio"]'
+    )!;
 
     expect(languageRow.querySelector('th[scope="row"]')?.textContent).toContain(
       'French'
@@ -254,6 +284,70 @@ describe('AssetLocalizedFiles recording integration', () => {
     expect(
       cells[5].querySelector('[data-cy="binary-asset-final-record-audio"]')
     ).not.toBeNull();
+    expect(
+      previewPlayer.compareDocumentPosition(previewRecorder) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      finalPlayer.compareDocumentPosition(finalRecorder) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      sourcePlayer.compareDocumentPosition(sourceRecorder) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(previewRecorder.getAttribute('aria-label')).toBe('Record audio');
+    expect(finalRecorder.getAttribute('aria-label')).toBe(
+      'Record a new final version'
+    );
+  });
+
+  it('shows current files as needing review until they are confirmed', () => {
+    render();
+
+    let status = row('French').querySelector(
+      '[data-cy="binary-asset-status"]'
+    )!;
+    let reviewToggle = row('French').querySelector(
+      '[data-cy="binary-asset-review-toggle"]'
+    )!;
+    expect(status.textContent).toBe('Needs Review');
+    expect(status.classList).toContain('MuiChip-colorWarning');
+    expect(reviewToggle.getAttribute('aria-label')).toBe(
+      'Confirm this final file'
+    );
+
+    render({
+      ...asset,
+      translations: asset.translations?.map((translation) =>
+        translation.languageId === 2
+          ? { ...translation, reviewed: true }
+          : translation
+      ),
+    });
+
+    status = row('French').querySelector('[data-cy="binary-asset-status"]')!;
+    reviewToggle = row('French').querySelector(
+      '[data-cy="binary-asset-review-toggle"]'
+    )!;
+    expect(status.textContent).toBe('Reviewed');
+    expect(status.classList).toContain('MuiChip-colorSuccess');
+    expect(reviewToggle.getAttribute('aria-label')).toBe(
+      'Confirmed — click to reopen'
+    );
+
+    render({
+      ...asset,
+      translations: asset.translations?.map((translation) =>
+        translation.languageId === 2
+          ? { ...translation, status: 'OUTDATED' }
+          : translation
+      ),
+    });
+
+    expect(
+      row('French').querySelector('[data-cy="binary-asset-review-toggle"]')
+    ).toBeNull();
   });
 
   it('requires edit and state-edit access for the Final recorder', () => {
@@ -270,6 +364,9 @@ describe('AssetLocalizedFiles recording integration', () => {
     ).not.toBeNull();
     expect(
       row('French').querySelector('[data-cy="binary-asset-final-record-audio"]')
+    ).toBeNull();
+    expect(
+      row('French').querySelector('[data-cy="binary-asset-review-toggle"]')
     ).toBeNull();
   });
 
