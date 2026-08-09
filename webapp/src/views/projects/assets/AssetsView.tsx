@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
-  Chip,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -11,7 +10,6 @@ import {
 import { Plus } from '@untitled-ui/icons-react';
 import { useTranslate } from '@tolgee/react';
 import { useMutation, useQueryClient } from 'react-query';
-import { Link as RouterLink } from 'react-router-dom';
 
 import { BaseProjectView } from 'tg.views/projects/BaseProjectView';
 import { useProject } from 'tg.hooks/useProject';
@@ -27,8 +25,8 @@ import {
   useApiInfiniteQuery,
 } from 'tg.service/http/useQueryApi';
 import { useInView } from 'react-intersection-observer';
-import { binaryAssetApi, visibleTranslations } from './binaryAssetApi';
-import { AssetLocalizedFiles } from './AssetLocalizedFiles';
+import { binaryAssetApi } from './binaryAssetApi';
+import { AssetCard } from './AssetCard';
 
 type MediaFilter = 'AUDIO' | 'VIDEO' | 'IMAGE';
 
@@ -313,88 +311,19 @@ const AssetsViewContent = () => {
           gap={2}
           data-cy="binary-assets-list"
         >
-          {assets.map((asset) => {
-            // counts follow the language selection, so they match the rows below
-            const rows = visibleTranslations(asset, selectedLanguages);
-            const currentCount = rows.filter(
-              (r) => r.status === 'CURRENT'
-            ).length;
-            const outdatedCount = rows.filter(
-              (r) => r.status === 'OUTDATED'
-            ).length;
-            return (
-              <Box
-                key={asset.id}
-                sx={{
-                  p: 2,
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  // a flex item defaults to min-width:auto, so a wide table would
-                  // stretch the card and the whole page instead of scrolling inside
-                  minWidth: 0,
-                }}
-                data-cy="binary-assets-list-item"
-              >
-                <Box
-                  display="flex"
-                  justifyContent="space-between"
-                  gap={2}
-                  flexWrap="wrap"
-                  alignItems="flex-start"
-                >
-                  <Box flex={1} minWidth={200}>
-                    <Typography
-                      fontWeight={600}
-                      component={RouterLink}
-                      to={LINKS.PROJECT_ASSET.build({
-                        [PARAMS.PROJECT_ID]: project.id,
-                        [PARAMS.ASSET_ID]: asset.id,
-                      })}
-                      sx={{
-                        color: 'inherit',
-                        textDecoration: 'none',
-                        '&:hover': { textDecoration: 'underline' },
-                      }}
-                    >
-                      {asset.name}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {/* the filename lives in the source row now */}
-                      {asset.sourceLanguageTag} r{asset.sourceRevision} ·{' '}
-                      {asset.contentType}
-                    </Typography>
-                  </Box>
-                  <Box display="flex" gap={1} alignItems="center">
-                    <Chip
-                      size="small"
-                      label={`${currentCount}/${rows.length} current`}
-                    />
-                    {outdatedCount > 0 && (
-                      <Chip
-                        size="small"
-                        color="warning"
-                        label={`${outdatedCount} outdated`}
-                      />
-                    )}
-                  </Box>
-                </Box>
-
-                <Box mt={2}>
-                  <AssetLocalizedFiles
-                    projectId={project.id}
-                    asset={asset}
-                    languageTags={selectedLanguages}
-                    sourceLanguageName={
-                      projectLanguages.find(
-                        (l) => l.tag === asset.sourceLanguageTag
-                      )?.name ?? asset.sourceLanguageTag
-                    }
-                  />
-                </Box>
-              </Box>
-            );
-          })}
+          {assets.map((asset) => (
+            <AssetCard
+              key={asset.id}
+              projectId={project.id}
+              asset={asset}
+              languageTags={selectedLanguages}
+              sourceLanguageName={
+                projectLanguages.find((l) => l.tag === asset.sourceLanguageTag)
+                  ?.name ?? asset.sourceLanguageTag
+              }
+              linkToDetail
+            />
+          ))}
         </Box>
       )}
 

@@ -116,6 +116,7 @@ declare module '@tolgee/web' {
     | 'binary_assets_create'
     | 'binary_assets_create_failed'
     | 'binary_assets_delete'
+    | 'binary_assets_delete_message'
     | 'binary_assets_delete_translation_message'
     | 'binary_assets_generate_audio'
     | 'binary_assets_replace_translation'

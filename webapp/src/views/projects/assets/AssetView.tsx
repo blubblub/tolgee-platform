@@ -1,52 +1,32 @@
-import { useRef, useState } from 'react';
-import { Box, Button, Typography } from '@mui/material';
+import { IconButton, Tooltip } from '@mui/material';
+import { Download01, Trash01 } from '@untitled-ui/icons-react';
 import { useTranslate } from '@tolgee/react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery } from 'react-query';
 import { useRouteMatch } from 'react-router-dom';
 
 import { BaseProjectView } from 'tg.views/projects/BaseProjectView';
 import { useProject } from 'tg.hooks/useProject';
+import { useProjectLanguages } from 'tg.hooks/useProjectLanguages';
+import { ProjectLanguagesProvider } from 'tg.hooks/ProjectLanguagesProvider';
 import { useProjectPermissions } from 'tg.hooks/useProjectPermissions';
+import { confirmation } from 'tg.hooks/confirmation';
 import { LINKS, PARAMS } from 'tg.constants/links';
 import { BoxLoading } from 'tg.component/common/BoxLoading';
-import { invalidateUrlPrefix } from 'tg.service/http/useQueryApi';
-import { binaryAssetApi, formatBytes } from './binaryAssetApi';
-import { BinaryAssetPreview } from './BinaryAssetPreview';
-import { AssetTranscript } from './AssetTranscript';
-import { AssetLocalizedFiles } from './AssetLocalizedFiles';
+import { binaryAssetApi } from './binaryAssetApi';
+import { AssetCard } from './AssetCard';
 
-export const AssetView = () => {
+const AssetViewContent = () => {
   const project = useProject();
+  const projectLanguages = useProjectLanguages();
   const match = useRouteMatch();
   const assetId = Number(match.params[PARAMS.ASSET_ID]);
   const { t } = useTranslate();
-  const { satisfiesPermission, satisfiesLanguageAccess } =
-    useProjectPermissions();
-  const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { satisfiesPermission } = useProjectPermissions();
 
-  const canEdit = satisfiesPermission('keys.edit');
   const canDelete = satisfiesPermission('keys.delete');
 
   const detailQuery = useQuery(['binary-asset', project.id, assetId], () =>
     binaryAssetApi.get(project.id, assetId)
-  );
-
-  const invalidate = () => {
-    queryClient.invalidateQueries(['binary-asset', project.id, assetId]);
-    invalidateUrlPrefix(queryClient, '/v2/projects/{projectId}/binary-assets');
-  };
-
-  const replaceSource = useMutation(
-    (file: File) => binaryAssetApi.replaceSource(project.id, assetId, file),
-    {
-      onSuccess: () => {
-        setError(null);
-        invalidate();
-      },
-      onError: (e: any) => setError(e?.message || 'Upload failed'),
-    }
   );
 
   const deleteAsset = useMutation(
@@ -59,6 +39,17 @@ export const AssetView = () => {
       },
     }
   );
+
+  const confirmDelete = () =>
+    confirmation({
+      title: t('binary_assets_delete', 'Delete asset'),
+      message: t(
+        'binary_assets_delete_message',
+        'Delete this asset and all localized files?'
+      ),
+      confirmButtonText: t('confirmation_dialog_delete', 'Delete'),
+      onConfirm: () => deleteAsset.mutate(),
+    });
 
   const downloadSource = async () => {
     const ticket = await binaryAssetApi.sourceTicket(project.id, assetId);
@@ -93,107 +84,46 @@ export const AssetView = () => {
         ],
       ]}
     >
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {t(
-          'binary_assets_help',
-          'Project-global binary assets (not branch-scoped). Audio, video, and images preview inline.'
-        )}
-      </Typography>
-
-      {error && (
-        <Typography color="error" sx={{ mb: 2 }}>
-          {error}
-        </Typography>
-      )}
-
-      <Box
-        mb={3}
-        p={2}
-        border={1}
-        borderColor="divider"
-        borderRadius={1}
-        data-cy="binary-asset-source"
-      >
-        <Typography fontWeight={600} mb={1}>
-          {t('binary_assets_source', 'Source')} ({asset.sourceLanguageTag}) · r
-          {asset.sourceRevision}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" mb={1}>
-          {asset.originalFilename} · {formatBytes(asset.byteSize)} ·{' '}
-          {asset.contentType}
-        </Typography>
-        <Box mb={1.5}>
-          <BinaryAssetPreview
-            projectId={project.id}
-            assetId={asset.id}
-            contentType={asset.contentType}
-            filename={asset.originalFilename}
-          />
-        </Box>
-        <Box display="flex" gap={1} flexWrap="wrap">
-          <Button
-            size="small"
-            onClick={downloadSource}
-            data-cy="binary-asset-download-source"
-          >
-            {t('binary_assets_download', 'Download')}
-          </Button>
-          {canEdit && (
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => fileInputRef.current?.click()}
-              data-cy="binary-asset-replace-source"
-            >
-              {t('binary_assets_replace_source', 'Replace source')}
-            </Button>
-          )}
-          {canDelete && (
-            <Button
-              size="small"
-              color="error"
-              onClick={() => {
-                if (
-                  window.confirm('Delete this asset and all localized files?')
-                ) {
-                  deleteAsset.mutate();
-                }
-              }}
-              data-cy="binary-asset-delete"
-            >
-              {t('binary_assets_delete', 'Delete asset')}
-            </Button>
-          )}
-        </Box>
-      </Box>
-
-      {/* any asset may carry a transcript; only AI transcription is limited to speech */}
-      <AssetTranscript
-        asset={asset}
+      {/* same card as the assets list, just filtered down to this one asset */}
+      <AssetCard
         projectId={project.id}
-        canCreate={satisfiesPermission('keys.create')}
-        canEdit={canEdit}
-        canEditSource={satisfiesLanguageAccess(
-          'translations.edit',
-          asset.sourceLanguageId
-        )}
-        onChange={invalidate}
-      />
-      <Typography fontWeight={600} mb={1}>
-        {t('binary_assets_translations', 'Localized files')}
-      </Typography>
-      <AssetLocalizedFiles projectId={project.id} asset={asset} />
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        hidden
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) replaceSource.mutate(file);
-          e.target.value = '';
-        }}
+        asset={asset}
+        sourceLanguageName={
+          projectLanguages.find((l) => l.tag === asset.sourceLanguageTag)
+            ?.name ?? asset.sourceLanguageTag
+        }
+        actions={
+          <>
+            <Tooltip title={t('binary_assets_download', 'Download')}>
+              <IconButton
+                size="small"
+                onClick={downloadSource}
+                data-cy="binary-asset-download-source"
+              >
+                <Download01 width={16} height={16} />
+              </IconButton>
+            </Tooltip>
+            {canDelete && (
+              <Tooltip title={t('binary_assets_delete', 'Delete asset')}>
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={confirmDelete}
+                  data-cy="binary-asset-delete"
+                >
+                  <Trash01 width={16} height={16} />
+                </IconButton>
+              </Tooltip>
+            )}
+          </>
+        }
       />
     </BaseProjectView>
   );
 };
+
+export const AssetView = () => (
+  <ProjectLanguagesProvider>
+    <AssetViewContent />
+  </ProjectLanguagesProvider>
+);

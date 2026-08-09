@@ -71,10 +71,7 @@ type Props = {
   asset: BinaryAsset;
   /** Tags to show; empty or undefined means every target language. */
   languageTags?: string[];
-  /**
-   * Name of the source language. When set, the source is listed first as a bolded row — the detail
-   * page presents it separately instead, so it leaves this out.
-   */
+  /** Name of the source language. When set, the source is listed first as a bolded row. */
   sourceLanguageName?: string;
 };
 
