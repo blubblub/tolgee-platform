@@ -11,6 +11,7 @@ import io.tolgee.repository.binaryAsset.BinaryAssetTranslationRepository
 import io.tolgee.repository.binaryAsset.BinaryAssetTranslationVersionRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.multipart.MultipartFile
 
 @Service
 class BinaryAssetTranslationVersionService(
@@ -50,6 +51,38 @@ class BinaryAssetTranslationVersionService(
       versionId,
     )
       ?: throw NotFoundException(Message.BINARY_ASSET_VERSION_NOT_FOUND)
+
+  @Transactional
+  fun upload(
+    projectId: Long,
+    assetId: Long,
+    languageId: Long,
+    file: MultipartFile,
+    user: UserAccount?,
+  ): BinaryAssetTranslationVersion {
+    val translation =
+      binaryAssetTranslationRepository.findByProjectAssetAndLanguage(projectId, assetId, languageId)
+        ?: throw NotFoundException(Message.BINARY_ASSET_TRANSLATION_NOT_FOUND)
+
+    binaryAssetService.requireStreamingStorage()
+    val stored = binaryAssetService.storeNewBlob(projectId, file)
+    return try {
+      binaryAssetTranslationVersionRepository.saveAndFlush(
+        BinaryAssetTranslationVersion(translation).apply {
+          storageKey = stored.storageKey
+          originalFilename = binaryAssetService.resolveFilename(file)
+          contentType = binaryAssetService.resolveContentType(file)
+          byteSize = stored.info.byteSize
+          sha256 = stored.info.sha256
+          tool = "upload"
+          createdBy = user
+        },
+      )
+    } catch (e: Exception) {
+      binaryAssetService.deleteBlobBestEffort(stored.storageKey)
+      throw e
+    }
+  }
 
   @Transactional
   fun runTool(

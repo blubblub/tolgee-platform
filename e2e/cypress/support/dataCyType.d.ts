@@ -162,15 +162,16 @@ declare namespace DataCy {
         "binary-asset-file-drop": true;
         "binary-asset-file-uploading": true;
         "binary-asset-final-cell": true;
+        "binary-asset-final-record-audio": true;
         "binary-asset-language-transcript-input": true;
         "binary-asset-language-transcript-placeholder": true;
         "binary-asset-preview-audio": true;
         "binary-asset-preview-error": true;
         "binary-asset-preview-image": true;
         "binary-asset-preview-pdf": true;
+        "binary-asset-preview-record-audio": true;
         "binary-asset-preview-unsupported": true;
         "binary-asset-preview-video": true;
-        "binary-asset-record-audio": true;
         "binary-asset-record-dialog": true;
         "binary-asset-record-playback": true;
         "binary-asset-record-start": true;

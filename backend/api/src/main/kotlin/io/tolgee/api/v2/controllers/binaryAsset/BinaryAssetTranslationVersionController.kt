@@ -26,6 +26,7 @@ import io.tolgee.service.binaryAsset.BinaryAssetTranslationVersionService
 import io.tolgee.service.security.PermissionService
 import io.tolgee.service.security.SecurityService
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.CrossOrigin
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -34,8 +35,10 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder
 
 @Suppress("MVCPathVariableInspection", "SpringJavaInjectionPointsAutowiringInspection")
@@ -60,7 +63,10 @@ class BinaryAssetTranslationVersionController(
   private val jwtService: JwtService,
 ) : IController {
   @GetMapping("")
-  @Operation(summary = "List pipeline versions for a translation")
+  @Operation(
+    summary = "List pipeline versions for a translation",
+    operationId = "listBinaryAssetTranslationVersions",
+  )
   @RequiresProjectPermissions([Scope.TRANSLATIONS_VIEW])
   @AllowApiAccess
   fun list(
@@ -71,6 +77,30 @@ class BinaryAssetTranslationVersionController(
     securityService.checkLanguageViewPermission(projectId, listOf(languageId))
     val versions = binaryAssetTranslationVersionService.listVersions(projectId, assetId, languageId)
     return versions.map { binaryAssetTranslationVersionModelAssembler.toModel(it) }
+  }
+
+  @PostMapping("", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+  @Operation(summary = "Upload a manual version for a translation")
+  @ResponseStatus(HttpStatus.CREATED)
+  @RequiresProjectPermissions([Scope.TRANSLATIONS_EDIT])
+  @AllowApiAccess
+  @RequestActivity(ActivityType.BINARY_ASSET_TRANSLATION_VERSION_RUN)
+  fun uploadVersion(
+    @PathVariable assetId: Long,
+    @PathVariable languageId: Long,
+    @RequestPart("file") file: MultipartFile,
+  ): BinaryAssetTranslationVersionModel {
+    val projectId = projectHolder.project.id
+    securityService.checkLanguageTranslatePermission(projectId, listOf(languageId))
+    val version =
+      binaryAssetTranslationVersionService.upload(
+        projectId = projectId,
+        assetId = assetId,
+        languageId = languageId,
+        file = file,
+        user = authenticationFacade.authenticatedUserEntityOrNull,
+      )
+    return binaryAssetTranslationVersionModelAssembler.toModel(version)
   }
 
   @PostMapping("/run")

@@ -66,11 +66,17 @@ describe('RecordAudioDialog capture lifecycle', () => {
   const renderDialog = (
     open = true,
     onUse: (file: File) => Promise<void> = vi.fn().mockResolvedValue(undefined),
-    onClose = vi.fn()
+    onClose = vi.fn(),
+    useAsFinal = false
   ) => {
     act(() => {
       root?.render(
-        <RecordAudioDialog open={open} onClose={onClose} onUse={onUse} />
+        <RecordAudioDialog
+          open={open}
+          useAsFinal={useAsFinal}
+          onClose={onClose}
+          onUse={onUse}
+        />
       );
     });
     return { onClose, onUse };
@@ -219,5 +225,13 @@ describe('RecordAudioDialog capture lifecycle', () => {
     expect(document.querySelector('[role="alert"]')?.textContent).toContain(
       'Upload failed'
     );
+  });
+
+  it('labels the final action explicitly', () => {
+    renderDialog(true, undefined, undefined, true);
+
+    expect(
+      document.querySelector('[data-cy="binary-asset-record-use"]')?.textContent
+    ).toContain('Use as final');
   });
 });

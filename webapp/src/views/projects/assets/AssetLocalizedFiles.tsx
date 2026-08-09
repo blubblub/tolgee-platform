@@ -95,10 +95,11 @@ export const AssetLocalizedFiles = ({
   const [dropUploading, setDropUploading] = useState<number | 'source' | null>(
     null
   );
-  // which row the record dialog serves; null = closed
-  const [recordTarget, setRecordTarget] = useState<number | 'source' | null>(
-    null
-  );
+  // which preview the record dialog serves; final=true stores a version and selects it
+  const [recordTarget, setRecordTarget] = useState<{
+    target: number | 'source';
+    final: boolean;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [generatingLanguageId, setGeneratingLanguageId] = useState<
     number | null
@@ -164,6 +165,11 @@ export const AssetLocalizedFiles = ({
   const chooseFinal = useApiMutation({
     url: '/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/versions/chosen-version',
     method: 'put',
+  });
+
+  const uploadVersion = useApiMutation({
+    url: '/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/versions',
+    method: 'post',
   });
 
   const runTool = useRunTool({
@@ -271,6 +277,36 @@ export const AssetLocalizedFiles = ({
     }
   };
 
+  const uploadFinalVersion = async (languageId: number, file: File) => {
+    setRegeneratingLanguageId(languageId);
+    try {
+      const version = await uploadVersion.mutateAsync({
+        path: { projectId, assetId: asset.id, languageId },
+        content: { 'multipart/form-data': { file: file as any } },
+      });
+      try {
+        await chooseFinal.mutateAsync({
+          path: { projectId, assetId: asset.id, languageId },
+          content: { 'application/json': { versionId: version.id } },
+        });
+        setError(null);
+      } catch {
+        setError(
+          t(
+            'binary_assets_set_final_failed',
+            'The new version finished, but setting it as the final file failed — pick it on the pipeline page.'
+          )
+        );
+      }
+      invalidate();
+    } catch (e: any) {
+      setError(e?.message || 'Upload failed');
+      throw e;
+    } finally {
+      setRegeneratingLanguageId(null);
+    }
+  };
+
   const generateTranscript = (languageId: number) => {
     setGeneratingLanguageId(languageId);
     generateLanguage.mutate(
@@ -308,10 +344,39 @@ export const AssetLocalizedFiles = ({
       </Tooltip>
     );
 
+  const recordButton = (
+    target: number | 'source',
+    final = false,
+    disabled = false
+  ) => (
+    <Tooltip
+      title={
+        final
+          ? t('binary_assets_record_final', 'Record a new final version')
+          : t('binary_assets_record_audio', 'Record audio')
+      }
+    >
+      <span>
+        <IconButton
+          size="small"
+          disabled={disabled}
+          onClick={() => setRecordTarget({ target, final })}
+          data-cy={
+            final
+              ? 'binary-asset-final-record-audio'
+              : 'binary-asset-preview-record-audio'
+          }
+        >
+          <Microphone01 width={16} height={16} />
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
+
   return (
     <Box ref={inViewRef}>
       {error && (
-        <Typography color="error" variant="body2" sx={{ mb: 1 }}>
+        <Typography color="error" variant="body2" role="alert" sx={{ mb: 1 }}>
           {error}
         </Typography>
       )}
@@ -352,7 +417,7 @@ export const AssetLocalizedFiles = ({
             <TableBody>
               {sourceLanguageName && (
                 <TableRow data-cy="binary-asset-source-row">
-                  <TableCell>
+                  <TableCell component="th" scope="row">
                     <Typography variant="body2" fontWeight={700}>
                       {sourceLanguageName} ({asset.sourceLanguageTag})
                     </Typography>
@@ -365,14 +430,17 @@ export const AssetLocalizedFiles = ({
                     />
                   </TableCell>
                   <TableCell>
-                    <BinaryAssetPreview
-                      projectId={projectId}
-                      assetId={asset.id}
-                      contentType={asset.contentType}
-                      filename={asset.originalFilename}
-                      enabled={inView}
-                      compact
-                    />
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      {canEditSource && recordable && recordButton('source')}
+                      <BinaryAssetPreview
+                        projectId={projectId}
+                        assetId={asset.id}
+                        contentType={asset.contentType}
+                        filename={asset.originalFilename}
+                        enabled={inView}
+                        compact
+                      />
+                    </Box>
                   </TableCell>
                   <FileDropTableCell
                     active={canEditSource && dropUploading === null}
@@ -391,22 +459,6 @@ export const AssetLocalizedFiles = ({
                       </Box>
                     ) : (
                       <Box display="flex" alignItems="center" gap={0.5}>
-                        {canEditSource && recordable && (
-                          <Tooltip
-                            title={t(
-                              'binary_assets_record_audio',
-                              'Record audio'
-                            )}
-                          >
-                            <IconButton
-                              size="small"
-                              onClick={() => setRecordTarget('source')}
-                              data-cy="binary-asset-record-audio"
-                            >
-                              <Microphone01 width={16} height={16} />
-                            </IconButton>
-                          </Tooltip>
-                        )}
                         <Tooltip title={asset.originalFilename}>
                           <Typography variant="body2" fontWeight={700}>
                             {truncateMiddle(asset.originalFilename)} ·{' '}
@@ -459,7 +511,7 @@ export const AssetLocalizedFiles = ({
               )}
               {rows.map((row) => (
                 <TableRow key={row.languageId}>
-                  <TableCell>
+                  <TableCell component="th" scope="row">
                     <Tooltip
                       title={t('asset_translation_pipeline', 'Pipeline')}
                     >
@@ -490,21 +542,29 @@ export const AssetLocalizedFiles = ({
                     />
                   </TableCell>
                   <TableCell>
-                    {row.status !== 'MISSING' ? (
-                      <BinaryAssetPreview
-                        projectId={projectId}
-                        assetId={asset.id}
-                        languageId={row.languageId}
-                        contentType={row.contentType}
-                        filename={row.originalFilename}
-                        enabled={inView}
-                        compact
-                      />
-                    ) : (
-                      <Typography variant="caption" color="text.secondary">
-                        —
-                      </Typography>
-                    )}
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      {satisfiesLanguageAccess(
+                        'translations.edit',
+                        row.languageId
+                      ) &&
+                        recordable &&
+                        recordButton(row.languageId)}
+                      {row.status !== 'MISSING' ? (
+                        <BinaryAssetPreview
+                          projectId={projectId}
+                          assetId={asset.id}
+                          languageId={row.languageId}
+                          contentType={row.contentType}
+                          filename={row.originalFilename}
+                          enabled={inView}
+                          compact
+                        />
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">
+                          —
+                        </Typography>
+                      )}
+                    </Box>
                   </TableCell>
                   <FileDropTableCell
                     active={canTranslate && dropUploading === null}
@@ -525,26 +585,6 @@ export const AssetLocalizedFiles = ({
                       </Box>
                     ) : (
                       <Box display="flex" alignItems="center" gap={0.5}>
-                        {satisfiesLanguageAccess(
-                          'translations.edit',
-                          row.languageId
-                        ) &&
-                          recordable && (
-                            <Tooltip
-                              title={t(
-                                'binary_assets_record_audio',
-                                'Record audio'
-                              )}
-                            >
-                              <IconButton
-                                size="small"
-                                onClick={() => setRecordTarget(row.languageId)}
-                                data-cy="binary-asset-record-audio"
-                              >
-                                <Microphone01 width={16} height={16} />
-                              </IconButton>
-                            </Tooltip>
-                          )}
                         {row.originalFilename ? (
                           <Tooltip title={row.originalFilename}>
                             <Typography variant="body2">
@@ -637,21 +677,37 @@ export const AssetLocalizedFiles = ({
                         —
                       </Typography>
                     ) : (
-                      /* the final file itself — a chosen pipeline version, else the upload */
-                      <BinaryAssetPreview
-                        projectId={projectId}
-                        assetId={asset.id}
-                        languageId={row.languageId}
-                        versionId={row.chosenVersionId}
-                        contentType={
-                          row.chosenVersionId ? undefined : row.contentType
-                        }
-                        filename={
-                          row.chosenVersionFilename ?? row.originalFilename
-                        }
-                        enabled={inView}
-                        compact
-                      />
+                      <Box display="flex" alignItems="center" gap={0.5}>
+                        {recordable &&
+                          satisfiesLanguageAccess(
+                            'translations.edit',
+                            row.languageId
+                          ) &&
+                          satisfiesLanguageAccess(
+                            'translations.state-edit',
+                            row.languageId
+                          ) &&
+                          recordButton(
+                            row.languageId,
+                            true,
+                            regeneratingLanguageId !== null
+                          )}
+                        {/* a chosen pipeline/uploaded version, else the OG upload */}
+                        <BinaryAssetPreview
+                          projectId={projectId}
+                          assetId={asset.id}
+                          languageId={row.languageId}
+                          versionId={row.chosenVersionId}
+                          contentType={
+                            row.chosenVersionId ? undefined : row.contentType
+                          }
+                          filename={
+                            row.chosenVersionFilename ?? row.originalFilename
+                          }
+                          enabled={inView}
+                          compact
+                        />
+                      </Box>
                     )}
                   </TableCell>
                   <TableCell align="right">
@@ -785,11 +841,14 @@ export const AssetLocalizedFiles = ({
 
       <RecordAudioDialog
         open={recordTarget !== null}
+        useAsFinal={recordTarget?.final}
         onClose={() => setRecordTarget(null)}
         onUse={async (file) => {
-          const target = recordTarget;
-          if (target !== null) {
-            await uploadFile(target, file);
+          const record = recordTarget;
+          if (record?.final && typeof record.target === 'number') {
+            await uploadFinalVersion(record.target, file);
+          } else if (record) {
+            await uploadFile(record.target, file);
           }
         }}
       />

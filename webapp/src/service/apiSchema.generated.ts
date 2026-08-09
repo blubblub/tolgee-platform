@@ -536,7 +536,8 @@ export interface paths {
     put: operations["setTranslationReviewed"];
   };
   "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/versions": {
-    get: operations["list_12"];
+    get: operations["listBinaryAssetTranslationVersions"];
+    post: operations["uploadVersion"];
   };
   "/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/versions/chosen-version": {
     put: operations["setChosen"];
@@ -15519,7 +15520,7 @@ export interface operations {
       };
     };
   };
-  list_12: {
+  listBinaryAssetTranslationVersions: {
     parameters: {
       path: {
         assetId: number;
@@ -15556,6 +15557,55 @@ export interface operations {
       404: {
         content: {
           "application/json": string;
+        };
+      };
+    };
+  };
+  uploadVersion: {
+    parameters: {
+      path: {
+        assetId: number;
+        languageId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** Created */
+      201: {
+        content: {
+          "*/*": components["schemas"]["BinaryAssetTranslationVersionModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": {
+          /** Format: binary */
+          file: string;
         };
       };
     };

@@ -376,7 +376,7 @@ class BinaryAssetService(
     }
   }
 
-  private fun storeNewBlob(
+  internal fun storeNewBlob(
     projectId: Long,
     file: MultipartFile,
   ): StoredBlob {
@@ -459,7 +459,7 @@ class BinaryAssetService(
    * carries no extension (clipboard pastes, extension-less files), derives one from the
    * content type so downloads and media-type sniffing keep working.
    */
-  private fun resolveFilename(file: MultipartFile): String {
+  internal fun resolveFilename(file: MultipartFile): String {
     val name = sanitizeFilename(file.originalFilename)
     if (name.contains('.')) {
       return name
@@ -505,7 +505,7 @@ class BinaryAssetService(
     return name
   }
 
-  private fun resolveContentType(file: MultipartFile): String {
+  internal fun resolveContentType(file: MultipartFile): String {
     val type = file.contentType?.takeIf { it.isNotBlank() && it != "application/octet-stream" }
     return type ?: "application/octet-stream"
   }

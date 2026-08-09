@@ -3,7 +3,6 @@ package io.tolgee.api.v2.controllers.binaryAsset
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.tolgee.ProjectAuthControllerTest
 import io.tolgee.component.transcription.ElevenLabsVoiceClient
-import io.tolgee.development.testDataBuilder.data.LanguagePermissionsTestData
 import io.tolgee.fixtures.andAssertThatJson
 import io.tolgee.fixtures.andIsBadRequest
 import io.tolgee.fixtures.andIsCreated
@@ -162,6 +161,52 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
             .response.contentAsString,
         )
     return tree.map { it.get("id").asLong() }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `uploads an unchosen manual version without replacing the OG`() {
+    val assetId = createAsset("vox-upload-version")
+    uploadTranslation(assetId, "de")
+    val de = languageId("de")
+    val before =
+      jacksonObjectMapper()
+        .readTree(
+          performProjectAuthGet("binary-assets/$assetId")
+            .andIsOk
+            .andReturn()
+            .response.contentAsString,
+        ).get("translations")
+        .first { it.get("languageId").asLong() == de }
+    val uploadedBytes = byteArrayOf(0x1a, 0x45, 0x5d, 0x01, 0x02, 0x03)
+
+    performProjectAuthMultipart(
+      url = "binary-assets/$assetId/translations/$de/versions",
+      files = listOf(MockMultipartFile("file", "recording.webm", "audio/webm", uploadedBytes)),
+    ).andIsCreated.andAssertThatJson {
+      node("tool").isEqualTo("upload")
+      node("toolParams").isNull()
+      node("originalFilename").isEqualTo("recording.webm")
+      node("contentType").isEqualTo("audio/webm")
+      node("byteSize").isEqualTo(uploadedBytes.size)
+      node("sha256").isString.hasSize(64)
+      node("chosen").isEqualTo(false)
+    }
+
+    val after =
+      jacksonObjectMapper()
+        .readTree(
+          performProjectAuthGet("binary-assets/$assetId")
+            .andIsOk
+            .andReturn()
+            .response.contentAsString,
+        ).get("translations")
+        .first { it.get("languageId").asLong() == de }
+    listOf("originalFilename", "contentType", "byteSize", "sha256", "uploadedById").forEach {
+      assertThat(after.get(it)).isEqualTo(before.get(it))
+    }
+    assertThat(after.get("chosenVersionId").isNull).isTrue()
+    assertThat(after.get("versionCount").asInt()).isEqualTo(1)
   }
 
   @Test
@@ -559,6 +604,35 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
     performProjectAuthPost(
       "binary-assets/$assetId/translations/$deLangId/versions/run",
       mapOf("tool" to "tts", "params" to mapOf("voiceId" to "v1")),
+    ).andIsForbidden
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `denies manual upload outside the user's language scope`() {
+    val assetId = createAsset("vox-scoped-upload")
+    uploadTranslation(assetId, "de")
+    val de = languageId("de")
+    val en = languageId("en")
+    val restrictedUser = dbPopulator.createUserIfNotExists("vox-scoped-upload", "password")
+    val projectId = project.id
+
+    executeInNewTransaction {
+      val permission =
+        io.tolgee.model.Permission().apply {
+          user = restrictedUser
+          project = projectRepository.findById(projectId).orElseThrow()
+          scopes = arrayOf(io.tolgee.model.enums.Scope.TRANSLATIONS_EDIT)
+          translateLanguages = mutableSetOf(languageService.getEntity(en, projectId))
+        }
+      permissionService.create(permission)
+    }
+
+    userAccount = restrictedUser
+
+    performProjectAuthMultipart(
+      url = "binary-assets/$assetId/translations/$de/versions",
+      files = listOf(MockMultipartFile("file", "recording.webm", "audio/webm", byteArrayOf(1, 2, 3))),
     ).andIsForbidden
   }
 }

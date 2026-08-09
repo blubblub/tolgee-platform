@@ -15,6 +15,7 @@ import { pickRecordingMime } from './binaryAssetApi';
 
 type Props = {
   open: boolean;
+  useAsFinal?: boolean;
   onClose: () => void;
   /** The finished take; the caller uploads it exactly like a chosen or dropped file. */
   onUse: (file: File) => Promise<void>;
@@ -27,7 +28,12 @@ const formatElapsed = (seconds: number) =>
  * Records a microphone take in the browser. The mic is only requested when Record is pressed,
  * and closing the dialog always releases it — no half-finished take or open microphone survives.
  */
-export const RecordAudioDialog = ({ open, onClose, onUse }: Props) => {
+export const RecordAudioDialog = ({
+  open,
+  useAsFinal = false,
+  onClose,
+  onUse,
+}: Props) => {
   const { t } = useTranslate();
   const [state, setState] = useState<'idle' | 'recording' | 'done'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -324,6 +330,8 @@ export const RecordAudioDialog = ({ open, onClose, onUse }: Props) => {
         >
           {isUploading
             ? t('binary_assets_record_uploading', 'Uploading…')
+            : useAsFinal
+            ? t('binary_assets_record_use_as_final', 'Use as final')
             : t('binary_assets_record_use', 'Use recording')}
         </Button>
       </DialogActions>
