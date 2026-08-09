@@ -257,14 +257,17 @@ export const AssetLocalizedFiles = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const uploadFile = (target: number | 'source', file: File) => {
+  const uploadFile = async (target: number | 'source', file: File) => {
     // dropped or recorded — same mutations as the upload button, plus a spinner in the File cell
     setDropUploading(target);
-    const onSettled = () => setDropUploading(null);
-    if (target === 'source') {
-      replaceSource.mutate(file, { onSettled });
-    } else {
-      upsertTranslation.mutate({ languageId: target, file }, { onSettled });
+    try {
+      if (target === 'source') {
+        await replaceSource.mutateAsync(file);
+      } else {
+        await upsertTranslation.mutateAsync({ languageId: target, file });
+      }
+    } finally {
+      setDropUploading(null);
     }
   };
 
@@ -373,7 +376,9 @@ export const AssetLocalizedFiles = ({
                   </TableCell>
                   <FileDropTableCell
                     active={canEditSource && dropUploading === null}
-                    onFile={(file) => uploadFile('source', file)}
+                    onFile={(file) => {
+                      void uploadFile('source', file).catch(() => undefined);
+                    }}
                   >
                     {dropUploading === 'source' ? (
                       <Box
@@ -503,7 +508,11 @@ export const AssetLocalizedFiles = ({
                   </TableCell>
                   <FileDropTableCell
                     active={canTranslate && dropUploading === null}
-                    onFile={(file) => uploadFile(row.languageId, file)}
+                    onFile={(file) => {
+                      void uploadFile(row.languageId, file).catch(
+                        () => undefined
+                      );
+                    }}
                   >
                     {dropUploading === row.languageId ? (
                       <Box
@@ -516,22 +525,26 @@ export const AssetLocalizedFiles = ({
                       </Box>
                     ) : (
                       <Box display="flex" alignItems="center" gap={0.5}>
-                        {canTranslate && recordable && (
-                          <Tooltip
-                            title={t(
-                              'binary_assets_record_audio',
-                              'Record audio'
-                            )}
-                          >
-                            <IconButton
-                              size="small"
-                              onClick={() => setRecordTarget(row.languageId)}
-                              data-cy="binary-asset-record-audio"
+                        {satisfiesLanguageAccess(
+                          'translations.edit',
+                          row.languageId
+                        ) &&
+                          recordable && (
+                            <Tooltip
+                              title={t(
+                                'binary_assets_record_audio',
+                                'Record audio'
+                              )}
                             >
-                              <Microphone01 width={16} height={16} />
-                            </IconButton>
-                          </Tooltip>
-                        )}
+                              <IconButton
+                                size="small"
+                                onClick={() => setRecordTarget(row.languageId)}
+                                data-cy="binary-asset-record-audio"
+                              >
+                                <Microphone01 width={16} height={16} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         {row.originalFilename ? (
                           <Tooltip title={row.originalFilename}>
                             <Typography variant="body2">
@@ -773,11 +786,10 @@ export const AssetLocalizedFiles = ({
       <RecordAudioDialog
         open={recordTarget !== null}
         onClose={() => setRecordTarget(null)}
-        onUse={(file) => {
+        onUse={async (file) => {
           const target = recordTarget;
-          setRecordTarget(null);
           if (target !== null) {
-            uploadFile(target, file);
+            await uploadFile(target, file);
           }
         }}
       />

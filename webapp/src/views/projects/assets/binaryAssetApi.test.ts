@@ -85,8 +85,14 @@ describe('isAudioAsset', () => {
     expect(isAudioAsset('audio/mpeg', 'voice.bin')).toBe(true);
   });
 
-  it('falls back to the filename extension for octet-stream uploads', () => {
+  it('falls back to the filename extension for blank or generic types', () => {
+    expect(isAudioAsset('', 'line.wav')).toBe(true);
     expect(isAudioAsset('application/octet-stream', 'line.wav')).toBe(true);
+  });
+
+  it('does not override a known non-audio content type with the extension', () => {
+    expect(isAudioAsset('video/webm', 'clip.webm')).toBe(false);
+    expect(isAudioAsset('image/png', 'recording.wav')).toBe(false);
   });
 
   it('rejects non-audio and missing data', () => {

@@ -106,6 +106,7 @@ export const isAudioAsset = (
 ) => {
   const type = (contentType ?? '').toLowerCase();
   if (type.startsWith('audio/')) return true;
+  if (type && type !== 'application/octet-stream') return false;
   const name = (filename ?? '').toLowerCase();
   return AUDIO_FILE_EXTENSIONS.some((ext) => name.endsWith(ext));
 };

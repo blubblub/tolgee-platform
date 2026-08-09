@@ -177,9 +177,8 @@ class BinaryAssetService(
     translation.reviewed = false
     translation.sourceRevision = translatedAgainstSourceRevision
     translation.storageKey = stored.storageKey
-    // every localized file is named after the asset's original file, whatever name the
-    // uploaded file had on the uploader's machine
-    translation.originalFilename = asset.originalFilename
+    // Keep the source name, but make the extension match the uploaded container.
+    translation.originalFilename = resolveTranslationFilename(asset.originalFilename, file)
     translation.contentType = resolveContentType(file)
     translation.byteSize = stored.info.byteSize
     translation.sha256 = stored.info.sha256
@@ -465,9 +464,27 @@ class BinaryAssetService(
     if (name.contains('.')) {
       return name
     }
-    val extension = EXTENSION_BY_CONTENT_TYPE[file.contentType?.substringBefore(';')?.trim()?.lowercase()]
+    val extension = resolveExtension(file)
     return if (extension != null) "$name.$extension" else name
   }
+
+  private fun resolveTranslationFilename(
+    sourceFilename: String,
+    file: MultipartFile,
+  ): String {
+    val extension = resolveExtension(file) ?: return sourceFilename
+    val maxStemLength = 255 - extension.length - 1
+    val stem = sourceFilename.substringBeforeLast('.', sourceFilename).take(maxStemLength)
+    return "$stem.$extension"
+  }
+
+  private fun resolveExtension(file: MultipartFile) =
+    EXTENSION_BY_CONTENT_TYPE[
+      file.contentType
+        ?.substringBefore(';')
+        ?.trim()
+        ?.lowercase(),
+    ]
 
   private fun sanitizeFilename(original: String?): String {
     val name =

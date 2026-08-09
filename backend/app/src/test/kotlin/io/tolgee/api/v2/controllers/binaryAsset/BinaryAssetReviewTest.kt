@@ -77,7 +77,10 @@ class BinaryAssetReviewTest : ProjectAuthControllerTest("/v2/projects/") {
 
     val list =
       jacksonObjectMapper().readTree(
-        performProjectAuthGet("binary-assets").andIsOk.andReturn().response.contentAsString,
+        performProjectAuthGet("binary-assets")
+          .andIsOk
+          .andReturn()
+          .response.contentAsString,
       )
     val row =
       list
@@ -109,7 +112,10 @@ class BinaryAssetReviewTest : ProjectAuthControllerTest("/v2/projects/") {
   ): Boolean {
     val detail =
       jacksonObjectMapper().readTree(
-        performProjectAuthGet("binary-assets/$assetId").andIsOk.andReturn().response.contentAsString,
+        performProjectAuthGet("binary-assets/$assetId")
+          .andIsOk
+          .andReturn()
+          .response.contentAsString,
       )
     return detail
       .get("translations")

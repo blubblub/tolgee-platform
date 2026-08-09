@@ -17,7 +17,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   /** The finished take; the caller uploads it exactly like a chosen or dropped file. */
-  onUse: (file: File) => void;
+  onUse: (file: File) => Promise<void>;
 };
 
 const formatElapsed = (seconds: number) =>
@@ -33,9 +33,18 @@ export const RecordAudioDialog = ({ open, onClose, onUse }: Props) => {
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [takeUrl, setTakeUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<File | null>(null);
   const timerRef = useRef<number | undefined>(undefined);
+  const takeUrlRef = useRef<string | null>(null);
+  const captureRef = useRef(0);
+  const startingRef = useRef(false);
+  const uploadingRef = useRef(false);
+  const mountedRef = useRef(false);
+  const openRef = useRef(open);
+  openRef.current = open;
 
   const stopTimer = () => {
     if (timerRef.current !== undefined) {
@@ -45,10 +54,11 @@ export const RecordAudioDialog = ({ open, onClose, onUse }: Props) => {
   };
 
   const discardTake = () => {
-    setTakeUrl((url) => {
-      if (url) URL.revokeObjectURL(url);
-      return null;
-    });
+    if (takeUrlRef.current) {
+      URL.revokeObjectURL(takeUrlRef.current);
+      takeUrlRef.current = null;
+    }
+    setTakeUrl(null);
     fileRef.current = null;
   };
 
@@ -59,14 +69,37 @@ export const RecordAudioDialog = ({ open, onClose, onUse }: Props) => {
       if (recorder.state !== 'inactive') {
         recorder.stop();
       }
-      recorder.stream.getTracks().forEach((track) => track.stop());
-      recorderRef.current = null;
     }
+    (streamRef.current ?? recorder?.stream)
+      ?.getTracks()
+      .forEach((track) => track.stop());
+    recorderRef.current = null;
+    streamRef.current = null;
   };
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      captureRef.current += 1;
+      startingRef.current = false;
+      uploadingRef.current = false;
+      if (recorderRef.current) {
+        recorderRef.current.onstop = null;
+      }
+      stopMic();
+      if (takeUrlRef.current) {
+        URL.revokeObjectURL(takeUrlRef.current);
+      }
+    };
+  }, []);
 
   // a close mid-recording throws the take away instead of finishing it
   useEffect(() => {
     if (!open) {
+      captureRef.current += 1;
+      startingRef.current = false;
+      uploadingRef.current = false;
       const recorder = recorderRef.current;
       if (recorder) {
         recorder.onstop = null;
@@ -76,14 +109,30 @@ export const RecordAudioDialog = ({ open, onClose, onUse }: Props) => {
       setState('idle');
       setError(null);
       setElapsed(0);
+      setIsUploading(false);
     }
   }, [open]);
 
   const start = async () => {
+    if (startingRef.current || recorderRef.current) {
+      return;
+    }
+    startingRef.current = true;
+    const capture = ++captureRef.current;
     setError(null);
     discardTake();
+    let stream: MediaStream | null = null;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (
+        capture !== captureRef.current ||
+        !mountedRef.current ||
+        !openRef.current
+      ) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      streamRef.current = stream;
       const mimeType = pickRecordingMime();
       const recorder = new MediaRecorder(
         stream,
@@ -99,13 +148,14 @@ export const RecordAudioDialog = ({ open, onClose, onUse }: Props) => {
       recorder.onstop = () => {
         const type = mimeType ?? 'audio/webm';
         const blob = new Blob(chunks, { type });
-        // translations are renamed after the asset server-side; this name only shows for source
+        // The server keeps the source stem and uses this extension for translations.
         fileRef.current = new File(
           [blob],
           `recording.${type.includes('mp4') ? 'm4a' : 'webm'}`,
           { type }
         );
-        setTakeUrl(URL.createObjectURL(blob));
+        takeUrlRef.current = URL.createObjectURL(blob);
+        setTakeUrl(takeUrlRef.current);
         stopMic();
         setState('done');
       };
@@ -117,20 +167,71 @@ export const RecordAudioDialog = ({ open, onClose, onUse }: Props) => {
       );
       setState('recording');
     } catch {
-      stopMic();
-      setError(
-        t(
-          'binary_assets_record_mic_error',
-          'Microphone unavailable — allow access and try again.'
-        )
-      );
+      if (capture === captureRef.current) {
+        stopMic();
+        if (mountedRef.current && openRef.current) {
+          setError(
+            t(
+              'binary_assets_record_mic_error',
+              'Microphone unavailable — allow access and try again.'
+            )
+          );
+        }
+      } else {
+        stream?.getTracks().forEach((track) => track.stop());
+      }
+    } finally {
+      if (capture === captureRef.current) {
+        startingRef.current = false;
+      }
+    }
+  };
+
+  const useTake = async () => {
+    const file = fileRef.current;
+    if (!file || uploadingRef.current) {
+      return;
+    }
+    uploadingRef.current = true;
+    const capture = captureRef.current;
+    setIsUploading(true);
+    setError(null);
+    try {
+      await onUse(file);
+      if (
+        capture === captureRef.current &&
+        mountedRef.current &&
+        openRef.current
+      ) {
+        onClose();
+      }
+    } catch {
+      if (
+        capture === captureRef.current &&
+        mountedRef.current &&
+        openRef.current
+      ) {
+        setError(
+          t(
+            'binary_assets_record_upload_error',
+            'Upload failed — try using the recording again.'
+          )
+        );
+      }
+    } finally {
+      if (capture === captureRef.current) {
+        uploadingRef.current = false;
+        if (mountedRef.current && openRef.current) {
+          setIsUploading(false);
+        }
+      }
     }
   };
 
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={isUploading ? undefined : onClose}
       maxWidth="xs"
       fullWidth
       data-cy="binary-asset-record-dialog"
@@ -160,14 +261,19 @@ export const RecordAudioDialog = ({ open, onClose, onUse }: Props) => {
               color={state === 'recording' ? 'error' : 'text.secondary'}
               data-cy="binary-asset-record-status"
             >
-              {state === 'recording'
-                ? t('binary_assets_record_recording', 'Recording… {time}', {
-                    time: formatElapsed(elapsed),
-                  })
-                : t(
-                    'binary_assets_record_hint',
-                    'Press record and speak — the take lands in the row you opened this from.'
-                  )}
+              {state === 'recording' ? (
+                <>
+                  <span aria-live="polite">
+                    {t('binary_assets_record_active', 'Recording…')}
+                  </span>{' '}
+                  <span aria-hidden="true">{formatElapsed(elapsed)}</span>
+                </>
+              ) : (
+                t(
+                  'binary_assets_record_hint',
+                  'Press record and speak — the take lands in the row you opened this from.'
+                )
+              )}
             </Typography>
           )}
           {state === 'recording' ? (
@@ -175,7 +281,12 @@ export const RecordAudioDialog = ({ open, onClose, onUse }: Props) => {
               variant="contained"
               color="error"
               startIcon={<StopCircle />}
-              onClick={() => recorderRef.current?.stop()}
+              onClick={() => {
+                const recorder = recorderRef.current;
+                if (recorder && recorder.state !== 'inactive') {
+                  recorder.stop();
+                }
+              }}
               data-cy="binary-asset-record-stop"
             >
               {t('binary_assets_record_stop', 'Stop')}
@@ -185,6 +296,7 @@ export const RecordAudioDialog = ({ open, onClose, onUse }: Props) => {
               variant="outlined"
               startIcon={<Microphone01 />}
               onClick={start}
+              disabled={isUploading}
               data-cy="binary-asset-record-start"
             >
               {state === 'done'
@@ -193,28 +305,26 @@ export const RecordAudioDialog = ({ open, onClose, onUse }: Props) => {
             </Button>
           )}
           {error && (
-            <Typography color="error" variant="body2">
+            <Typography color="error" variant="body2" role="alert">
               {error}
             </Typography>
           )}
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>
+        <Button onClick={onClose} disabled={isUploading}>
           {t('asset_translation_cancel', 'Cancel')}
         </Button>
         <Button
           variant="contained"
-          disabled={state !== 'done'}
-          onClick={() => {
-            const file = fileRef.current;
-            if (file) {
-              onUse(file);
-            }
-          }}
+          disabled={state !== 'done' || isUploading}
+          onClick={useTake}
+          aria-busy={isUploading}
           data-cy="binary-asset-record-use"
         >
-          {t('binary_assets_record_use', 'Use recording')}
+          {isUploading
+            ? t('binary_assets_record_uploading', 'Uploading…')
+            : t('binary_assets_record_use', 'Use recording')}
         </Button>
       </DialogActions>
     </Dialog>

@@ -106,7 +106,8 @@ class BinaryAssetControllerTest : ProjectAuthControllerTest("/v2/projects/") {
     val germanId = languageId("de")
 
     uploadTranslation(assetId, germanId, uploadedFilename = "Aufnahme final (2).m4a")
-      .andIsOk.andAssertThatJson {
+      .andIsOk
+      .andAssertThatJson {
         node("translations[0].languageTag").isEqualTo("de")
         node("translations[0].status").isEqualTo("CURRENT")
         node("translations[0].originalFilename").isEqualTo("intro.mp3")
@@ -114,7 +115,8 @@ class BinaryAssetControllerTest : ProjectAuthControllerTest("/v2/projects/") {
 
     // replacing the localized file with a differently named one changes nothing
     uploadTranslation(assetId, germanId, uploadedFilename = "de-final-v3.wav")
-      .andIsOk.andAssertThatJson {
+      .andIsOk
+      .andAssertThatJson {
         node("translations[0].originalFilename").isEqualTo("intro.mp3")
       }
   }
@@ -130,6 +132,39 @@ class BinaryAssetControllerTest : ProjectAuthControllerTest("/v2/projects/") {
     ).andIsOk.andAssertThatJson {
       node("originalFilename").isEqualTo("intro-v2.wav")
       node("sourceRevision").isEqualTo(2)
+    }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `localized filename extension matches the uploaded media type`() {
+    val assetId = createAsset(filename = "intro.mp3", contentType = "audio/mpeg")
+    val germanId = languageId("de")
+
+    uploadTranslation(
+      assetId,
+      germanId,
+      uploadedFilename = "recording.webm",
+      contentType = "audio/webm;codecs=opus",
+    ).andIsOk.andAssertThatJson {
+      node("translations[0].originalFilename").isEqualTo("intro.webm")
+      node("translations[0].contentType").isEqualTo("audio/webm;codecs=opus")
+    }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `localized filename stays within the database limit when its extension grows`() {
+    val assetId = createAsset(filename = "${"a".repeat(251)}.mp3", contentType = "audio/mpeg")
+    val germanId = languageId("de")
+
+    uploadTranslation(
+      assetId,
+      germanId,
+      uploadedFilename = "recording.webm",
+      contentType = "audio/webm;codecs=opus",
+    ).andIsOk.andAssertThatJson {
+      node("translations[0].originalFilename").isEqualTo("${"a".repeat(250)}.webm")
     }
   }
 
@@ -215,10 +250,11 @@ class BinaryAssetControllerTest : ProjectAuthControllerTest("/v2/projects/") {
     assetId: Long,
     languageId: Long,
     uploadedFilename: String,
+    contentType: String = "application/octet-stream",
   ): ResultActions =
     putMultipart(
       "binary-assets/$assetId/translations/$languageId",
-      MockMultipartFile("file", uploadedFilename, "application/octet-stream", byteArrayOf(7, 8, 9)),
+      MockMultipartFile("file", uploadedFilename, contentType, byteArrayOf(7, 8, 9)),
       MockMultipartFile("translatedAgainstSourceRevision", null, MediaType.TEXT_PLAIN_VALUE, "1".toByteArray()),
     )
 

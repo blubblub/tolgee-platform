@@ -469,7 +469,10 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
   ): Boolean =
     jacksonObjectMapper()
       .readTree(
-        performProjectAuthGet("binary-assets/$assetId").andIsOk.andReturn().response.contentAsString,
+        performProjectAuthGet("binary-assets/$assetId")
+          .andIsOk
+          .andReturn()
+          .response.contentAsString,
       ).get("translations")
       .first { it.get("languageId").asLong() == languageId }
       .get("reviewed")

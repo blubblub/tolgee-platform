@@ -61,7 +61,12 @@ class BinaryAssetVoiceControllerTest : ProjectAuthControllerTest("/v2/projects/"
 
     val tree =
       jacksonObjectMapper()
-        .readTree(performProjectAuthGet("binary-asset-voices").andIsOk.andReturn().response.contentAsString)
+        .readTree(
+          performProjectAuthGet("binary-asset-voices")
+            .andIsOk
+            .andReturn()
+            .response.contentAsString,
+        )
     assertThat(tree.size()).isEqualTo(1)
     assertThat(tree.get(0).get("voiceId").asText()).isEqualTo("second")
   }
@@ -80,7 +85,12 @@ class BinaryAssetVoiceControllerTest : ProjectAuthControllerTest("/v2/projects/"
 
     val tree =
       jacksonObjectMapper()
-        .readTree(performProjectAuthGet("binary-asset-voices").andIsOk.andReturn().response.contentAsString)
+        .readTree(
+          performProjectAuthGet("binary-asset-voices")
+            .andIsOk
+            .andReturn()
+            .response.contentAsString,
+        )
     assertThat(tree.size()).isEqualTo(0)
   }
 

@@ -8,18 +8,12 @@ import io.tolgee.model.UserAccount
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
-import jakarta.persistence.Index
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 
 @Entity
-@Table(
-  name = "binary_asset_translation_version",
-  indexes = [
-    Index(name = "binary_asset_translation_version_translation_id_idx", columnList = "translation_id"),
-  ],
-)
+@Table(name = "binary_asset_translation_version")
 @ActivityLoggedEntity
 @ActivityEntityDescribingPaths(paths = ["translation", "asset"])
 class BinaryAssetTranslationVersion(
