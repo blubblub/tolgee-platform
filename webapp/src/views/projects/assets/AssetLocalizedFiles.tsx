@@ -563,6 +563,7 @@ export const AssetLocalizedFiles = ({
                     <Chip
                       size="small"
                       color={statusColor(row.status, row.reviewed) as any}
+                      sx={{ textTransform: 'uppercase' }}
                       label={
                         row.status === 'CURRENT'
                           ? row.reviewed
