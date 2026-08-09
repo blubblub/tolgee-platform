@@ -8,7 +8,7 @@ permissions:
   packages: read
 
 env:
-  IMAGE: ghcr.io/blubblub/tolgee-platform:v3.215.0-blubblub.36
+  IMAGE: ghcr.io/blubblub/tolgee-platform:v3.215.0-blubblub.37
 
 jobs:
   export:
