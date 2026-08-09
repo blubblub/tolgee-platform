@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   AlertTitle,
@@ -6,11 +6,21 @@ import {
   Button,
   Chip,
   CircularProgress,
-  FormControlLabel,
-  Radio,
+  IconButton,
+  Tooltip,
   Typography,
 } from '@mui/material';
-import { ArrowLeft, Download01, Trash01 } from '@untitled-ui/icons-react';
+import {
+  ArrowLeft,
+  CheckCircle,
+  Download01,
+  Flag01,
+  Microphone01,
+  Stars01,
+  Trash01,
+  UploadCloud02,
+  Zap,
+} from '@untitled-ui/icons-react';
 import { T, useTranslate } from '@tolgee/react';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
 import { Link as RouterLink, useRouteMatch } from 'react-router-dom';
@@ -25,17 +35,23 @@ import { BoxLoading } from 'tg.component/common/BoxLoading';
 import { FlagImage } from '@tginternal/library/components/languages/FlagImage';
 import { confirmation } from 'tg.hooks/confirmation';
 import { useMessageService } from 'tg.globalContext/useMessageService';
+import { ApiError } from 'tg.service/http/ApiError';
+import { useApiMutation } from 'tg.service/http/useQueryApi';
 import {
   binaryAssetApi,
   BinaryAssetTranslationVersionModel,
   BinaryAssetTranslationWithVersions,
+  canRecordAudio,
   formatBytes,
+  isAudioAsset,
   RunPayload,
   TOOL_LABELS,
 } from './binaryAssetApi';
 import { BinaryAssetPreview } from './BinaryAssetPreview';
 import { BinaryAssetTranslation } from './types';
 import { RunToolDialog } from './RunToolDialog';
+import { RecordAudioDialog } from './RecordAudioDialog';
+import { FileDropZone } from './FileDropZone';
 import { useRunErrorText } from './useRunErrorText';
 import { useRunTool } from './useRunTool';
 
@@ -56,6 +72,38 @@ const parseToolParams = (
     return {};
   }
 };
+
+/** Tooltip-wrapped icon button — the same action style as the assets table rows. */
+const IconAction = ({
+  label,
+  icon,
+  onClick,
+  disabled,
+  color = 'default',
+  dataCy,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  color?: 'default' | 'primary' | 'error' | 'success';
+  dataCy: string;
+}) => (
+  <Tooltip title={label}>
+    <span>
+      <IconButton
+        size="small"
+        color={color}
+        disabled={disabled}
+        aria-label={label}
+        onClick={onClick}
+        data-cy={dataCy}
+      >
+        {icon}
+      </IconButton>
+    </span>
+  </Tooltip>
+);
 
 const AssetTranslationContent = () => {
   const project = useProject();
@@ -78,11 +126,21 @@ const AssetTranslationContent = () => {
     payload: RunPayload;
     code?: string;
   } | null>(null);
+  const [transcribing, setTranscribing] = useState(false);
+  const [uploadingOg, setUploadingOg] = useState(false);
+  const [uploadingVersion, setUploadingVersion] = useState(false);
+  const [recordOpen, setRecordOpen] = useState(false);
+  const ogInputRef = useRef<HTMLInputElement>(null);
+  const versionInputRef = useRef<HTMLInputElement>(null);
   const runErrorText = useRunErrorText();
 
   const canView = satisfiesPermission('translations.view');
   const canEdit = satisfiesLanguageAccess('translations.edit', languageId);
   const canChooseFinal = satisfiesPermission('translations.state-edit');
+  const canReview = satisfiesLanguageAccess(
+    'translations.state-edit',
+    languageId
+  );
 
   const assetQuery = useQuery(
     ['binary-asset', project.id, assetId],
@@ -191,6 +249,103 @@ const AssetTranslationContent = () => {
     },
   });
 
+  const replaceOg = useMutation(
+    (file: File) =>
+      binaryAssetApi.upsertTranslation(
+        project.id,
+        assetId,
+        languageId,
+        file,
+        // the button only renders once the asset has loaded
+        assetQuery.data?.sourceRevision ?? 0
+      ),
+    {
+      onSuccess: invalidate,
+      onError: (e: any) =>
+        actions.showMessage({
+          text: e?.message || 'Upload failed',
+          variant: 'error',
+        }),
+      onSettled: () => setUploadingOg(false),
+    }
+  );
+
+  const uploadVersion = useApiMutation({
+    url: '/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/versions',
+    method: 'post',
+  });
+
+  const uploadVersionFile = async (file: File) => {
+    setUploadingVersion(true);
+    try {
+      await uploadVersion.mutateAsync({
+        path: { projectId: project.id, assetId, languageId },
+        content: { 'multipart/form-data': { file: file as any } },
+      });
+      invalidate();
+    } catch (e) {
+      (e as ApiError).handleError?.();
+    } finally {
+      setUploadingVersion(false);
+    }
+  };
+
+  const setReviewed = useApiMutation({
+    url: '/v2/projects/{projectId}/binary-assets/{assetId}/translations/{languageId}/reviewed',
+    method: 'put',
+  });
+
+  const toggleReviewed = (reviewed: boolean) =>
+    setReviewed.mutate(
+      {
+        path: { projectId: project.id, assetId, languageId },
+        content: { 'application/json': { reviewed } },
+      },
+      { onSuccess: invalidate }
+    );
+
+  const generateTranscript = useApiMutation({
+    url: '/v2/projects/{projectId}/binary-assets/{assetId}/transcript/generate/{languageId}',
+    method: 'post',
+  });
+
+  const transcribe = async () => {
+    setTranscribing(true);
+    try {
+      await generateTranscript.mutateAsync({
+        path: { projectId: project.id, assetId, languageId },
+      });
+      invalidate();
+    } catch (e) {
+      // Per-call React Query callbacks only survive for the newest concurrent mutation.
+      (e as ApiError).handleError?.();
+    } finally {
+      setTranscribing(false);
+    }
+  };
+
+  const deleteTranslation = useMutation(
+    () => binaryAssetApi.deleteTranslation(project.id, assetId, languageId),
+    { onSuccess: invalidate }
+  );
+
+  const confirmDeleteTranslation = () =>
+    confirmation({
+      title: t('binary_assets_delete', 'Delete'),
+      message: t(
+        'binary_assets_delete_translation_message',
+        'Delete {filename} and its version history? This cannot be undone.',
+        {
+          filename:
+            translation?.originalFilename ??
+            language?.tag ??
+            String(languageId),
+        }
+      ),
+      confirmButtonText: t('confirmation_dialog_delete', 'Delete'),
+      onConfirm: () => deleteTranslation.mutate(),
+    });
+
   const downloadVersion = async (versionId: number) => {
     const ticket = await binaryAssetApi.versionTicket(
       project.id,
@@ -251,6 +406,34 @@ const AssetTranslationContent = () => {
   const asset = assetQuery.data;
   const versions = versionsQuery.data ?? [];
   const chosenVersionId = translation?.chosenVersionId;
+  const recordable =
+    canEdit &&
+    canRecordAudio() &&
+    isAudioAsset(asset.contentType, asset.originalFilename);
+
+  const statusChip = !translation ? null : translation.status === 'CURRENT' ? (
+    <Chip
+      size="small"
+      color={translation.reviewed ? 'success' : 'warning'}
+      sx={{ textTransform: 'uppercase' }}
+      label={
+        translation.reviewed
+          ? t('translation_state_reviewed', 'Reviewed')
+          : t('binary_assets_status_needs_review', 'Needs Review')
+      }
+      data-cy="binary-asset-status"
+    />
+  ) : (
+    <Chip
+      size="small"
+      sx={{ textTransform: 'uppercase' }}
+      label={translation.status}
+      data-cy="binary-asset-status"
+    />
+  );
+
+  const finalLabel = t('asset_translation_final_label', 'Final');
+  const setFinalLabel = t('asset_translation_set_final', 'Set as final');
 
   return (
     <BaseProjectView
@@ -297,19 +480,56 @@ const AssetTranslationContent = () => {
         <Typography variant="h6" fontWeight={600}>
           {asset.name}
         </Typography>
-        <Box display="flex" alignItems="center" gap={1} mt={0.5}>
+        <Box
+          display="flex"
+          alignItems="center"
+          gap={1}
+          mt={0.5}
+          flexWrap="wrap"
+        >
           {language?.flagEmoji && (
             <FlagImage flagEmoji={language.flagEmoji} height={18} />
           )}
           <Typography variant="body1">
             {language?.name ?? languageId} ({language?.tag ?? languageId})
           </Typography>
-          {translation?.status === 'OUTDATED' && (
-            <Chip
-              size="small"
-              color="warning"
-              label={t('asset_translation_outdated', 'Outdated')}
-              data-cy="asset-translation-outdated-badge"
+          {statusChip}
+          {canReview && translation?.status === 'CURRENT' && (
+            <IconAction
+              label={
+                translation.reviewed
+                  ? t(
+                      'binary_assets_reviewed_undo',
+                      'Confirmed — click to reopen'
+                    )
+                  : t(
+                      'binary_assets_reviewed_confirm',
+                      'Confirm this final file'
+                    )
+              }
+              icon={<CheckCircle width={16} height={16} />}
+              color={translation.reviewed ? 'success' : 'default'}
+              disabled={setReviewed.isLoading}
+              onClick={() => toggleReviewed(!translation.reviewed)}
+              dataCy="binary-asset-review-toggle"
+            />
+          )}
+          {canEdit && translation?.transcriptionAvailable && (
+            <IconAction
+              label={t(
+                'binary_assets_transcript_generate_language',
+                "Transcribe this language's audio with AI"
+              )}
+              icon={
+                transcribing ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  <Stars01 width={16} height={16} />
+                )
+              }
+              disabled={transcribing}
+              onClick={() => void transcribe()}
+              dataCy="binary-asset-transcript-generate-language"
             />
           )}
         </Box>
@@ -323,40 +543,48 @@ const AssetTranslationContent = () => {
         borderRadius={1}
         data-cy="asset-translation-source-card"
       >
-        <Typography fontWeight={600} mb={1}>
-          {t('asset_translation_source', 'Source ({tag})', {
-            tag: asset.sourceLanguageTag,
-          })}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" mb={1}>
-          {asset.originalFilename} · {formatBytes(asset.byteSize)}
-        </Typography>
-        <Box mb={1.5}>
-          <BinaryAssetPreview
-            projectId={project.id}
-            assetId={asset.id}
-            languageId={null}
-            contentType={asset.contentType}
-            filename={asset.originalFilename}
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          flexWrap="wrap"
+          gap={1}
+          mb={1}
+        >
+          <Box>
+            <Typography fontWeight={600}>
+              {t('asset_translation_source', 'Source ({tag})', {
+                tag: asset.sourceLanguageTag,
+              })}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {asset.originalFilename} · {formatBytes(asset.byteSize)}
+            </Typography>
+          </Box>
+          <IconAction
+            label={t('asset_translation_download', 'Download')}
+            icon={<Download01 width={16} height={16} />}
+            onClick={downloadSource}
+            dataCy="asset-translation-source-download"
           />
         </Box>
-        <Button
-          size="small"
-          startIcon={<Download01 width={16} height={16} />}
-          onClick={downloadSource}
-          data-cy="asset-translation-source-download"
-        >
-          {t('asset_translation_download', 'Download')}
-        </Button>
+        <BinaryAssetPreview
+          projectId={project.id}
+          assetId={asset.id}
+          languageId={null}
+          contentType={asset.contentType}
+          filename={asset.originalFilename}
+        />
       </Box>
 
-      <Box
-        mb={3}
-        p={2}
-        border={1}
-        borderColor="divider"
-        borderRadius={1}
-        data-cy="asset-translation-og-card"
+      <FileDropZone
+        active={canEdit && !uploadingOg}
+        onFile={(file) => {
+          setUploadingOg(true);
+          replaceOg.mutate(file);
+        }}
+        dataCy="asset-translation-og-drop"
+        sx={{ mb: 3, p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}
       >
         <Box
           display="flex"
@@ -366,9 +594,24 @@ const AssetTranslationContent = () => {
           gap={1}
           mb={1}
         >
-          <Typography fontWeight={600}>
-            {t('asset_translation_original', 'Original upload')}
-          </Typography>
+          <Box>
+            <Typography fontWeight={600}>
+              {t('asset_translation_original', 'Original upload')}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {(translation as BinaryAssetTranslation | undefined)
+                ?.originalFilename ?? asset.originalFilename}{' '}
+              ·{' '}
+              {formatBytes(
+                (translation as BinaryAssetTranslation | undefined)?.byteSize ??
+                  asset.byteSize
+              )}{' '}
+              ·{' '}
+              {translation?.updatedAt
+                ? formatDate(translation.updatedAt)
+                : t('asset_translation_not_uploaded', 'Not uploaded')}
+            </Typography>
+          </Box>
           {chosenVersionId === null && (
             <Chip
               size="small"
@@ -378,19 +621,6 @@ const AssetTranslationContent = () => {
             />
           )}
         </Box>
-        <Typography variant="body2" color="text.secondary" mb={1}>
-          {(translation as BinaryAssetTranslation | undefined)
-            ?.originalFilename ?? asset.originalFilename}{' '}
-          ·{' '}
-          {formatBytes(
-            (translation as BinaryAssetTranslation | undefined)?.byteSize ??
-              asset.byteSize
-          )}{' '}
-          ·{' '}
-          {translation?.updatedAt
-            ? formatDate(translation.updatedAt)
-            : t('asset_translation_not_uploaded', 'Not uploaded')}
-        </Typography>
         <Box mb={1.5}>
           <BinaryAssetPreview
             projectId={project.id}
@@ -405,48 +635,73 @@ const AssetTranslationContent = () => {
             }
           />
         </Box>
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          flexWrap="wrap"
-          gap={1}
-        >
-          <Box display="flex" gap={1} flexWrap="wrap">
-            <Button
-              size="small"
-              startIcon={<Download01 width={16} height={16} />}
-              onClick={downloadTranslation}
-              disabled={translation?.status === 'MISSING'}
-              data-cy="asset-translation-og-download"
-            >
-              {t('asset_translation_download', 'Download')}
-            </Button>
-            {canEdit && (
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => setRunDialogOpen(true)}
-                data-cy="asset-version-run-tool"
-              >
-                {t('asset_translation_run_tool', 'Run tool')}
-              </Button>
-            )}
-          </Box>
-          {canChooseFinal && (
-            <FormControlLabel
-              control={
-                <Radio
-                  checked={chosenVersionId === null}
-                  onChange={() => setChosenVersion.mutate(null)}
-                  data-cy="asset-translation-choose-original"
+        <Box display="flex" gap={1} alignItems="center" flexWrap="wrap">
+          {uploadingOg ? (
+            <Box py={0.5} data-cy="binary-asset-file-uploading">
+              <CircularProgress size={18} />
+            </Box>
+          ) : (
+            <>
+              {canChooseFinal && (
+                <IconAction
+                  label={chosenVersionId === null ? finalLabel : setFinalLabel}
+                  icon={<Flag01 width={16} height={16} />}
+                  color={chosenVersionId === null ? 'primary' : 'default'}
+                  disabled={setChosenVersion.isLoading}
+                  onClick={() => setChosenVersion.mutate(null)}
+                  dataCy="asset-translation-choose-original"
                 />
-              }
-              label={t('asset_translation_final_label', 'Final')}
-            />
+              )}
+              <IconAction
+                label={t('asset_translation_download', 'Download')}
+                icon={<Download01 width={16} height={16} />}
+                disabled={translation?.status === 'MISSING'}
+                onClick={downloadTranslation}
+                dataCy="asset-translation-og-download"
+              />
+              {canEdit && translation?.status !== 'MISSING' && (
+                <IconAction
+                  label={t('asset_translation_run_tool', 'Run tool')}
+                  icon={<Zap width={16} height={16} />}
+                  color="primary"
+                  disabled={runTool.isLoading}
+                  onClick={() => setRunDialogOpen(true)}
+                  dataCy="asset-version-run-tool"
+                />
+              )}
+              {recordable && (
+                <IconAction
+                  label={t('binary_assets_record_audio', 'Record audio')}
+                  icon={<Microphone01 width={16} height={16} />}
+                  onClick={() => setRecordOpen(true)}
+                  dataCy="asset-translation-og-record"
+                />
+              )}
+              {canEdit && (
+                <IconAction
+                  label={
+                    translation?.status === 'MISSING'
+                      ? t('binary_assets_upload_translation', 'Upload')
+                      : t('binary_assets_replace_translation', 'Replace')
+                  }
+                  icon={<UploadCloud02 width={16} height={16} />}
+                  onClick={() => ogInputRef.current?.click()}
+                  dataCy="asset-translation-og-upload"
+                />
+              )}
+              {canEdit && translation?.status !== 'MISSING' && (
+                <IconAction
+                  label={t('binary_assets_delete', 'Delete')}
+                  icon={<Trash01 width={16} height={16} />}
+                  color="error"
+                  onClick={confirmDeleteTranslation}
+                  dataCy="binary-asset-delete-translation"
+                />
+              )}
+            </>
           )}
         </Box>
-      </Box>
+      </FileDropZone>
 
       {failedRun && (
         <Alert
@@ -481,9 +736,50 @@ const AssetTranslationContent = () => {
         </Alert>
       )}
 
-      <Typography fontWeight={600} mb={1}>
-        {t('asset_translation_versions', 'Versions')}
-      </Typography>
+      <Box display="flex" alignItems="center" gap={1} mb={1}>
+        <Typography fontWeight={600}>
+          {t('asset_translation_versions', 'Versions')}
+        </Typography>
+        {canEdit && (
+          <IconAction
+            label={t('asset_translation_upload_version', 'Upload a version')}
+            icon={<UploadCloud02 width={16} height={16} />}
+            onClick={() => versionInputRef.current?.click()}
+            dataCy="asset-translation-version-upload"
+          />
+        )}
+      </Box>
+
+      {canEdit && (
+        <FileDropZone
+          active={!uploadingVersion}
+          onFile={(file) => void uploadVersionFile(file)}
+          dataCy="asset-translation-version-drop"
+          sx={{
+            mb: 2,
+            p: 2,
+            border: '1px dashed',
+            borderColor: 'divider',
+            borderRadius: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            color: 'text.secondary',
+          }}
+        >
+          {uploadingVersion ? (
+            <CircularProgress size={18} data-cy="binary-asset-file-uploading" />
+          ) : (
+            <UploadCloud02 width={16} height={16} />
+          )}
+          <Typography variant="body2">
+            {t(
+              'asset_translation_drop_version',
+              'Drop a file to add a version'
+            )}
+          </Typography>
+        </FileDropZone>
+      )}
 
       {versions.length === 0 ? (
         <Typography
@@ -557,44 +853,30 @@ const AssetTranslationContent = () => {
                     filename={version.originalFilename}
                   />
                 </Box>
-                <Box
-                  display="flex"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  flexWrap="wrap"
-                  gap={1}
-                >
-                  <Box display="flex" gap={1}>
-                    <Button
-                      size="small"
-                      startIcon={<Download01 width={16} height={16} />}
-                      onClick={() => downloadVersion(version.id)}
-                      data-cy="asset-version-download"
-                    >
-                      {t('asset_translation_download', 'Download')}
-                    </Button>
-                    {canEdit && (
-                      <Button
-                        size="small"
-                        color="error"
-                        startIcon={<Trash01 width={16} height={16} />}
-                        onClick={() => handleDelete(version)}
-                        data-cy="asset-version-delete"
-                      >
-                        {t('asset_translation_delete', 'Delete')}
-                      </Button>
-                    )}
-                  </Box>
+                <Box display="flex" gap={1} alignItems="center">
                   {canChooseFinal && (
-                    <FormControlLabel
-                      control={
-                        <Radio
-                          checked={isChosen}
-                          onChange={() => setChosenVersion.mutate(version.id)}
-                          data-cy="asset-version-choose-final"
-                        />
-                      }
-                      label={t('asset_translation_final_label', 'Final')}
+                    <IconAction
+                      label={isChosen ? finalLabel : setFinalLabel}
+                      icon={<Flag01 width={16} height={16} />}
+                      color={isChosen ? 'primary' : 'default'}
+                      disabled={setChosenVersion.isLoading}
+                      onClick={() => setChosenVersion.mutate(version.id)}
+                      dataCy="asset-version-choose-final"
+                    />
+                  )}
+                  <IconAction
+                    label={t('asset_translation_download', 'Download')}
+                    icon={<Download01 width={16} height={16} />}
+                    onClick={() => downloadVersion(version.id)}
+                    dataCy="asset-version-download"
+                  />
+                  {canEdit && (
+                    <IconAction
+                      label={t('asset_translation_delete', 'Delete')}
+                      icon={<Trash01 width={16} height={16} />}
+                      color="error"
+                      onClick={() => handleDelete(version)}
+                      dataCy="asset-version-delete"
                     />
                   )}
                 </Box>
@@ -604,6 +886,32 @@ const AssetTranslationContent = () => {
         </Box>
       )}
 
+      <input
+        ref={ogInputRef}
+        type="file"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            setUploadingOg(true);
+            replaceOg.mutate(file);
+          }
+          e.target.value = '';
+        }}
+      />
+      <input
+        ref={versionInputRef}
+        type="file"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            void uploadVersionFile(file);
+          }
+          e.target.value = '';
+        }}
+      />
+
       <RunToolDialog
         projectId={project.id}
         assetId={assetId}
@@ -612,6 +920,15 @@ const AssetTranslationContent = () => {
         isLoading={runTool.isLoading}
         onClose={() => setRunDialogOpen(false)}
         onSubmit={(payload) => runTool.mutate(payload)}
+      />
+
+      <RecordAudioDialog
+        open={recordOpen}
+        onClose={() => setRecordOpen(false)}
+        onUse={async (file) => {
+          setUploadingOg(true);
+          await replaceOg.mutateAsync(file);
+        }}
       />
     </BaseProjectView>
   );
