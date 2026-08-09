@@ -103,12 +103,13 @@ declare namespace DataCy {
         "asset-translation-choose-original": true;
         "asset-translation-no-versions": true;
         "asset-translation-og-download": true;
-        "asset-translation-og-drop": true;
         "asset-translation-og-final-badge": true;
         "asset-translation-og-record": true;
+        "asset-translation-og-row": true;
         "asset-translation-og-upload": true;
         "asset-translation-source-card": true;
         "asset-translation-source-download": true;
+        "asset-translation-table": true;
         "asset-translation-version-drop": true;
         "asset-translation-version-upload": true;
         "asset-version-base-select": true;
