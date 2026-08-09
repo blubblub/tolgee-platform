@@ -4,7 +4,11 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
 
 import { AssetLocalizedFiles } from './AssetLocalizedFiles';
-import { binaryAssetApi } from './binaryAssetApi';
+import {
+  binaryAssetApi,
+  BinaryAssetTranslationVersionModel,
+  RunPayload,
+} from './binaryAssetApi';
 import { BinaryAsset } from './types';
 
 const permissions = vi.hoisted(() => ({
@@ -24,6 +28,18 @@ const uploadVersion = vi.hoisted(() => ({
   mutateAsync: vi.fn(),
 }));
 
+const generateLanguage = vi.hoisted(() => ({
+  mutate: vi.fn(),
+  mutateAsync: vi.fn(),
+}));
+
+const confirmationMock = vi.hoisted(() => vi.fn());
+
+const runDialog = vi.hoisted(() => ({
+  languageId: undefined as number | undefined,
+  onSubmit: undefined as ((payload: RunPayload) => void) | undefined,
+}));
+
 const recordDialog = vi.hoisted(() => ({
   open: false,
   useAsFinal: false,
@@ -40,10 +56,16 @@ vi.mock('tg.hooks/useProjectPermissions', () => ({
   useProjectPermissions: () => permissions,
 }));
 
+vi.mock('tg.hooks/confirmation', () => ({
+  confirmation: confirmationMock,
+}));
+
 vi.mock('tg.service/http/useQueryApi', () => ({
   invalidateUrlPrefix: vi.fn(),
   useApiMutation: ({ url }: { url: string }) =>
-    url.endsWith('/versions/chosen-version')
+    url.endsWith('/transcript/generate/{languageId}')
+      ? { isLoading: false, ...generateLanguage }
+      : url.endsWith('/versions/chosen-version')
       ? { isLoading: false, ...chooseFinal }
       : url.endsWith('/versions')
       ? { isLoading: false, ...uploadVersion }
@@ -69,7 +91,19 @@ vi.mock('./FileDropTableCell', () => ({
     <td>{children}</td>
   ),
 }));
-vi.mock('./RunToolDialog', () => ({ RunToolDialog: () => null }));
+vi.mock('./RunToolDialog', () => ({
+  RunToolDialog: ({
+    languageId,
+    onSubmit,
+  }: {
+    languageId: number;
+    onSubmit: (payload: RunPayload) => void;
+  }) => {
+    runDialog.languageId = languageId;
+    runDialog.onSubmit = onSubmit;
+    return null;
+  },
+}));
 vi.mock('./RecordAudioDialog', () => ({
   RecordAudioDialog: ({
     open,
@@ -126,6 +160,42 @@ const asset: BinaryAsset = {
   ],
 };
 
+const concurrentAsset: BinaryAsset = {
+  ...asset,
+  targetLanguageCount: 3,
+  translations: [
+    ...(asset.translations ?? []).map((translation) =>
+      translation.languageId === 2
+        ? { ...translation, transcriptionAvailable: true }
+        : translation
+    ),
+    {
+      languageId: 3,
+      languageTag: 'es',
+      languageName: 'Spanish',
+      status: 'CURRENT',
+      originalFilename: 'prompt-es.wav',
+      contentType: 'audio/wav',
+      byteSize: 80,
+      sha256: 'spanish',
+      transcriptionAvailable: true,
+    },
+  ],
+};
+
+const version = (id: number): BinaryAssetTranslationVersionModel => ({
+  id,
+  tool: 'tts',
+  toolParams: null,
+  originalFilename: `generated-${id}.wav`,
+  contentType: 'audio/wav',
+  byteSize: 5,
+  sha256: `version-${id}`,
+  chosen: false,
+  createdById: 1,
+  createdAt: '2026-08-09T00:00:00Z',
+});
+
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -136,7 +206,7 @@ const deferred = <T,>() => {
   return { promise, resolve, reject };
 };
 
-describe('AssetLocalizedFiles recording integration', () => {
+describe('AssetLocalizedFiles', () => {
   let root: Root;
   let container: HTMLDivElement;
   let queryClient: QueryClient;
@@ -187,6 +257,9 @@ describe('AssetLocalizedFiles recording integration', () => {
     chooseFinal.mutateAsync.mockReset();
     uploadVersion.mutate.mockReset();
     uploadVersion.mutateAsync.mockReset();
+    generateLanguage.mutate.mockReset();
+    generateLanguage.mutateAsync.mockReset();
+    confirmationMock.mockReset();
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -218,6 +291,8 @@ describe('AssetLocalizedFiles recording integration', () => {
     chooseFinal.mutateAsync.mockResolvedValue(asset);
     recordDialog.open = false;
     recordDialog.onUse = undefined;
+    runDialog.languageId = undefined;
+    runDialog.onSubmit = undefined;
   });
 
   afterEach(() => {
@@ -368,6 +443,138 @@ describe('AssetLocalizedFiles recording integration', () => {
     expect(
       row('French').querySelector('[data-cy="binary-asset-review-toggle"]')
     ).toBeNull();
+  });
+
+  it('asks for confirmation before deleting a localized file', async () => {
+    permissions.satisfiesPermission.mockImplementation(
+      (permission) => permission === 'translations.edit'
+    );
+    vi.spyOn(binaryAssetApi, 'deleteTranslation').mockResolvedValue(undefined);
+    render();
+
+    act(() => {
+      row('French')
+        .querySelector<HTMLButtonElement>(
+          '[data-cy="binary-asset-delete-translation"]'
+        )!
+        .click();
+    });
+
+    expect(binaryAssetApi.deleteTranslation).not.toHaveBeenCalled();
+    expect(confirmationMock).toHaveBeenCalledTimes(1);
+
+    const options = confirmationMock.mock.calls[0][0] as {
+      onConfirm: () => void;
+    };
+    act(() => options.onConfirm());
+
+    await vi.waitFor(() =>
+      expect(binaryAssetApi.deleteTranslation).toHaveBeenCalledWith(7, 42, 2)
+    );
+  });
+
+  it('handles each transcription error and keeps the other spinner', async () => {
+    permissions.satisfiesLanguageAccess.mockImplementation(() => true);
+    const french = deferred<void>();
+    const spanish = deferred<void>();
+    const error = { handleError: vi.fn() };
+    generateLanguage.mutateAsync.mockImplementation(
+      ({ path }: { path: { languageId: number } }) =>
+        path.languageId === 2 ? french.promise : spanish.promise
+    );
+    render(concurrentAsset);
+
+    act(() => {
+      row('French')
+        .querySelector<HTMLButtonElement>(
+          '[data-cy="binary-asset-transcript-generate-language"]'
+        )!
+        .click();
+      row('Spanish')
+        .querySelector<HTMLButtonElement>(
+          '[data-cy="binary-asset-transcript-generate-language"]'
+        )!
+        .click();
+    });
+
+    expect(row('French').querySelector('[role="progressbar"]')).not.toBeNull();
+    expect(row('Spanish').querySelector('[role="progressbar"]')).not.toBeNull();
+
+    await act(async () => {
+      french.reject(error);
+      await expect(french.promise).rejects.toBe(error);
+    });
+
+    expect(error.handleError).toHaveBeenCalledTimes(1);
+    expect(row('French').querySelector('[role="progressbar"]')).toBeNull();
+    expect(row('Spanish').querySelector('[role="progressbar"]')).not.toBeNull();
+
+    await act(async () => {
+      spanish.resolve();
+      await spanish.promise;
+    });
+  });
+
+  it('keeps concurrent generation spinners keyed to their language', async () => {
+    permissions.satisfiesPermission.mockImplementation(
+      (permission) => permission === 'translations.edit'
+    );
+    const french = deferred<BinaryAssetTranslationVersionModel>();
+    const spanish = deferred<BinaryAssetTranslationVersionModel>();
+    vi.spyOn(binaryAssetApi, 'runTool').mockImplementation(
+      (_projectId, _assetId, languageId) =>
+        languageId === 2 ? french.promise : spanish.promise
+    );
+    render(concurrentAsset);
+
+    act(() => {
+      row('French')
+        .querySelector<HTMLButtonElement>('[data-cy="binary-asset-run-tool"]')!
+        .click();
+    });
+    expect(runDialog.languageId).toBe(2);
+    act(() => runDialog.onSubmit!({ tool: 'tts', params: {} }));
+
+    const spanishButton = row('Spanish').querySelector<HTMLButtonElement>(
+      '[data-cy="binary-asset-run-tool"]'
+    )!;
+    expect(spanishButton.disabled).toBe(false);
+    act(() => spanishButton.click());
+    expect(runDialog.languageId).toBe(3);
+    act(() => runDialog.onSubmit!({ tool: 'tts', params: {} }));
+
+    expect(
+      row('French').querySelector('[data-cy="binary-asset-regenerating"]')
+    ).not.toBeNull();
+    expect(
+      row('Spanish').querySelector('[data-cy="binary-asset-regenerating"]')
+    ).not.toBeNull();
+
+    await act(async () => {
+      french.resolve(version(82));
+      await french.promise;
+    });
+
+    expect(chooseFinal.mutateAsync).toHaveBeenCalledWith({
+      path: { projectId: 7, assetId: 42, languageId: 2 },
+      content: { 'application/json': { versionId: 82 } },
+    });
+    expect(
+      row('French').querySelector('[data-cy="binary-asset-regenerating"]')
+    ).toBeNull();
+    expect(
+      row('Spanish').querySelector('[data-cy="binary-asset-regenerating"]')
+    ).not.toBeNull();
+
+    await act(async () => {
+      spanish.resolve(version(83));
+      await spanish.promise;
+    });
+
+    expect(chooseFinal.mutateAsync).toHaveBeenCalledWith({
+      path: { projectId: 7, assetId: 42, languageId: 3 },
+      content: { 'application/json': { versionId: 83 } },
+    });
   });
 
   it('uploads a recorded file against the current source revision', async () => {

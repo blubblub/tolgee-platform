@@ -26,7 +26,9 @@ import { Link as RouterLink } from 'react-router-dom';
 import { useInView } from 'react-intersection-observer';
 
 import { LINKS, PARAMS } from 'tg.constants/links';
+import { confirmation } from 'tg.hooks/confirmation';
 import { useProjectPermissions } from 'tg.hooks/useProjectPermissions';
+import { ApiError } from 'tg.service/http/ApiError';
 import {
   invalidateUrlPrefix,
   useApiMutation,
@@ -36,6 +38,7 @@ import {
   canRecordAudio,
   formatBytes,
   isAudioAsset,
+  RunPayload,
   truncateMiddle,
   visibleTranslations,
 } from './binaryAssetApi';
@@ -48,7 +51,6 @@ import { BinaryAsset, BinaryAssetTranslationStatus } from './types';
 import { RunToolDialog } from './RunToolDialog';
 import { RecordAudioDialog } from './RecordAudioDialog';
 import { useRunErrorText } from './useRunErrorText';
-import { useRunTool } from './useRunTool';
 
 const statusColor = (
   status: BinaryAssetTranslationStatus,
@@ -104,17 +106,17 @@ export const AssetLocalizedFiles = ({
     final: boolean;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [generatingLanguageId, setGeneratingLanguageId] = useState<
-    number | null
-  >(null);
+  const [transcribingLanguageIds, setTranscribingLanguageIds] = useState<
+    number[]
+  >([]);
   const [runLanguageId, setRunLanguageId] = useState<number | null>(null);
-  // from submit until the new version is chosen + refreshed — the Final cell spins meanwhile
-  const [regeneratingLanguageId, setRegeneratingLanguageId] = useState<
+  const [recordingFinalLanguageId, setRecordingFinalLanguageId] = useState<
     number | null
   >(null);
-  // react-query v3 snapshots the mutation callbacks when mutate() runs — before the submit-time
-  // state updates land — so the success handler must read the language through a ref, not state
-  const regeneratingRef = useRef<number | null>(null);
+  // AI runs can overlap; each Final cell stays pending through generation and final selection.
+  const [regeneratingLanguageIds, setRegeneratingLanguageIds] = useState<
+    number[]
+  >([]);
   const runErrorText = useRunErrorText();
 
   // a page of assets would otherwise ask for a download ticket per language before anyone scrolls
@@ -180,52 +182,6 @@ export const AssetLocalizedFiles = ({
     method: 'post',
   });
 
-  const runTool = useRunTool({
-    projectId,
-    assetId: asset.id,
-    // the dialog only opens with a language selected; 0 is never submitted
-    languageId: runLanguageId ?? 0,
-    onSuccess: (version) => {
-      setRunLanguageId(null);
-      setError(null);
-      // a regeneration from the table is meant to become the final right away
-      chooseFinal.mutate(
-        {
-          path: {
-            projectId,
-            assetId: asset.id,
-            languageId: regeneratingRef.current ?? 0,
-          },
-          content: { 'application/json': { versionId: version.id } },
-        },
-        {
-          onSuccess: () => {
-            invalidate();
-            regeneratingRef.current = null;
-            setRegeneratingLanguageId(null);
-          },
-          onError: () => {
-            invalidate();
-            regeneratingRef.current = null;
-            setRegeneratingLanguageId(null);
-            setError(
-              t(
-                'binary_assets_set_final_failed',
-                'The new version finished, but setting it as the final file failed — pick it on the pipeline page.'
-              )
-            );
-          },
-        }
-      );
-    },
-    onError: (code) => {
-      regeneratingRef.current = null;
-      setRegeneratingLanguageId(null);
-      setRunLanguageId(null);
-      setError(runErrorText(code));
-    },
-  });
-
   const upsertTranslation = useMutation(
     (vars: { languageId: number; file: File }) =>
       binaryAssetApi.upsertTranslation(
@@ -249,6 +205,18 @@ export const AssetLocalizedFiles = ({
       binaryAssetApi.deleteTranslation(projectId, asset.id, languageId),
     { onSuccess: invalidate }
   );
+
+  const confirmDeleteTranslation = (languageId: number, filename: string) =>
+    confirmation({
+      title: t('binary_assets_delete', 'Delete'),
+      message: t(
+        'binary_assets_delete_translation_message',
+        'Delete {filename} and its version history? This cannot be undone.',
+        { filename }
+      ),
+      confirmButtonText: t('confirmation_dialog_delete', 'Delete'),
+      onConfirm: () => deleteTranslation.mutate(languageId),
+    });
 
   const replaceSource = useMutation(
     (file: File) => binaryAssetApi.replaceSource(projectId, asset.id, file),
@@ -286,7 +254,8 @@ export const AssetLocalizedFiles = ({
   };
 
   const uploadFinalVersion = async (languageId: number, file: File) => {
-    setRegeneratingLanguageId(languageId);
+    setRecordingFinalLanguageId(languageId);
+    setError(null);
     try {
       const version = await uploadVersion.mutateAsync({
         path: { projectId, assetId: asset.id, languageId },
@@ -297,7 +266,6 @@ export const AssetLocalizedFiles = ({
           path: { projectId, assetId: asset.id, languageId },
           content: { 'application/json': { versionId: version.id } },
         });
-        setError(null);
       } catch {
         setError(
           t(
@@ -311,46 +279,95 @@ export const AssetLocalizedFiles = ({
       setError(e?.message || 'Upload failed');
       throw e;
     } finally {
-      setRegeneratingLanguageId(null);
+      setRecordingFinalLanguageId(null);
     }
   };
 
-  const generateTranscript = (languageId: number) => {
-    setGeneratingLanguageId(languageId);
-    generateLanguage.mutate(
-      { path: { projectId, assetId: asset.id, languageId } },
-      { onSuccess: invalidate }
-    );
+  const generateTranscript = async (languageId: number) => {
+    setTranscribingLanguageIds((ids) => [...ids, languageId]);
+    try {
+      await generateLanguage.mutateAsync({
+        path: { projectId, assetId: asset.id, languageId },
+      });
+      invalidate();
+    } catch (e) {
+      // Per-call React Query callbacks only survive for the newest concurrent mutation.
+      (e as ApiError).handleError?.();
+    } finally {
+      setTranscribingLanguageIds((ids) =>
+        ids.filter((id) => id !== languageId)
+      );
+    }
   };
 
-  const transcribeButton = (languageId: number, available?: boolean) =>
-    available &&
-    satisfiesLanguageAccess('translations.edit', languageId) && (
-      <Tooltip
-        title={t(
-          'binary_assets_transcript_generate_language',
-          "Transcribe this language's audio with AI"
-        )}
-      >
-        <span>
-          <IconButton
-            size="small"
-            disabled={
-              generateLanguage.isLoading && generatingLanguageId === languageId
-            }
-            onClick={() => generateTranscript(languageId)}
-            data-cy="binary-asset-transcript-generate-language"
-          >
-            {generateLanguage.isLoading &&
-            generatingLanguageId === languageId ? (
-              <CircularProgress size={16} />
-            ) : (
-              <Stars01 width={16} height={16} />
-            )}
-          </IconButton>
-        </span>
-      </Tooltip>
+  const generateFinal = async (languageId: number, payload: RunPayload) => {
+    setRegeneratingLanguageIds((ids) => [...ids, languageId]);
+    setError(null);
+    try {
+      const version = await binaryAssetApi.runTool(
+        projectId,
+        asset.id,
+        languageId,
+        payload
+      );
+      try {
+        await chooseFinal.mutateAsync({
+          path: { projectId, assetId: asset.id, languageId },
+          content: { 'application/json': { versionId: version.id } },
+        });
+      } catch {
+        setError(
+          t(
+            'binary_assets_set_final_failed',
+            'The new version finished, but setting it as the final file failed — pick it on the pipeline page.'
+          )
+        );
+      }
+      queryClient.invalidateQueries([
+        'binary-asset-versions',
+        projectId,
+        asset.id,
+        languageId,
+      ]);
+      invalidate();
+    } catch (e: any) {
+      setError(runErrorText(e?.code));
+    } finally {
+      setRegeneratingLanguageIds((ids) =>
+        ids.filter((id) => id !== languageId)
+      );
+    }
+  };
+
+  const transcribeButton = (languageId: number, available?: boolean) => {
+    const transcribing = transcribingLanguageIds.includes(languageId);
+    return (
+      available &&
+      satisfiesLanguageAccess('translations.edit', languageId) && (
+        <Tooltip
+          title={t(
+            'binary_assets_transcript_generate_language',
+            "Transcribe this language's audio with AI"
+          )}
+        >
+          <span>
+            <IconButton
+              size="small"
+              disabled={transcribing}
+              onClick={() => void generateTranscript(languageId)}
+              data-cy="binary-asset-transcript-generate-language"
+            >
+              {transcribing ? (
+                <CircularProgress size={16} />
+              ) : (
+                <Stars01 width={16} height={16} />
+              )}
+            </IconButton>
+          </span>
+        </Tooltip>
+      )
     );
+  };
 
   const recordButton = (
     target: number | 'source',
@@ -681,7 +698,8 @@ export const AssetLocalizedFiles = ({
                     </Box>
                   </TableCell>
                   <TableCell data-cy="binary-asset-final-cell">
-                    {regeneratingLanguageId === row.languageId ? (
+                    {recordingFinalLanguageId === row.languageId ||
+                    regeneratingLanguageIds.includes(row.languageId) ? (
                       <Box
                         display="flex"
                         alignItems="center"
@@ -720,7 +738,8 @@ export const AssetLocalizedFiles = ({
                           recordButton(
                             row.languageId,
                             true,
-                            regeneratingLanguageId !== null
+                            recordingFinalLanguageId !== null ||
+                              regeneratingLanguageIds.length > 0
                           )}
                       </Box>
                     )}
@@ -759,12 +778,16 @@ export const AssetLocalizedFiles = ({
                             <IconButton
                               size="small"
                               color="primary"
-                              // one run at a time keeps the chosen-final chain unambiguous
-                              disabled={regeneratingLanguageId !== null}
+                              disabled={
+                                recordingFinalLanguageId !== null ||
+                                regeneratingLanguageIds.includes(row.languageId)
+                              }
                               onClick={() => setRunLanguageId(row.languageId)}
                               data-cy="binary-asset-run-tool"
                             >
-                              {regeneratingLanguageId === row.languageId ? (
+                              {regeneratingLanguageIds.includes(
+                                row.languageId
+                              ) ? (
                                 <CircularProgress size={16} />
                               ) : (
                                 <Zap width={16} height={16} />
@@ -802,7 +825,10 @@ export const AssetLocalizedFiles = ({
                             size="small"
                             color="error"
                             onClick={() =>
-                              deleteTranslation.mutate(row.languageId)
+                              confirmDeleteTranslation(
+                                row.languageId,
+                                row.originalFilename ?? row.languageName
+                              )
                             }
                             data-cy="binary-asset-delete-translation"
                           >
@@ -832,14 +858,13 @@ export const AssetLocalizedFiles = ({
           assetId={asset.id}
           languageId={runLanguageId}
           open
-          isLoading={runTool.isLoading}
+          isLoading={false}
           onClose={() => setRunLanguageId(null)}
           onSubmit={(payload) => {
             // close right away — progress shows in the row, not behind a modal
-            regeneratingRef.current = runLanguageId;
-            setRegeneratingLanguageId(runLanguageId);
+            const languageId = runLanguageId;
             setRunLanguageId(null);
-            runTool.mutate(payload);
+            void generateFinal(languageId, payload);
           }}
         />
       )}

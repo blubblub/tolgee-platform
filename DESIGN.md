@@ -35,6 +35,7 @@
 
 - Keep an action beside the object it affects; recording controls follow the corresponding media preview.
 - Show workflow state, not implementation state; a current unconfirmed final reads “Needs Review,” not “CURRENT.”
+- Confirm destructive actions before changing data, and keep independent row jobs independently actionable.
 - Tradeoffs: Dense tables may scroll horizontally rather than hiding controls or truncating workflow state.
 
 ## Visual language
@@ -48,7 +49,7 @@
 
 ## Components
 
-- Existing components to reuse: MUI `Table`, `Chip`, `Tooltip`, `IconButton`, and `BinaryAssetPreview`.
+- Existing components to reuse: MUI `Table`, `Chip`, `Tooltip`, `IconButton`, `BinaryAssetPreview`, and the global confirmation dialog.
 - New/changed components: No new component; adjust `AssetLocalizedFiles` composition only.
 - Variants and states: Missing = neutral, outdated = warning, current/unconfirmed = “Needs Review” warning, current/confirmed = “Reviewed” success.
 - Token/component ownership: `ThemeProvider.tsx` and upstream MUI own tokens; feature code selects semantic variants.
@@ -69,7 +70,7 @@
 
 ## Interaction states
 
-- Loading: Keep the existing row-scoped progress indicators.
+- Loading: Every concurrent generation or transcription keeps a row-scoped progress indicator until that job finishes.
 - Empty: Keep neutral dashes and existing empty-state copy.
 - Error: Keep inline alert text and retryable recorder state.
 - Success: A confirmed current final displays “Reviewed” with success styling.
@@ -88,7 +89,7 @@
 - Design-token constraints: No raw feature colors when semantic palette variants exist.
 - Performance constraints: Avoid additional per-row API requests.
 - Compatibility constraints: Fork-only translation keys live in `webapp/tolgee.prod.d.ts`; generated `en.json` is not edited.
-- Test/screenshot expectations: Component tests assert semantic label/color and DOM order; production smoke verifies Preview/Final placement.
+- Test/screenshot expectations: Component tests assert semantic label/color, DOM order, destructive confirmation, and independent concurrent loading states; production smoke verifies Preview/Final placement.
 
 ## Open questions
 
