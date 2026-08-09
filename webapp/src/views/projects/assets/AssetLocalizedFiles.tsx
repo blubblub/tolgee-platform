@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import {
   CheckCircle,
+  Microphone01,
   Stars01,
   Trash01,
   UploadCloud02,
@@ -32,7 +33,9 @@ import {
 } from 'tg.service/http/useQueryApi';
 import {
   binaryAssetApi,
+  canRecordAudio,
   formatBytes,
+  isAudioAsset,
   truncateMiddle,
   visibleTranslations,
 } from './binaryAssetApi';
@@ -43,6 +46,7 @@ import { TranscriptEditor } from './TranscriptEditor';
 import { TranscriptAddInline } from './TranscriptAddInline';
 import { BinaryAsset, BinaryAssetTranslationStatus } from './types';
 import { RunToolDialog } from './RunToolDialog';
+import { RecordAudioDialog } from './RecordAudioDialog';
 import { useRunErrorText } from './useRunErrorText';
 import { useRunTool } from './useRunTool';
 
@@ -91,6 +95,10 @@ export const AssetLocalizedFiles = ({
   const [dropUploading, setDropUploading] = useState<number | 'source' | null>(
     null
   );
+  // which row the record dialog serves; null = closed
+  const [recordTarget, setRecordTarget] = useState<number | 'source' | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
   const [generatingLanguageId, setGeneratingLanguageId] = useState<
     number | null
@@ -115,6 +123,9 @@ export const AssetLocalizedFiles = ({
   const canReview = satisfiesPermission('translations.state-edit');
   const canEditSource = satisfiesPermission('keys.edit');
   const canCreateTranscript = satisfiesPermission('keys.create');
+  // recording produces an audio take, so only offer it where an audio file would land
+  const recordable =
+    canRecordAudio() && isAudioAsset(asset.contentType, asset.originalFilename);
 
   const rows = useMemo(
     () => visibleTranslations(asset, languageTags),
@@ -246,8 +257,8 @@ export const AssetLocalizedFiles = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const onFileDropped = (target: number | 'source', file: File) => {
-    // same mutations as the upload button, plus a spinner in that row's File cell
+  const uploadFile = (target: number | 'source', file: File) => {
+    // dropped or recorded — same mutations as the upload button, plus a spinner in the File cell
     setDropUploading(target);
     const onSettled = () => setDropUploading(null);
     if (target === 'source') {
@@ -362,7 +373,7 @@ export const AssetLocalizedFiles = ({
                   </TableCell>
                   <FileDropTableCell
                     active={canEditSource && dropUploading === null}
-                    onFile={(file) => onFileDropped('source', file)}
+                    onFile={(file) => uploadFile('source', file)}
                   >
                     {dropUploading === 'source' ? (
                       <Box
@@ -374,12 +385,30 @@ export const AssetLocalizedFiles = ({
                         <CircularProgress size={18} />
                       </Box>
                     ) : (
-                      <Tooltip title={asset.originalFilename}>
-                        <Typography variant="body2" fontWeight={700}>
-                          {truncateMiddle(asset.originalFilename)} ·{' '}
-                          {formatBytes(asset.byteSize)}
-                        </Typography>
-                      </Tooltip>
+                      <Box display="flex" alignItems="center" gap={0.5}>
+                        {canEditSource && recordable && (
+                          <Tooltip
+                            title={t(
+                              'binary_assets_record_audio',
+                              'Record audio'
+                            )}
+                          >
+                            <IconButton
+                              size="small"
+                              onClick={() => setRecordTarget('source')}
+                              data-cy="binary-asset-record-audio"
+                            >
+                              <Microphone01 width={16} height={16} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        <Tooltip title={asset.originalFilename}>
+                          <Typography variant="body2" fontWeight={700}>
+                            {truncateMiddle(asset.originalFilename)} ·{' '}
+                            {formatBytes(asset.byteSize)}
+                          </Typography>
+                        </Tooltip>
+                      </Box>
                     )}
                   </FileDropTableCell>
                   <TableCell
@@ -474,7 +503,7 @@ export const AssetLocalizedFiles = ({
                   </TableCell>
                   <FileDropTableCell
                     active={canTranslate && dropUploading === null}
-                    onFile={(file) => onFileDropped(row.languageId, file)}
+                    onFile={(file) => uploadFile(row.languageId, file)}
                   >
                     {dropUploading === row.languageId ? (
                       <Box
@@ -485,15 +514,35 @@ export const AssetLocalizedFiles = ({
                       >
                         <CircularProgress size={18} />
                       </Box>
-                    ) : row.originalFilename ? (
-                      <Tooltip title={row.originalFilename}>
-                        <Typography variant="body2">
-                          {truncateMiddle(row.originalFilename)} ·{' '}
-                          {formatBytes(row.byteSize ?? 0)}
-                        </Typography>
-                      </Tooltip>
                     ) : (
-                      '—'
+                      <Box display="flex" alignItems="center" gap={0.5}>
+                        {canTranslate && recordable && (
+                          <Tooltip
+                            title={t(
+                              'binary_assets_record_audio',
+                              'Record audio'
+                            )}
+                          >
+                            <IconButton
+                              size="small"
+                              onClick={() => setRecordTarget(row.languageId)}
+                              data-cy="binary-asset-record-audio"
+                            >
+                              <Microphone01 width={16} height={16} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {row.originalFilename ? (
+                          <Tooltip title={row.originalFilename}>
+                            <Typography variant="body2">
+                              {truncateMiddle(row.originalFilename)} ·{' '}
+                              {formatBytes(row.byteSize ?? 0)}
+                            </Typography>
+                          </Tooltip>
+                        ) : (
+                          '—'
+                        )}
+                      </Box>
                     )}
                   </FileDropTableCell>
                   <TableCell
@@ -720,6 +769,18 @@ export const AssetLocalizedFiles = ({
           }}
         />
       )}
+
+      <RecordAudioDialog
+        open={recordTarget !== null}
+        onClose={() => setRecordTarget(null)}
+        onUse={(file) => {
+          const target = recordTarget;
+          setRecordTarget(null);
+          if (target !== null) {
+            uploadFile(target, file);
+          }
+        }}
+      />
     </Box>
   );
 };

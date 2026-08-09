@@ -85,6 +85,43 @@ export const visibleTranslations = (
     : all;
 };
 
+const AUDIO_FILE_EXTENSIONS = [
+  '.mp3',
+  '.wav',
+  '.ogg',
+  '.m4a',
+  '.aac',
+  '.flac',
+  '.webm',
+  '.opus',
+];
+
+/**
+ * Whether the asset holds audio. Uploads often arrive as application/octet-stream, so fall
+ * back to the filename extension, like the backend's transcribable check does.
+ */
+export const isAudioAsset = (
+  contentType?: string | null,
+  filename?: string | null
+) => {
+  const type = (contentType ?? '').toLowerCase();
+  if (type.startsWith('audio/')) return true;
+  const name = (filename ?? '').toLowerCase();
+  return AUDIO_FILE_EXTENSIONS.some((ext) => name.endsWith(ext));
+};
+
+/** In-browser recording needs both getUserMedia and MediaRecorder. */
+export const canRecordAudio = () =>
+  typeof navigator !== 'undefined' &&
+  !!navigator.mediaDevices?.getUserMedia &&
+  typeof MediaRecorder !== 'undefined';
+
+/** Best supported take format — opus-in-webm almost everywhere, Safari wants mp4. */
+export const pickRecordingMime = (): string | undefined =>
+  ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(
+    (m) => canRecordAudio() && MediaRecorder.isTypeSupported(m)
+  );
+
 export const binaryAssetApi = {
   list(
     projectId: number,

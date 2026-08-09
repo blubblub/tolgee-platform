@@ -1,4 +1,9 @@
-import { binaryAssetApi, visibleTranslations } from './binaryAssetApi';
+import {
+  binaryAssetApi,
+  isAudioAsset,
+  pickRecordingMime,
+  visibleTranslations,
+} from './binaryAssetApi';
 import { BinaryAsset } from './types';
 
 const calls: string[] = [];
@@ -72,5 +77,46 @@ describe('visibleTranslations', () => {
 
   it('survives an asset with no localized files', () => {
     expect(visibleTranslations({} as BinaryAsset, ['de'])).toEqual([]);
+  });
+});
+
+describe('isAudioAsset', () => {
+  it('detects audio by content type', () => {
+    expect(isAudioAsset('audio/mpeg', 'voice.bin')).toBe(true);
+  });
+
+  it('falls back to the filename extension for octet-stream uploads', () => {
+    expect(isAudioAsset('application/octet-stream', 'line.wav')).toBe(true);
+  });
+
+  it('rejects non-audio and missing data', () => {
+    expect(isAudioAsset('image/png', 'shot.png')).toBe(false);
+    expect(isAudioAsset('video/mp4', 'clip.mp4')).toBe(false);
+    expect(isAudioAsset(undefined, undefined)).toBe(false);
+  });
+});
+
+describe('pickRecordingMime', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('prefers opus webm when the browser supports it', () => {
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: vi.fn() } });
+    vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true });
+    expect(pickRecordingMime()).toBe('audio/webm;codecs=opus');
+  });
+
+  it('falls back to the first supported container (Safari: mp4)', () => {
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: vi.fn() } });
+    vi.stubGlobal('MediaRecorder', {
+      isTypeSupported: (m: string) => m === 'audio/mp4',
+    });
+    expect(pickRecordingMime()).toBe('audio/mp4');
+  });
+
+  it('is undefined where recording is unsupported', () => {
+    vi.stubGlobal('MediaRecorder', undefined);
+    expect(pickRecordingMime()).toBeUndefined();
   });
 });
