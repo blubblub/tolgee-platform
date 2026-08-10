@@ -74,6 +74,10 @@ fun Map<String, Any?>.getString(key: String): String? = this[key] as? String
 
 fun Map<String, Any?>.requireString(key: String): String = getString(key) ?: missingParam(key)
 
+fun Map<String, Any?>.getBoolean(key: String): Boolean? = this[key] as? Boolean
+
+fun Map<String, Any?>.requireBoolean(key: String): Boolean = getBoolean(key) ?: missingParam(key)
+
 fun Map<String, Any?>.getInt(key: String): Int? = (this[key] as? Number)?.toInt()
 
 @Suppress("UNCHECKED_CAST")

@@ -457,3 +457,29 @@ FKs through `EntityManager.getReference` and the controller checks that the
 language belongs to the project. Its FKs to `project` and `language` mean
 cleanup must stay wired into `ProjectHardDeletingService`, `ProjectContentClearer`,
 and `LanguageHardDeleter`.
+
+## MCP server covers assets
+
+Upstream's MCP server (`/mcp/developer`) only ships text-translation tools. The
+fork adds the full binary-asset surface as MCP tools — providers
+`BinaryAssetMcpTools`, `BinaryAssetTranscriptMcpTools`,
+`BinaryAssetTranslationMcpTools`, `BinaryAssetVoiceMcpTools` under
+`backend/app/src/main/kotlin/io/tolgee/mcp/tools/`, each deriving its permission
+spec from the matching REST controller via `buildSpec`, so scopes stay in sync
+by construction. Tool names: `list_assets`, `get_asset`, `create_asset`,
+`update_asset`, `replace_asset_source`, `delete_asset`, `set_asset_transcript`,
+`generate_asset_transcript`, `delete_asset_transcript`,
+`upload_asset_translation`, `set_asset_translation_reviewed`,
+`delete_asset_translation`, `list_asset_versions`, `upload_asset_version`,
+`run_asset_tool` (this is the MCP entry point for `tts`/`voice-changer`),
+`set_asset_chosen_version`, `delete_asset_version`, `get_asset_download_url`,
+`list_asset_voices`, `set_asset_voice`.
+
+MCP has no multipart, so uploads take `fileName` + `fileContentBase64` JSON args
+(`decodeUpload` in `McpUploads.kt`), capped at 32 MiB decoded — larger files must
+use the REST multipart endpoints. Downloads go through
+`get_asset_download_url`, which issues the same short-lived JWT ticket the REST
+controllers issue and returns a public `/v2/binary-assets/download?token=…` URL.
+Tool handlers wrap service calls in `executeInNewTransaction` because MCP
+requests have no open Hibernate session — assembling an asset model outside a
+transaction blows up on lazy fields.
