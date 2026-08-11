@@ -460,6 +460,11 @@ and `LanguageHardDeleter`.
 
 ## MCP server covers assets
 
+To *drive* a Tolgee instance (rather than change the platform), use the
+`tolgee-mcp` skill in `.claude/skills/tolgee-mcp/` — it covers connecting, the
+tool map, and the end-to-end voice-over pipeline. The rest of this section is
+about the implementation.
+
 Upstream's MCP server (`/mcp/developer`) only ships text-translation tools. The
 fork adds the full binary-asset surface as MCP tools — providers
 `BinaryAssetMcpTools`, `BinaryAssetTranscriptMcpTools`,
@@ -476,8 +481,10 @@ by construction. Tool names: `list_assets`, `get_asset`, `create_asset`,
 `list_asset_voices`, `set_asset_voice`.
 
 MCP has no multipart, so uploads take `fileName` + `fileContentBase64` JSON args
-(`decodeUpload` in `McpUploads.kt`), capped at 32 MiB decoded — larger files must
-use the REST multipart endpoints. Downloads go through
+(`decodeUpload` in `McpUploads.kt`), capped at 200 MiB decoded — larger files
+must use the REST multipart endpoints, which stream rather than buffering. That
+cap is memory, not policy: a call at the limit holds the base64 argument plus the
+decoded array, so raising it further needs matching JVM heap. Downloads go through
 `get_asset_download_url`, which issues the same short-lived JWT ticket the REST
 controllers issue and returns a public `/v2/binary-assets/download?token=…` URL.
 Tool handlers wrap service calls in `executeInNewTransaction` because MCP
