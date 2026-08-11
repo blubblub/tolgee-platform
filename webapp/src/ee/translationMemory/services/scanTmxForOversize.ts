@@ -10,8 +10,9 @@ export const TM_ENTRY_TEXT_MAX_LENGTH = 10_000;
  * blocks the main thread for too long on memory-constrained devices. Backend still enforces the
  * cap and reports any drops via `TmxImportResult.skipped`.
  *
- * 10 MB covers ~95% of real TMX uploads. The backend's default upload cap is 50 MB, so this
- * scan boundary lets us cover the typical case without risking tab freezes for the long tail.
+ * 10 MB covers ~95% of real TMX uploads. The backend's upload cap is far higher (200 MB by
+ * default), so this scan boundary covers the typical case without risking tab freezes on the
+ * long tail rather than matching the backend limit.
  */
 export const TMX_SCAN_MAX_FILE_BYTES = 10 * 1024 * 1024;
 

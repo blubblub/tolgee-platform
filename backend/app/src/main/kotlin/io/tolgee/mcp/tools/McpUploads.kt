@@ -11,9 +11,14 @@ import java.util.Base64
 /**
  * MCP carries no multipart requests, so file uploads arrive base64-encoded inside JSON tool
  * arguments. The cap bounds how much memory a single tool call can hold — larger files must go
- * through the REST multipart endpoints.
+ * through the REST multipart endpoints, which stream instead.
+ *
+ * Unlike the streamed REST path this is not free: a call at the cap holds the base64 argument
+ * (~4/3 of the limit) plus the decoded array at once, so peak heap is roughly 2.3x this value per
+ * concurrent upload. At 200 MiB that is ~470 MiB, which needs the container heap raised
+ * (JAVA_OPTS=-Xmx2g or -XX:MaxRAMPercentage=50) above the JVM's 25%-of-RAM default.
  */
-const val MCP_MAX_UPLOAD_BYTES: Long = 32L * 1024 * 1024
+const val MCP_MAX_UPLOAD_BYTES: Long = 200L * 1024 * 1024
 
 class InMemoryMultipartFile(
   private val partName: String,
