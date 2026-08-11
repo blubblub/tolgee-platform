@@ -575,6 +575,109 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
       }
   }
 
+  private fun assetDetail(assetId: Long) =
+    jacksonObjectMapper()
+      .readTree(
+        performProjectAuthGet("binary-assets/$assetId")
+          .andIsOk
+          .andReturn()
+          .response.contentAsString,
+      )
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `runs voice changer on the source file and picks the result as final`() {
+    val assetId = createAsset("vox-source")
+    val source = assetDetail(assetId).get("sourceLanguageId").asLong()
+
+    val versionId =
+      jacksonObjectMapper()
+        .readTree(
+          performProjectAuthPost(
+            "binary-assets/$assetId/translations/$source/versions/run",
+            mapOf("tool" to "voice-changer", "params" to mapOf("voiceId" to "voice-1")),
+          ).andIsCreated.andReturn().response.contentAsString,
+        ).get("id")
+        .asLong()
+
+    // the asset's own file is the input — the source language has no translation to read
+    verify(voiceClient).changeVoice(
+      any(),
+      eq("vox-source.mp3"),
+      any(),
+      eq("voice-1"),
+      any(),
+      any(),
+    )
+
+    performProjectAuthPut(
+      "binary-assets/$assetId/translations/$source/versions/chosen-version",
+      mapOf("versionId" to versionId),
+    ).andIsOk.andAssertThatJson {
+      node("chosenVersionId").isEqualTo(versionId)
+      node("chosenVersionFilename").isEqualTo("vox-source-voice.mp3")
+      node("chosenVersionTool").isEqualTo("voice-changer")
+      node("versionCount").isEqualTo(1)
+    }
+
+    // source versions belong to the source, not to every language that has no file of its own
+    assetDetail(assetId).get("translations").forEach {
+      assertThat(it.get("versionCount").asInt()).isEqualTo(0)
+      assertThat(it.get("chosenVersionId").isNull).isTrue()
+    }
+
+    // clearing puts the uploaded original back as the final
+    performProjectAuthPut(
+      "binary-assets/$assetId/translations/$source/versions/chosen-version",
+      mapOf<String, Any?>("versionId" to null),
+    ).andIsOk.andAssertThatJson {
+      node("chosenVersionId").isNull()
+      node("versionCount").isEqualTo(1)
+    }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `downloads a source version and deletes the asset with it`() {
+    val assetId = createAsset("vox-source-download")
+    createTranscriptWithText(assetId, "Hello world.")
+    val source = assetDetail(assetId).get("sourceLanguageId").asLong()
+
+    val versionId =
+      jacksonObjectMapper()
+        .readTree(
+          performProjectAuthPost(
+            "binary-assets/$assetId/translations/$source/versions/run",
+            mapOf("tool" to "tts", "params" to mapOf("voiceId" to "voice-1")),
+          ).andIsCreated.andReturn().response.contentAsString,
+        ).get("id")
+        .asLong()
+
+    val ticketUrl =
+      jacksonObjectMapper()
+        .readTree(
+          performProjectAuthPost(
+            "binary-assets/$assetId/translations/$source/versions/$versionId/download-ticket",
+            null,
+          ).andIsOk.andReturn().response.contentAsString,
+        ).get("url")
+        .asText()
+
+    mvc
+      .perform(
+        MockMvcRequestBuilders
+          .get("/v2/binary-assets/download")
+          .param("token", ticketUrl.substringAfter("token=")),
+      ).andExpect(MockMvcResultMatchers.status().isOk)
+      .andExpect { result ->
+        assertThat(result.response.contentAsByteArray).isEqualTo(mp3Bytes)
+      }
+
+    // source versions hang off no translation, so the asset delete has to clean them up itself
+    performProjectAuthDelete("binary-assets/$assetId", null).andIsNoContent
+    performProjectAuthGet("binary-assets/$assetId").andIsNotFound
+  }
+
   @Test
   @ProjectJWTAuthTestMethod
   fun `denies run for user without translations edit`() {

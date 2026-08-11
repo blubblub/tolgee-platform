@@ -70,17 +70,17 @@ class BinaryAssetMcpTools(
             binaryAssetTranscriptService.getTranscriptTranslationsByKey(
               page.content.mapNotNull { it.transcriptKey?.id },
             )
-          val versionsByTranslation =
+          val versionsByAsset =
             binaryAssetTranslationVersionService
-              .findByTranslationIdIn(page.content.flatMap { asset -> asset.translations.map { it.id } })
-              .groupBy { it.translation.id }
+              .findByAssetIdIn(page.content.map { it.id })
+              .groupBy { it.asset.id }
           val result =
             pagedResponse(page) { asset ->
               binaryAssetModelAssembler.toListModel(
                 asset,
                 languages,
                 transcripts[asset.transcriptKey?.id].orEmpty(),
-                versionsByTranslation,
+                versionsByAsset,
               )
             }
           textResult(objectMapper.writeValueAsString(result))

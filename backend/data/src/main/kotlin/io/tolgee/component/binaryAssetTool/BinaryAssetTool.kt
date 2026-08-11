@@ -7,7 +7,8 @@ import io.tolgee.service.binaryAsset.BinaryAssetService.FileStream
 
 data class BinaryAssetToolContext(
   val asset: BinaryAsset,
-  val translation: BinaryAssetTranslation,
+  /** Null when the run targets the asset's source language, which has no translation row. */
+  val translation: BinaryAssetTranslation?,
   val language: Language,
   /** Project/language default, used when the run does not pass a `voiceId` param. */
   val defaultVoiceId: String? = null,

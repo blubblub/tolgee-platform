@@ -6047,4 +6047,32 @@
         <sql>CREATE UNIQUE INDEX bav_one_project_default ON binary_asset_voice (project_id, tool) WHERE language_id IS NULL</sql>
     </changeSet>
 
+    <changeSet author="blubblub" id="1787000000000-1">
+        <!-- versions hang off the asset now, so the source file can have them too; a null
+             translation_id means a version of the source file, which has no translation row -->
+        <addColumn tableName="binary_asset_translation_version">
+            <column name="asset_id" type="BIGINT"/>
+        </addColumn>
+        <sql>
+            UPDATE binary_asset_translation_version v
+            SET asset_id = t.asset_id
+            FROM binary_asset_translation t
+            WHERE t.id = v.translation_id
+        </sql>
+        <addNotNullConstraint tableName="binary_asset_translation_version" columnName="asset_id"
+                              columnDataType="BIGINT"/>
+        <dropNotNullConstraint tableName="binary_asset_translation_version" columnName="translation_id"
+                               columnDataType="BIGINT"/>
+        <createIndex indexName="binary_asset_translation_version_asset_id_idx"
+                     tableName="binary_asset_translation_version">
+            <column name="asset_id"/>
+        </createIndex>
+        <addForeignKeyConstraint baseColumnNames="asset_id" baseTableName="binary_asset_translation_version"
+                                 constraintName="FK_binary_asset_translation_version_asset" deferrable="false"
+                                 initiallyDeferred="false" referencedColumnNames="id"
+                                 referencedTableName="binary_asset" validate="true"/>
+        <!-- NULLs are distinct in batv_one_chosen_per_translation, so source versions need their own -->
+        <sql>CREATE UNIQUE INDEX batv_one_chosen_source ON binary_asset_translation_version (asset_id) WHERE chosen AND translation_id IS NULL</sql>
+    </changeSet>
+
 </databaseChangeLog>

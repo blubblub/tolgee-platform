@@ -36,6 +36,12 @@ open class BinaryAssetModel(
   val transcriptSourceText: String? = null,
   /** Whether "transcribe with AI" is offered: a provider is configured and this file is speech. */
   val transcriptionAvailable: Boolean = false,
+  /** Chosen pipeline version of the source file; null means the uploaded original is the final. */
+  val chosenVersionId: Long? = null,
+  val chosenVersionFilename: String? = null,
+  val chosenVersionTool: String? = null,
+  /** Pipeline versions of the source file, not of any translation. */
+  val versionCount: Int = 0,
   val translations: List<BinaryAssetTranslationModel>? = null,
 ) : RepresentationModel<BinaryAssetModel>()
 

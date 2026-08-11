@@ -230,7 +230,8 @@ class BinaryAssetService(
       binaryAssetRepository.findByProjectIdAndId(projectId, assetId)
         ?: throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
     val keys = mutableListOf(asset.storageKey)
-    keys += asset.translations.flatMap { it.versions.map { v -> v.storageKey } }
+    // asset.versions covers the source file's versions too, which hang off no translation
+    keys += asset.versions.map { it.storageKey }
     keys += asset.translations.map { it.storageKey }
     binaryAssetRepository.delete(asset)
     entityManager.flush()
@@ -243,7 +244,7 @@ class BinaryAssetService(
     val keys = mutableListOf<String>()
     assets.forEach { asset ->
       keys += asset.storageKey
-      keys += asset.translations.flatMap { it.versions.map { v -> v.storageKey } }
+      keys += asset.versions.map { it.storageKey }
       keys += asset.translations.map { it.storageKey }
     }
     if (assets.isNotEmpty()) {

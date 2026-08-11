@@ -42,7 +42,8 @@ class ElevenLabsTtsTool(
 
     val bytes = voiceClient.synthesize(text, voiceId, modelId)
 
-    val baseName = context.translation.originalFilename.substringBeforeLast('.')
+    val baseName =
+      (context.translation?.originalFilename ?: context.asset.originalFilename).substringBeforeLast('.')
     val filename = "$baseName-tts.mp3"
 
     return BinaryAssetToolOutput(bytes = bytes, filename = filename, contentType = "audio/mpeg")

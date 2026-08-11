@@ -91,4 +91,8 @@ class BinaryAsset(
 
   @OneToMany(mappedBy = "asset", orphanRemoval = true)
   var translations: MutableList<BinaryAssetTranslation> = mutableListOf()
+
+  /** Every pipeline version of this asset — the source file's and every language's. */
+  @OneToMany(mappedBy = "asset", orphanRemoval = true)
+  var versions: MutableList<BinaryAssetTranslationVersion> = mutableListOf()
 }

@@ -47,6 +47,12 @@ export type BinaryAsset = {
   transcriptKeyDeleted?: boolean;
   transcriptSourceText?: string | null;
   transcriptionAvailable?: boolean;
+  /** Chosen version of the source file; null/absent means the uploaded original is the final. */
+  chosenVersionId?: number | null;
+  chosenVersionFilename?: string | null;
+  chosenVersionTool?: string | null;
+  /** Versions of the source file, not of any translation. */
+  versionCount?: number;
   translations?: BinaryAssetTranslation[] | null;
 };
 

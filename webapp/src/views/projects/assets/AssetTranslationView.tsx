@@ -170,6 +170,12 @@ const AssetTranslationContent = () => {
     return tr as unknown as BinaryAssetTranslationWithVersions | undefined;
   }, [assetQuery.data, languageId]);
 
+  /**
+   * The asset's source language has no translation row — its original is the asset's own file, and
+   * its versions hang off the asset. Everything else on this page works the same.
+   */
+  const isSource = assetQuery.data?.sourceLanguageId === languageId;
+
   const invalidate = () => {
     queryClient.invalidateQueries(['binary-asset', project.id, assetId]);
     queryClient.invalidateQueries([
@@ -260,14 +266,16 @@ const AssetTranslationContent = () => {
 
   const replaceOg = useMutation(
     (file: File) =>
-      binaryAssetApi.upsertTranslation(
-        project.id,
-        assetId,
-        languageId,
-        file,
-        // the button only renders once the asset has loaded
-        assetQuery.data?.sourceRevision ?? 0
-      ),
+      isSource
+        ? binaryAssetApi.replaceSource(project.id, assetId, file)
+        : binaryAssetApi.upsertTranslation(
+            project.id,
+            assetId,
+            languageId,
+            file,
+            // the button only renders once the asset has loaded
+            assetQuery.data?.sourceRevision ?? 0
+          ),
     {
       onSuccess: invalidate,
       onError: (e: any) =>
@@ -318,6 +326,11 @@ const AssetTranslationContent = () => {
     method: 'post',
   });
 
+  const generateSourceTranscript = useApiMutation({
+    url: '/v2/projects/{projectId}/binary-assets/{assetId}/transcript/generate',
+    method: 'post',
+  });
+
   const addTranscript = useApiMutation({
     url: '/v2/projects/{projectId}/binary-assets/{assetId}/transcript',
     method: 'post',
@@ -326,9 +339,15 @@ const AssetTranslationContent = () => {
   const transcribe = async () => {
     setTranscribing(true);
     try {
-      await generateTranscript.mutateAsync({
-        path: { projectId: project.id, assetId, languageId },
-      });
+      if (isSource) {
+        await generateSourceTranscript.mutateAsync({
+          path: { projectId: project.id, assetId },
+        });
+      } else {
+        await generateTranscript.mutateAsync({
+          path: { projectId: project.id, assetId, languageId },
+        });
+      }
       invalidate();
     } catch (e) {
       // Per-call React Query callbacks only survive for the newest concurrent mutation.
@@ -418,14 +437,27 @@ const AssetTranslationContent = () => {
   }
 
   const asset = assetQuery.data;
+  // replacing the source file is a keys.edit action, unlike replacing a language's file
+  const canEditOg = isSource ? satisfiesPermission('keys.edit') : canEdit;
   const versions = versionsQuery.data ?? [];
-  const chosenVersionId = translation?.chosenVersionId;
+  const chosenVersionId = isSource
+    ? asset.chosenVersionId ?? null
+    : translation?.chosenVersionId;
+  // the source file is always there; a translation may not be uploaded yet
+  const ogMissing = !isSource && translation?.status === 'MISSING';
   const recordable =
-    canEdit &&
+    canEditOg &&
     canRecordAudio() &&
     isAudioAsset(asset.contentType, asset.originalFilename);
 
-  const statusChip = !translation ? null : translation.status === 'CURRENT' ? (
+  const statusChip = isSource ? (
+    <Chip
+      size="small"
+      variant="outlined"
+      label={t('binary_assets_source_badge', 'ORIGINAL')}
+      data-cy="binary-asset-status"
+    />
+  ) : !translation ? null : translation.status === 'CURRENT' ? (
     <Chip
       size="small"
       color={translation.reviewed ? 'success' : 'warning'}
@@ -531,47 +563,50 @@ const AssetTranslationContent = () => {
         </Box>
       </Box>
 
-      <Box
-        mb={3}
-        p={2}
-        border={1}
-        borderColor="divider"
-        borderRadius={1}
-        data-cy="asset-translation-source-card"
-      >
+      {/* on the source language's own page this card would just repeat the OG row below */}
+      {!isSource && (
         <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="flex-start"
-          flexWrap="wrap"
-          gap={1}
-          mb={1}
+          mb={3}
+          p={2}
+          border={1}
+          borderColor="divider"
+          borderRadius={1}
+          data-cy="asset-translation-source-card"
         >
-          <Box>
-            <Typography fontWeight={600}>
-              {t('asset_translation_source', 'Source ({tag})', {
-                tag: asset.sourceLanguageTag,
-              })}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {asset.originalFilename} · {formatBytes(asset.byteSize)}
-            </Typography>
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="flex-start"
+            flexWrap="wrap"
+            gap={1}
+            mb={1}
+          >
+            <Box>
+              <Typography fontWeight={600}>
+                {t('asset_translation_source', 'Source ({tag})', {
+                  tag: asset.sourceLanguageTag,
+                })}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {asset.originalFilename} · {formatBytes(asset.byteSize)}
+              </Typography>
+            </Box>
+            <IconAction
+              label={t('asset_translation_download', 'Download')}
+              icon={<Download01 width={16} height={16} />}
+              onClick={downloadSource}
+              dataCy="asset-translation-source-download"
+            />
           </Box>
-          <IconAction
-            label={t('asset_translation_download', 'Download')}
-            icon={<Download01 width={16} height={16} />}
-            onClick={downloadSource}
-            dataCy="asset-translation-source-download"
+          <BinaryAssetPreview
+            projectId={project.id}
+            assetId={asset.id}
+            languageId={null}
+            contentType={asset.contentType}
+            filename={asset.originalFilename}
           />
         </Box>
-        <BinaryAssetPreview
-          projectId={project.id}
-          assetId={asset.id}
-          languageId={null}
-          contentType={asset.contentType}
-          filename={asset.originalFilename}
-        />
-      </Box>
+      )}
 
       {failedRun && (
         <Alert
@@ -687,7 +722,7 @@ const AssetTranslationContent = () => {
                 )}
               </TableCell>
               <FileDropTableCell
-                active={canEdit && !uploadingOg}
+                active={canEditOg && !uploadingOg}
                 onFile={(file) => {
                   setUploadingOg(true);
                   replaceOg.mutate(file);
@@ -715,13 +750,15 @@ const AssetTranslationContent = () => {
                       ?.byteSize ?? asset.byteSize
                   )}{' '}
                   ·{' '}
-                  {translation?.updatedAt
-                    ? formatDate(translation.updatedAt)
+                  {(isSource ? asset.updatedAt : translation?.updatedAt)
+                    ? formatDate(
+                        (isSource ? asset.updatedAt : translation?.updatedAt)!
+                      )
                     : t('asset_translation_not_uploaded', 'Not uploaded')}
                 </Typography>
               </FileDropTableCell>
               <TableCell>
-                {translation?.status === 'MISSING' ? (
+                {ogMissing ? (
                   <Typography variant="caption" color="text.secondary">
                     —
                   </Typography>
@@ -729,14 +766,15 @@ const AssetTranslationContent = () => {
                   <BinaryAssetPreview
                     projectId={project.id}
                     assetId={asset.id}
-                    languageId={languageId}
+                    // the source file has no translation row to ticket through
+                    languageId={isSource ? null : languageId}
                     contentType={
                       (translation as BinaryAssetTranslation | undefined)
-                        ?.contentType
+                        ?.contentType ?? asset.contentType
                     }
                     filename={
                       (translation as BinaryAssetTranslation | undefined)
-                        ?.originalFilename
+                        ?.originalFilename ?? asset.originalFilename
                     }
                     compact
                   />
@@ -754,7 +792,11 @@ const AssetTranslationContent = () => {
                         projectId={project.id}
                         keyName={asset.transcriptKeyName}
                         languageTag={language?.tag ?? String(languageId)}
-                        value={translation?.transcriptText}
+                        value={
+                          isSource
+                            ? asset.transcriptSourceText
+                            : translation?.transcriptText
+                        }
                         canEdit={canEdit}
                         placeholder={t(
                           'binary_assets_transcript_add_translation',
@@ -793,24 +835,27 @@ const AssetTranslationContent = () => {
                       </Typography>
                     )}
                   </Box>
-                  {canEdit && translation?.transcriptionAvailable && (
-                    <IconAction
-                      label={t(
-                        'binary_assets_transcript_generate_language',
-                        "Transcribe this language's audio with AI"
-                      )}
-                      icon={
-                        transcribing ? (
-                          <CircularProgress size={16} />
-                        ) : (
-                          <Stars01 width={16} height={16} />
-                        )
-                      }
-                      disabled={transcribing}
-                      onClick={() => void transcribe()}
-                      dataCy="binary-asset-transcript-generate-language"
-                    />
-                  )}
+                  {canEdit &&
+                    (isSource
+                      ? asset.transcriptionAvailable
+                      : translation?.transcriptionAvailable) && (
+                      <IconAction
+                        label={t(
+                          'binary_assets_transcript_generate_language',
+                          "Transcribe this language's audio with AI"
+                        )}
+                        icon={
+                          transcribing ? (
+                            <CircularProgress size={16} />
+                          ) : (
+                            <Stars01 width={16} height={16} />
+                          )
+                        }
+                        disabled={transcribing}
+                        onClick={() => void transcribe()}
+                        dataCy="binary-asset-transcript-generate-language"
+                      />
+                    )}
                 </Box>
               </TableCell>
               <TableCell align="right">
@@ -823,11 +868,11 @@ const AssetTranslationContent = () => {
                     <IconAction
                       label={t('asset_translation_download', 'Download')}
                       icon={<Download01 width={16} height={16} />}
-                      disabled={translation?.status === 'MISSING'}
-                      onClick={downloadTranslation}
+                      disabled={ogMissing}
+                      onClick={isSource ? downloadSource : downloadTranslation}
                       dataCy="asset-translation-og-download"
                     />
-                    {canEdit && translation?.status !== 'MISSING' && (
+                    {canEdit && !ogMissing && (
                       <IconAction
                         label={t('asset_translation_run_tool', 'Run tool')}
                         icon={<Zap width={16} height={16} />}
@@ -845,10 +890,10 @@ const AssetTranslationContent = () => {
                         dataCy="asset-translation-og-record"
                       />
                     )}
-                    {canEdit && (
+                    {canEditOg && (
                       <IconAction
                         label={
-                          translation?.status === 'MISSING'
+                          ogMissing
                             ? t('binary_assets_upload_translation', 'Upload')
                             : t('binary_assets_replace_translation', 'Replace')
                         }
@@ -857,7 +902,7 @@ const AssetTranslationContent = () => {
                         dataCy="asset-translation-og-upload"
                       />
                     )}
-                    {canEdit && translation?.status !== 'MISSING' && (
+                    {canEdit && !isSource && !ogMissing && (
                       <IconAction
                         label={t('binary_assets_delete', 'Delete')}
                         icon={<Trash01 width={16} height={16} />}

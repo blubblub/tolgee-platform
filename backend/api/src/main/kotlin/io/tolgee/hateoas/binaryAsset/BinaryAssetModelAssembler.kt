@@ -32,32 +32,29 @@ class BinaryAssetModelAssembler(
     asset: BinaryAsset,
     targetLanguages: Collection<LanguageDto>,
     transcripts: Map<Long, BinaryAssetTranscriptService.TranscriptText> = emptyMap(),
-    versionsByTranslation: Map<Long, List<BinaryAssetTranslationVersion>> = emptyMap(),
-  ): BinaryAssetModel = build(asset, targetLanguages, transcripts, versionsByTranslation)
+    versionsByAsset: Map<Long, List<BinaryAssetTranslationVersion>> = emptyMap(),
+  ): BinaryAssetModel = build(asset, targetLanguages, transcripts, versionsByAsset[asset.id].orEmpty())
 
   fun toDetailModel(
     asset: BinaryAsset,
     targetLanguages: Collection<LanguageDto>,
     transcripts: Map<Long, BinaryAssetTranscriptService.TranscriptText> = emptyMap(),
-  ): BinaryAssetModel {
-    val translationIds = asset.translations.map { it.id }
-    val versionsByTranslation: Map<Long, List<BinaryAssetTranslationVersion>> =
-      if (translationIds.isEmpty()) {
-        emptyMap()
-      } else {
-        binaryAssetTranslationVersionService
-          .findByTranslationIdIn(translationIds)
-          .groupBy { it.translation.id }
-      }
-    return build(asset, targetLanguages, transcripts, versionsByTranslation)
-  }
+  ): BinaryAssetModel =
+    build(
+      asset,
+      targetLanguages,
+      transcripts,
+      binaryAssetTranslationVersionService.findByAssetIdIn(listOf(asset.id)),
+    )
 
   private fun build(
     asset: BinaryAsset,
     targetLanguages: Collection<LanguageDto>,
     transcripts: Map<Long, BinaryAssetTranscriptService.TranscriptText>,
-    versionsByTranslation: Map<Long, List<BinaryAssetTranslationVersion>>,
+    versions: List<BinaryAssetTranslationVersion>,
   ): BinaryAssetModel {
+    // source-file versions have no translation, so they land under the null key
+    val versionsByTranslation = versions.groupBy { it.translation?.id }
     val byLang = asset.translations.associateBy { it.language.id }
     val visibleTargets = targetLanguages.filter { lang -> lang.id != asset.sourceLanguage.id }
     val translationModels =
@@ -68,7 +65,8 @@ class BinaryAssetModelAssembler(
           byLang[lang.id],
           transcripts[lang.id],
           binaryAssetTranscriptService.canTranscribe(asset),
-          versionsByTranslation[byLang[lang.id]?.id].orEmpty(),
+          // a language with no translation row has no versions — it must not read the null (source) bucket
+          byLang[lang.id]?.let { versionsByTranslation[it.id] }.orEmpty(),
         )
       }
     var current = 0
@@ -80,6 +78,7 @@ class BinaryAssetModelAssembler(
         BinaryAssetTranslationStatus.MISSING -> {}
       }
     }
+    val sourceVersions = versionsByTranslation[null].orEmpty()
     return baseModel(
       asset,
       current,
@@ -88,6 +87,7 @@ class BinaryAssetModelAssembler(
       translationModels,
       transcripts[asset.sourceLanguage.id]?.text,
       binaryAssetTranscriptService.canTranscribe(asset),
+      sourceVersions,
     )
   }
 
@@ -132,8 +132,10 @@ class BinaryAssetModelAssembler(
     translations: List<BinaryAssetTranslationModel>?,
     transcriptSourceText: String? = null,
     transcriptionAvailable: Boolean = false,
-  ): BinaryAssetModel =
-    BinaryAssetModel(
+    sourceVersions: List<BinaryAssetTranslationVersion> = emptyList(),
+  ): BinaryAssetModel {
+    val chosenSource = sourceVersions.firstOrNull { it.chosen }
+    return BinaryAssetModel(
       id = asset.id,
       name = asset.name,
       description = asset.description,
@@ -156,8 +158,13 @@ class BinaryAssetModelAssembler(
       transcriptKeyDeleted = asset.transcriptKey?.deletedAt != null,
       transcriptSourceText = transcriptSourceText,
       transcriptionAvailable = transcriptionAvailable,
+      chosenVersionId = chosenSource?.id,
+      chosenVersionFilename = chosenSource?.originalFilename,
+      chosenVersionTool = chosenSource?.tool,
+      versionCount = sourceVersions.size,
       translations = translations,
     )
+  }
 
   override fun toModel(entity: BinaryAsset): BinaryAssetModel {
     return baseModel(entity, 0, 0, 0, null)

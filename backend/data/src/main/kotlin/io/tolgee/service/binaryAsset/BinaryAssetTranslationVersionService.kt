@@ -5,6 +5,7 @@ import io.tolgee.component.binaryAssetTool.BinaryAssetToolService
 import io.tolgee.constants.Message
 import io.tolgee.exceptions.NotFoundException
 import io.tolgee.model.UserAccount
+import io.tolgee.model.binaryAsset.BinaryAsset
 import io.tolgee.model.binaryAsset.BinaryAssetTranslation
 import io.tolgee.model.binaryAsset.BinaryAssetTranslationVersion
 import io.tolgee.repository.binaryAsset.BinaryAssetTranslationRepository
@@ -30,11 +31,11 @@ class BinaryAssetTranslationVersionService(
     binaryAssetTranslationVersionRepository.findByProjectAssetAndLanguage(projectId, assetId, languageId)
 
   @Transactional(readOnly = true)
-  fun findByTranslationIdIn(translationIds: Collection<Long>): List<BinaryAssetTranslationVersion> =
-    if (translationIds.isEmpty()) {
+  fun findByAssetIdIn(assetIds: Collection<Long>): List<BinaryAssetTranslationVersion> =
+    if (assetIds.isEmpty()) {
       emptyList()
     } else {
-      binaryAssetTranslationVersionRepository.findByTranslationIdIn(translationIds)
+      binaryAssetTranslationVersionRepository.findByAssetIdIn(assetIds)
     }
 
   @Transactional(readOnly = true)
@@ -60,15 +61,13 @@ class BinaryAssetTranslationVersionService(
     file: MultipartFile,
     user: UserAccount?,
   ): BinaryAssetTranslationVersion {
-    val translation =
-      binaryAssetTranslationRepository.findByProjectAssetAndLanguage(projectId, assetId, languageId)
-        ?: throw NotFoundException(Message.BINARY_ASSET_TRANSLATION_NOT_FOUND)
+    val target = resolveTarget(projectId, assetId, languageId)
 
     binaryAssetService.requireStreamingStorage()
     val stored = binaryAssetService.storeNewBlob(projectId, file)
     return try {
       binaryAssetTranslationVersionRepository.saveAndFlush(
-        BinaryAssetTranslationVersion(translation).apply {
+        BinaryAssetTranslationVersion(target.asset, target.translation).apply {
           storageKey = stored.storageKey
           originalFilename = binaryAssetService.resolveFilename(file)
           contentType = binaryAssetService.resolveContentType(file)
@@ -94,9 +93,7 @@ class BinaryAssetTranslationVersionService(
     baseVersionId: Long?,
     user: UserAccount?,
   ): BinaryAssetTranslationVersion {
-    val translation =
-      binaryAssetTranslationRepository.findByProjectAssetAndLanguage(projectId, assetId, languageId)
-        ?: throw NotFoundException(Message.BINARY_ASSET_TRANSLATION_NOT_FOUND)
+    val target = resolveTarget(projectId, assetId, languageId)
 
     val tool = binaryAssetToolService.getTool(toolName)
 
@@ -111,18 +108,18 @@ class BinaryAssetTranslationVersionService(
         )
       } else {
         binaryAssetService.openByStorageKey(
-          translation.storageKey,
-          translation.contentType,
-          translation.originalFilename,
-          translation.byteSize,
+          target.storageKey,
+          target.contentType,
+          target.originalFilename,
+          target.byteSize,
         )
       }
 
     val context =
       io.tolgee.component.binaryAssetTool.BinaryAssetToolContext(
-        asset = translation.asset,
-        translation = translation,
-        language = translation.language,
+        asset = target.asset,
+        translation = target.translation,
+        language = target.language,
         defaultVoiceId = binaryAssetVoiceService.resolve(projectId, languageId, tool.name),
       )
 
@@ -145,7 +142,7 @@ class BinaryAssetTranslationVersionService(
     val stored = binaryAssetService.storeBlobBytes(projectId, output.bytes)
 
     val version =
-      BinaryAssetTranslationVersion(translation).apply {
+      BinaryAssetTranslationVersion(target.asset, target.translation).apply {
         this.storageKey = stored.storageKey
         this.originalFilename = output.filename
         this.contentType = output.contentType
@@ -164,26 +161,30 @@ class BinaryAssetTranslationVersionService(
     assetId: Long,
     languageId: Long,
     versionId: Long?,
-  ): BinaryAssetTranslation {
-    val translation =
-      binaryAssetTranslationRepository.findByProjectAssetAndLanguage(projectId, assetId, languageId)
-        ?: throw NotFoundException(Message.BINARY_ASSET_TRANSLATION_NOT_FOUND)
+  ) {
+    val target = resolveTarget(projectId, assetId, languageId)
+    val versions = listVersions(projectId, assetId, languageId)
 
     // a different final is a different thing to confirm, so the review has to be redone
-    val previousChosenId = translation.versions.firstOrNull { it.chosen }?.id
-    if (previousChosenId != versionId) {
-      translation.reviewed = false
+    target.translation?.let { translation ->
+      if (versions.firstOrNull { it.chosen }?.id != versionId) {
+        translation.reviewed = false
+        binaryAssetTranslationRepository.save(translation)
+      }
     }
 
-    translation.versions.forEach { it.chosen = false }
+    // clear before setting, or the "one chosen" index sees two rows mid-flush
+    versions.forEach { it.chosen = false }
+    binaryAssetTranslationVersionRepository.saveAll(versions)
+    binaryAssetTranslationVersionRepository.flush()
 
     if (versionId != null) {
-      val version = getVersion(projectId, assetId, languageId, versionId)
+      val version =
+        versions.find { it.id == versionId }
+          ?: throw NotFoundException(Message.BINARY_ASSET_VERSION_NOT_FOUND)
       version.chosen = true
       binaryAssetTranslationVersionRepository.save(version)
     }
-
-    return binaryAssetTranslationRepository.save(translation)
   }
 
   @Transactional
@@ -197,12 +198,43 @@ class BinaryAssetTranslationVersionService(
     val storageKey = version.storageKey
     if (version.chosen) {
       // final falls back to the original upload — a different file than the one confirmed
-      val translation = version.translation
-      translation.reviewed = false
-      binaryAssetTranslationRepository.save(translation)
+      version.translation?.let { translation ->
+        translation.reviewed = false
+        binaryAssetTranslationRepository.save(translation)
+      }
     }
     binaryAssetTranslationVersionRepository.delete(version)
     binaryAssetTranslationVersionRepository.flush()
     binaryAssetService.deleteBlobBestEffort(storageKey)
+  }
+
+  private fun resolveTarget(
+    projectId: Long,
+    assetId: Long,
+    languageId: Long,
+  ): VersionTarget {
+    val asset = binaryAssetService.get(projectId, assetId)
+    if (languageId == asset.sourceLanguage.id) {
+      return VersionTarget(asset, null)
+    }
+    val translation =
+      binaryAssetTranslationRepository.findByProjectAssetAndLanguage(projectId, assetId, languageId)
+        ?: throw NotFoundException(Message.BINARY_ASSET_TRANSLATION_NOT_FOUND)
+    return VersionTarget(asset, translation)
+  }
+
+  /**
+   * What a language's versions hang off, and which file is their "original". For the asset's source
+   * language that is the asset itself — it has no translation row.
+   */
+  private class VersionTarget(
+    val asset: BinaryAsset,
+    val translation: BinaryAssetTranslation?,
+  ) {
+    val language get() = translation?.language ?: asset.sourceLanguage
+    val storageKey get() = translation?.storageKey ?: asset.storageKey
+    val originalFilename get() = translation?.originalFilename ?: asset.originalFilename
+    val contentType get() = translation?.contentType ?: asset.contentType
+    val byteSize get() = translation?.byteSize ?: asset.byteSize
   }
 }

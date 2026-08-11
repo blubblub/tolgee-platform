@@ -77,7 +77,19 @@ vi.mock('react-intersection-observer', () => ({
 }));
 
 vi.mock('./BinaryAssetPreview', () => ({
-  BinaryAssetPreview: () => <span data-cy="binary-asset-preview-audio" />,
+  BinaryAssetPreview: ({
+    languageId,
+    versionId,
+  }: {
+    languageId?: number | null;
+    versionId?: number | null;
+  }) => (
+    <span
+      data-cy="binary-asset-preview-audio"
+      data-language={String(languageId ?? '')}
+      data-version={String(versionId ?? '')}
+    />
+  ),
 }));
 vi.mock('./AssetSourceTranscript', () => ({
   AssetSourceTranscript: () => null,
@@ -706,5 +718,53 @@ describe('AssetLocalizedFiles', () => {
     expect(
       container.querySelector('[data-cy="binary-asset-file-uploading"]')
     ).toBeNull();
+  });
+
+  it('runs the pipeline on the source file under the source language', () => {
+    permissions.satisfiesPermission.mockImplementation(
+      (permission) => permission === 'translations.edit'
+    );
+    permissions.satisfiesLanguageAccess.mockImplementation(
+      (_permission, languageId) => languageId === asset.sourceLanguageId
+    );
+    render(asset, 'English');
+
+    const button = row('English').querySelector<HTMLButtonElement>(
+      '[data-cy="binary-asset-run-tool"]'
+    );
+    expect(button).not.toBeNull();
+    act(() => button!.click());
+
+    expect(runDialog.languageId).toBe(asset.sourceLanguageId);
+  });
+
+  it('shows the chosen source version as the final source file', () => {
+    render(
+      {
+        ...asset,
+        chosenVersionId: 5,
+        chosenVersionFilename: 'prompt-voice.mp3',
+      },
+      'English'
+    );
+
+    const preview = row('English')
+      .querySelector('[data-cy="binary-asset-final-cell"]')
+      ?.querySelector('[data-cy="binary-asset-preview-audio"]');
+    expect(preview?.getAttribute('data-version')).toBe('5');
+    expect(preview?.getAttribute('data-language')).toBe(
+      String(asset.sourceLanguageId)
+    );
+  });
+
+  it('falls back to the uploaded source when no version is chosen', () => {
+    render(asset, 'English');
+
+    const preview = row('English')
+      .querySelector('[data-cy="binary-asset-final-cell"]')
+      ?.querySelector('[data-cy="binary-asset-preview-audio"]');
+    // no chosen version -> the source file, which tickets without a language
+    expect(preview?.getAttribute('data-version')).toBe('');
+    expect(preview?.getAttribute('data-language')).toBe('');
   });
 });

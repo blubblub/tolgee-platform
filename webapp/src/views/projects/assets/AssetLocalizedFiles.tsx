@@ -131,6 +131,14 @@ export const AssetLocalizedFiles = ({
       : t('binary_assets_reviewed_confirm', 'Confirm this final file');
   const canEditSource = satisfiesPermission('keys.edit');
   const canCreateTranscript = satisfiesPermission('keys.create');
+  // the source file's pipeline is language-scoped like any other — on the source language
+  const sourceLanguageId = asset.sourceLanguageId;
+  const canRunOnSource =
+    canTranslate &&
+    satisfiesLanguageAccess('translations.edit', sourceLanguageId);
+  const sourceBusy =
+    recordingFinalLanguageId === sourceLanguageId ||
+    regeneratingLanguageIds.includes(sourceLanguageId);
   // recording produces an audio take, so only offer it where an audio file would land
   const recordable =
     canRecordAudio() && isAudioAsset(asset.contentType, asset.originalFilename);
@@ -440,9 +448,28 @@ export const AssetLocalizedFiles = ({
               {sourceLanguageName && (
                 <TableRow data-cy="binary-asset-source-row">
                   <TableCell component="th" scope="row">
-                    <Typography variant="body2" fontWeight={700}>
-                      {sourceLanguageName} ({asset.sourceLanguageTag})
-                    </Typography>
+                    <Tooltip
+                      title={t('asset_translation_pipeline', 'Pipeline')}
+                    >
+                      <Typography
+                        variant="body2"
+                        fontWeight={700}
+                        component={RouterLink}
+                        to={LINKS.PROJECT_ASSET_TRANSLATION.build({
+                          [PARAMS.PROJECT_ID]: projectId,
+                          [PARAMS.ASSET_ID]: asset.id,
+                          [PARAMS.LANGUAGE_ID]: sourceLanguageId,
+                        })}
+                        sx={{
+                          color: 'inherit',
+                          textDecoration: 'none',
+                          '&:hover': { textDecoration: 'underline' },
+                        }}
+                        data-cy="binary-asset-source-pipeline"
+                      >
+                        {sourceLanguageName} ({asset.sourceLanguageTag})
+                      </Typography>
+                    </Tooltip>
                   </TableCell>
                   <TableCell>
                     <Chip
@@ -501,13 +528,78 @@ export const AssetLocalizedFiles = ({
                       asset={asset}
                     />
                   </TableCell>
-                  <TableCell>
-                    <Typography variant="caption" color="text.secondary">
-                      —
-                    </Typography>
+                  <TableCell data-cy="binary-asset-final-cell">
+                    {sourceBusy ? (
+                      <Box
+                        display="flex"
+                        alignItems="center"
+                        py={0.5}
+                        data-cy="binary-asset-regenerating"
+                      >
+                        <CircularProgress size={18} />
+                      </Box>
+                    ) : (
+                      <Box display="flex" alignItems="center" gap={0.5}>
+                        {/* a chosen source version, else the uploaded source itself — which has
+                            no translation row, so it tickets through the source endpoint */}
+                        <BinaryAssetPreview
+                          projectId={projectId}
+                          assetId={asset.id}
+                          languageId={
+                            asset.chosenVersionId ? sourceLanguageId : null
+                          }
+                          versionId={asset.chosenVersionId}
+                          contentType={
+                            asset.chosenVersionId
+                              ? undefined
+                              : asset.contentType
+                          }
+                          filename={
+                            asset.chosenVersionFilename ??
+                            asset.originalFilename
+                          }
+                          enabled={inView}
+                          compact
+                        />
+                        {recordable &&
+                          canRunOnSource &&
+                          recordButton(
+                            sourceLanguageId,
+                            true,
+                            recordingFinalLanguageId !== null ||
+                              regeneratingLanguageIds.length > 0
+                          )}
+                      </Box>
+                    )}
                   </TableCell>
                   <TableCell align="right">
                     <Box display="flex" gap={1} justifyContent="flex-end">
+                      {canRunOnSource && (
+                        <Tooltip
+                          title={t(
+                            'binary_assets_generate_audio',
+                            'Generate with AI (pipeline)'
+                          )}
+                        >
+                          <span>
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              disabled={
+                                recordingFinalLanguageId !== null || sourceBusy
+                              }
+                              onClick={() => setRunLanguageId(sourceLanguageId)}
+                              data-cy="binary-asset-run-tool"
+                            >
+                              {sourceBusy ? (
+                                <CircularProgress size={16} />
+                              ) : (
+                                <Zap width={16} height={16} />
+                              )}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
                       {canEditSource && (
                         <Tooltip
                           title={t(

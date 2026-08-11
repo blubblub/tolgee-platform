@@ -18,8 +18,15 @@ import jakarta.persistence.Table
 @ActivityEntityDescribingPaths(paths = ["translation", "asset"])
 class BinaryAssetTranslationVersion(
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "translation_id", nullable = false)
-  var translation: BinaryAssetTranslation,
+  @JoinColumn(name = "asset_id", nullable = false)
+  var asset: BinaryAsset,
+  /**
+   * Null for a version of the asset's own source file — the source language has no translation row,
+   * the asset itself is its original. Any other language points at its translation.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "translation_id")
+  var translation: BinaryAssetTranslation? = null,
 ) : StandardAuditModel() {
   @Column(nullable = false, length = 512)
   lateinit var storageKey: String
