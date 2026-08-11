@@ -680,6 +680,26 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
 
   @Test
   @ProjectJWTAuthTestMethod
+  fun `deletes an asset holding both source and translation versions`() {
+    val assetId = createAsset("vox-mixed-delete")
+    uploadTranslation(assetId, "de")
+    createTranscriptWithText(assetId, "Source.")
+    setTranslationForKey("transcript.vox-mixed-delete", "de", "Quelle.")
+    val source = assetDetail(assetId).get("sourceLanguageId").asLong()
+
+    runTool(assetId, "de", "tts")
+    performProjectAuthPost(
+      "binary-assets/$assetId/translations/$source/versions/run",
+      mapOf("tool" to "voice-changer", "params" to mapOf("voiceId" to "voice-1")),
+    ).andIsCreated
+
+    // the same rows sit in both asset.versions and translation.versions
+    performProjectAuthDelete("binary-assets/$assetId", null).andIsNoContent
+    performProjectAuthGet("binary-assets/$assetId").andIsNotFound
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
   fun `denies run for user without translations edit`() {
     val assetId = createAsset("vox-forbidden")
     uploadTranslation(assetId, "de")
