@@ -15,6 +15,8 @@ class BinaryAssetVoiceModelAssembler :
     BinaryAssetVoiceModel(
       languageId = entity.language?.id,
       languageTag = entity.language?.tag,
+      // the sentinel is a storage detail — the API says "no tool" with null
+      tool = entity.tool.takeIf { it != BinaryAssetVoice.ANY_TOOL },
       voiceId = entity.voiceId,
     )
 }

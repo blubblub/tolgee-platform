@@ -8,5 +8,7 @@ open class BinaryAssetVoiceModel(
   /** null = the project-wide default */
   val languageId: Long?,
   val languageTag: String?,
+  /** null = applies to every tool */
+  val tool: String?,
   val voiceId: String,
 ) : RepresentationModel<BinaryAssetVoiceModel>()

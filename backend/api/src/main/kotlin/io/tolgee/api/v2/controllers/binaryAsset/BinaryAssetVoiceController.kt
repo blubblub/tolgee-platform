@@ -3,11 +3,13 @@ package io.tolgee.api.v2.controllers.binaryAsset
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import io.tolgee.api.v2.controllers.IController
+import io.tolgee.component.binaryAssetTool.BinaryAssetToolService
 import io.tolgee.constants.Message
 import io.tolgee.dtos.request.binaryAsset.SetBinaryAssetVoiceRequest
 import io.tolgee.exceptions.BadRequestException
 import io.tolgee.hateoas.binaryAsset.BinaryAssetVoiceModel
 import io.tolgee.hateoas.binaryAsset.BinaryAssetVoiceModelAssembler
+import io.tolgee.model.binaryAsset.BinaryAssetVoice
 import io.tolgee.model.enums.Scope
 import io.tolgee.security.ProjectHolder
 import io.tolgee.security.authentication.AllowApiAccess
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController
 class BinaryAssetVoiceController(
   private val binaryAssetVoiceService: BinaryAssetVoiceService,
   private val binaryAssetVoiceModelAssembler: BinaryAssetVoiceModelAssembler,
+  private val binaryAssetToolService: BinaryAssetToolService,
   private val languageService: LanguageService,
   private val projectHolder: ProjectHolder,
 ) : IController {
@@ -54,7 +57,12 @@ class BinaryAssetVoiceController(
       languageService.findAll(projectId).find { it.id == languageId }
         ?: throw BadRequestException(Message.LANGUAGE_NOT_FROM_PROJECT)
     }
-    binaryAssetVoiceService.set(projectId, request.languageId, request.voiceId)
+    val tool = BinaryAssetVoice.toolKey(request.tool)
+    // an unknown tool name would store a default that no run ever reads
+    if (tool != BinaryAssetVoice.ANY_TOOL) {
+      binaryAssetToolService.getTool(tool)
+    }
+    binaryAssetVoiceService.set(projectId, request.languageId, tool, request.voiceId)
     return list()
   }
 }

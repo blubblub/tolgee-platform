@@ -22,36 +22,50 @@ class BinaryAssetVoiceService(
   fun list(projectId: Long): List<BinaryAssetVoice> =
     binaryAssetVoiceRepository
       .findByProjectId(projectId)
-      // project default first, then languages in a stable order
-      .sortedBy { it.language?.id ?: Long.MIN_VALUE }
+      // project default first, then languages in a stable order, tool-specific rows after shared ones
+      .sortedWith(compareBy({ it.language?.id ?: Long.MIN_VALUE }, { it.tool }))
 
   /**
-   * The voice to use when a run does not name one: the language's own default, else the project's.
+   * The voice to use when a run does not name one, most specific first: this language and tool, the
+   * language for any tool, the project for this tool, then the project for any tool.
    */
   @Transactional(readOnly = true)
   fun resolve(
     projectId: Long,
     languageId: Long,
+    tool: String,
   ): String? {
     val rows = binaryAssetVoiceRepository.findByProjectId(projectId)
-    return rows.find { it.language?.id == languageId }?.voiceId
-      ?: rows.find { it.language == null }?.voiceId
+    fun pick(
+      forLanguage: Boolean,
+      forTool: String,
+    ) = rows
+      .find { row ->
+        (if (forLanguage) row.language?.id == languageId else row.language == null) && row.tool == forTool
+      }?.voiceId
+
+    return pick(forLanguage = true, forTool = tool)
+      ?: pick(forLanguage = true, forTool = BinaryAssetVoice.ANY_TOOL)
+      ?: pick(forLanguage = false, forTool = tool)
+      ?: pick(forLanguage = false, forTool = BinaryAssetVoice.ANY_TOOL)
   }
 
   /**
    * @param languageId null targets the project-wide default
+   * @param tool [BinaryAssetVoice.ANY_TOOL] targets every tool
    * @param voiceId null or blank clears the entry
    */
   @Transactional
   fun set(
     projectId: Long,
     languageId: Long?,
+    tool: String,
     voiceId: String?,
   ): BinaryAssetVoice? {
     val existing =
       binaryAssetVoiceRepository
         .findByProjectId(projectId)
-        .find { it.language?.id == languageId }
+        .find { it.language?.id == languageId && it.tool == tool }
 
     val trimmed = voiceId?.trim()?.takeIf { it.isNotBlank() }
     if (trimmed == null) {
@@ -62,6 +76,7 @@ class BinaryAssetVoiceService(
     val entity =
       existing ?: BinaryAssetVoice(entityManager.getReference(Project::class.java, projectId)).apply {
         language = languageId?.let { entityManager.getReference(Language::class.java, it) }
+        this.tool = tool
       }
     entity.voiceId = trimmed
     return binaryAssetVoiceRepository.save(entity)

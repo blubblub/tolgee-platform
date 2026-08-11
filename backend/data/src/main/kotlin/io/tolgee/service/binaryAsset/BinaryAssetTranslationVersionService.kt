@@ -123,7 +123,7 @@ class BinaryAssetTranslationVersionService(
         asset = translation.asset,
         translation = translation,
         language = translation.language,
-        defaultVoiceId = binaryAssetVoiceService.resolve(projectId, languageId),
+        defaultVoiceId = binaryAssetVoiceService.resolve(projectId, languageId, tool.name),
       )
 
     val output =

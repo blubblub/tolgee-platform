@@ -1838,6 +1838,7 @@ export interface components {
       /** Format: int64 */
       languageId?: number;
       languageTag?: string;
+      tool?: string;
       voiceId: string;
     };
     BranchMergeChangeModel: {
@@ -6519,6 +6520,7 @@ export interface components {
     SetBinaryAssetVoiceRequest: {
       /** Format: int64 */
       languageId?: number;
+      tool?: string;
       voiceId?: string;
     };
     SetBranchProtectedModel: {
