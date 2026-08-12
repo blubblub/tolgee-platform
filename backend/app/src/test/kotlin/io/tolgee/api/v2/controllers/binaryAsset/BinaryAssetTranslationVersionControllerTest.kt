@@ -61,6 +61,15 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
     return jacksonObjectMapper().readTree(result.response.contentAsString).get("id").asLong()
   }
 
+  private fun createSourcelessAsset(name: String): Long {
+    val result =
+      performProjectAuthMultipart(
+        url = "binary-assets",
+        files = listOf(MockMultipartFile("name", null, MediaType.TEXT_PLAIN_VALUE, name.toByteArray())),
+      ).andIsCreated.andReturn()
+    return jacksonObjectMapper().readTree(result.response.contentAsString).get("id").asLong()
+  }
+
   private fun uploadTranslation(
     assetId: Long,
     languageTag: String,
@@ -583,6 +592,38 @@ class BinaryAssetTranslationVersionControllerTest : ProjectAuthControllerTest("/
           .andReturn()
           .response.contentAsString,
       )
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `runs tts on the source lane of an asset with no source file`() {
+    // TTS synthesizes from the transcript, so it needs no input bytes — this is how a source-less
+    // asset gets a source-language deliverable at all.
+    val assetId = createSourcelessAsset("vox-no-source-tts")
+    val source = assetDetail(assetId).get("sourceLanguageId").asLong()
+    createTranscriptWithText(assetId, "Hello world.")
+
+    performProjectAuthPost(
+      "binary-assets/$assetId/translations/$source/versions/run",
+      mapOf("tool" to "tts", "params" to mapOf("voiceId" to "voice-1")),
+    ).andIsCreated.andAssertThatJson {
+      node("tool").isEqualTo("tts")
+      node("originalFilename").isEqualTo("vox-no-source-tts-tts.mp3")
+    }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `rejects the voice changer on the source lane of an asset with no source file`() {
+    val assetId = createSourcelessAsset("vox-no-source-changer")
+    val source = assetDetail(assetId).get("sourceLanguageId").asLong()
+
+    performProjectAuthPost(
+      "binary-assets/$assetId/translations/$source/versions/run",
+      mapOf("tool" to "voice-changer", "params" to mapOf("voiceId" to "voice-1")),
+    ).andIsBadRequest.andAssertThatJson {
+      node("code").isEqualTo("binary_asset_source_not_found")
+    }
+  }
 
   @Test
   @ProjectJWTAuthTestMethod

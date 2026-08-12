@@ -229,6 +229,126 @@ class BinaryAssetControllerTest : ProjectAuthControllerTest("/v2/projects/") {
     assertThat(after).containsExactlyElementsOf(before)
   }
 
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `creates lists and gets an asset with no source file`() {
+    val assetId = createSourcelessAsset("combo-only")
+
+    // isTranscribable used to dereference contentType, which 500s the whole list for one such row
+    performProjectAuthGet("binary-assets").andIsOk.andAssertThatJson {
+      node("_embedded.binaryAssets").isArray.isNotEmpty
+    }
+
+    performProjectAuthGet("binary-assets/$assetId").andIsOk.andAssertThatJson {
+      node("name").isEqualTo("combo-only")
+      node("sourceRevision").isEqualTo(1)
+      node("originalFilename").isNull()
+      node("contentType").isNull()
+      node("sha256").isNull()
+      node("byteSize").isEqualTo(0)
+      node("transcriptionAvailable").isEqualTo(false)
+    }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `a source download ticket for an asset with no source file is not found`() {
+    val assetId = createSourcelessAsset("no-source")
+
+    performProjectAuthPost("binary-assets/$assetId/source/download-ticket", null)
+      .andExpect(status().isNotFound)
+      .andAssertThatJson { node("code").isEqualTo("binary_asset_source_not_found") }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `a translation on a source-less asset keeps its own filename and extension`() {
+    val assetId = createSourcelessAsset("combo-de")
+    val german = languageId("de")
+
+    uploadTranslation(assetId, german, "combo-de.mp3", "audio/mpeg").andIsOk
+
+    performProjectAuthGet("binary-assets/$assetId").andIsOk.andAssertThatJson {
+      node("originalFilename").isNull()
+      node("translations").isArray.isNotEmpty
+    }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `an empty file part is still rejected rather than read as no source`() {
+    performProjectAuthMultipart(
+      url = "binary-assets",
+      files =
+        listOf(
+          MockMultipartFile("name", null, MediaType.TEXT_PLAIN_VALUE, "empty-file".toByteArray()),
+          MockMultipartFile("file", "empty.mp3", "audio/mpeg", ByteArray(0)),
+        ),
+    ).andExpect(status().isBadRequest)
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `deletes a source-less asset that has translations`() {
+    val assetId = createSourcelessAsset("delete-me")
+    uploadTranslation(assetId, languageId("de"), "delete-me-de.mp3", "audio/mpeg").andIsOk
+
+    performProjectAuthDelete("binary-assets/$assetId", null).andExpect(status().isNoContent)
+    performProjectAuthGet("binary-assets/$assetId").andExpect(status().isNotFound)
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `attaching a source later does not invalidate the files that predate it`() {
+    val assetId = createSourcelessAsset("late-source")
+    val german = languageId("de")
+    uploadTranslation(assetId, german, "late-de.mp3", "audio/mpeg").andIsOk
+
+    performProjectAuthPut("binary-assets/$assetId/translations/$german/reviewed", mapOf("reviewed" to true)).andIsOk
+
+    putMultipart(
+      "binary-assets/$assetId/source",
+      MockMultipartFile("file", "late.mp3", "audio/mpeg", byteArrayOf(4, 5, 6)),
+    ).andIsOk
+
+    // those files were never translations of this original, so they stay current and confirmed
+    performProjectAuthGet("binary-assets/$assetId").andIsOk.andAssertThatJson {
+      node("sourceRevision").isEqualTo(1)
+      node("originalFilename").isEqualTo("late.mp3")
+      node("translations[0].status").isEqualTo("CURRENT")
+      node("translations[0].reviewed").isEqualTo(true)
+    }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `replacing a real source still invalidates its translations`() {
+    val assetId = createAsset("orig.mp3", "audio/mpeg", name = "real-source")
+    val german = languageId("de")
+    uploadTranslation(assetId, german, "orig-de.mp3", "audio/mpeg").andIsOk
+    performProjectAuthPut("binary-assets/$assetId/translations/$german/reviewed", mapOf("reviewed" to true)).andIsOk
+
+    putMultipart(
+      "binary-assets/$assetId/source",
+      MockMultipartFile("file", "orig2.mp3", "audio/mpeg", byteArrayOf(4, 5, 6)),
+    ).andIsOk
+
+    performProjectAuthGet("binary-assets/$assetId").andIsOk.andAssertThatJson {
+      node("sourceRevision").isEqualTo(2)
+      node("translations[0].status").isEqualTo("OUTDATED")
+      node("translations[0].reviewed").isEqualTo(false)
+    }
+  }
+
+  private fun createSourcelessAsset(name: String): Long {
+    val create =
+      performProjectAuthMultipart(
+        url = "binary-assets",
+        files = listOf(MockMultipartFile("name", null, MediaType.TEXT_PLAIN_VALUE, name.toByteArray())),
+      ).andIsCreated.andReturn()
+    return jacksonObjectMapper().readTree(create.response.contentAsString).get("id").asLong()
+  }
+
   private fun createAsset(
     filename: String,
     contentType: String,
