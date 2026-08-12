@@ -79,8 +79,8 @@ export const AssetCard = ({
           )}
           <Typography variant="body2" color="text.secondary">
             {/* the filename lives in the source row now */}
-            {asset.sourceLanguageTag} r{asset.sourceRevision} ·{' '}
-            {asset.contentType}
+            {asset.sourceLanguageTag} r{asset.sourceRevision}
+            {asset.contentType ? ` · ${asset.contentType}` : ''}
           </Typography>
         </Box>
         <Box display="flex" gap={1} alignItems="center">

@@ -31,10 +31,11 @@ export type BinaryAsset = {
   sourceLanguageId: number;
   sourceLanguageTag: string;
   sourceRevision: number;
-  originalFilename: string;
-  contentType: string;
+  /** Null when the asset has no original file; the other three blob fields go with it. */
+  originalFilename?: string | null;
+  contentType?: string | null;
   byteSize: number;
-  sha256: string;
+  sha256?: string | null;
   uploadedById?: number | null;
   createdAt?: string | null;
   updatedAt?: string | null;

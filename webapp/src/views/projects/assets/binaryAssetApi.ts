@@ -140,12 +140,14 @@ export const binaryAssetApi = {
   },
   create(
     projectId: number,
-    payload: { name: string; description?: string; file: File }
+    payload: { name: string; description?: string; file?: File | null }
   ) {
     const form = new FormData();
     form.append('name', payload.name);
     if (payload.description) form.append('description', payload.description);
-    form.append('file', payload.file);
+    // Omitted entirely for an asset with no original — an empty part would be rejected as an
+    // empty file rather than understood as "no source".
+    if (payload.file) form.append('file', payload.file);
     return apiV2HttpService.postMultipart<BinaryAsset>(base(projectId), form);
   },
   update(

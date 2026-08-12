@@ -443,12 +443,15 @@ const AssetTranslationContent = () => {
   const chosenVersionId = isSource
     ? asset.chosenVersionId ?? null
     : translation?.chosenVersionId;
-  // the source file is always there; a translation may not be uploaded yet
-  const ogMissing = !isSource && translation?.status === 'MISSING';
+  // an asset may have no original at all; a translation may not be uploaded yet
+  const ogMissing = isSource
+    ? !asset.originalFilename
+    : translation?.status === 'MISSING';
   const recordable =
     canEditOg &&
     canRecordAudio() &&
-    isAudioAsset(asset.contentType, asset.originalFilename);
+    (!asset.contentType ||
+      isAudioAsset(asset.contentType, asset.originalFilename));
 
   const statusChip = isSource ? (
     <Chip
@@ -742,19 +745,27 @@ const AssetTranslationContent = () => {
                   )}
                 </Box>
                 <Typography variant="caption" color="text.secondary">
-                  {(translation as BinaryAssetTranslation | undefined)
-                    ?.originalFilename ?? asset.originalFilename}{' '}
-                  ·{' '}
-                  {formatBytes(
-                    (translation as BinaryAssetTranslation | undefined)
-                      ?.byteSize ?? asset.byteSize
-                  )}{' '}
-                  ·{' '}
-                  {(isSource ? asset.updatedAt : translation?.updatedAt)
-                    ? formatDate(
-                        (isSource ? asset.updatedAt : translation?.updatedAt)!
-                      )
-                    : t('asset_translation_not_uploaded', 'Not uploaded')}
+                  {ogMissing ? (
+                    t('asset_translation_not_uploaded', 'Not uploaded')
+                  ) : (
+                    <>
+                      {(translation as BinaryAssetTranslation | undefined)
+                        ?.originalFilename ?? asset.originalFilename}{' '}
+                      ·{' '}
+                      {formatBytes(
+                        (translation as BinaryAssetTranslation | undefined)
+                          ?.byteSize ?? asset.byteSize
+                      )}{' '}
+                      ·{' '}
+                      {(isSource ? asset.updatedAt : translation?.updatedAt)
+                        ? formatDate(
+                            (isSource
+                              ? asset.updatedAt
+                              : translation?.updatedAt)!
+                          )
+                        : t('asset_translation_not_uploaded', 'Not uploaded')}
+                    </>
+                  )}
                 </Typography>
               </FileDropTableCell>
               <TableCell>

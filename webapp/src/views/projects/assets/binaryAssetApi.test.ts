@@ -7,6 +7,7 @@ import {
 import { BinaryAsset } from './types';
 
 const calls: string[] = [];
+const multipartForms: FormData[] = [];
 
 vi.mock('tg.service/http/ApiV2HttpService', () => {
   const record = (url: string) => {
@@ -19,6 +20,11 @@ vi.mock('tg.service/http/ApiV2HttpService', () => {
       post: record,
       put: record,
       delete: record,
+      postMultipart: (url: string, form: FormData) => {
+        calls.push(url);
+        multipartForms.push(form);
+        return Promise.resolve({});
+      },
     },
   };
 });
@@ -47,6 +53,30 @@ describe('binaryAssetApi pipeline paths', () => {
       `${prefix}/4`,
       `${prefix}/4/download-ticket`,
     ]);
+  });
+});
+
+// An empty "file" part is rejected by the backend as an empty file, not read as "no source",
+// so a source-less create has to omit the part entirely.
+describe('binaryAssetApi.create', () => {
+  beforeEach(() => {
+    calls.length = 0;
+    multipartForms.length = 0;
+  });
+
+  it('omits the file part when no file is given', async () => {
+    await binaryAssetApi.create(1, { name: 'combo only' });
+
+    expect(multipartForms).toHaveLength(1);
+    expect(multipartForms[0].get('name')).toBe('combo only');
+    expect(multipartForms[0].has('file')).toBe(false);
+  });
+
+  it('sends the file part when one is given', async () => {
+    const file = new File(['x'], 'intro.mp3', { type: 'audio/mpeg' });
+    await binaryAssetApi.create(1, { name: 'with source', file });
+
+    expect(multipartForms[0].has('file')).toBe(true);
   });
 });
 

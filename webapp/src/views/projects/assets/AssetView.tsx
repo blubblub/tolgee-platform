@@ -94,15 +94,18 @@ const AssetViewContent = () => {
         }
         actions={
           <>
-            <Tooltip title={t('binary_assets_download', 'Download')}>
-              <IconButton
-                size="small"
-                onClick={downloadSource}
-                data-cy="binary-asset-download-source"
-              >
-                <Download01 width={16} height={16} />
-              </IconButton>
-            </Tooltip>
+            {/* nothing to download when the asset has no original file */}
+            {asset.originalFilename && (
+              <Tooltip title={t('binary_assets_download', 'Download')}>
+                <IconButton
+                  size="small"
+                  onClick={downloadSource}
+                  data-cy="binary-asset-download-source"
+                >
+                  <Download01 width={16} height={16} />
+                </IconButton>
+              </Tooltip>
+            )}
             {canDelete && (
               <Tooltip title={t('binary_assets_delete', 'Delete asset')}>
                 <IconButton

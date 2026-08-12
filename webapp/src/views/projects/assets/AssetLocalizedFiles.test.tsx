@@ -315,6 +315,27 @@ describe('AssetLocalizedFiles', () => {
     vi.unstubAllGlobals();
   });
 
+  it('renders the source row for an asset with no original file', () => {
+    // truncateMiddle/formatBytes would throw on undefined and blank the whole page
+    render(
+      {
+        ...asset,
+        originalFilename: undefined,
+        contentType: undefined,
+        sha256: undefined,
+        byteSize: 0,
+      },
+      'English'
+    );
+
+    const sourceRow = container.querySelector(
+      '[data-cy="binary-asset-source-row"]'
+    )!;
+    expect(sourceRow).not.toBeNull();
+    expect(sourceRow.textContent).toContain('Not uploaded');
+    expect(sourceRow.textContent).not.toContain('prompt.wav');
+  });
+
   it('shows recording only for a language the user can edit', () => {
     render();
 

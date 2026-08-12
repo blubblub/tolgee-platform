@@ -139,9 +139,12 @@ export const AssetLocalizedFiles = ({
   const sourceBusy =
     recordingFinalLanguageId === sourceLanguageId ||
     regeneratingLanguageIds.includes(sourceLanguageId);
-  // recording produces an audio take, so only offer it where an audio file would land
+  // recording produces an audio take, so only offer it where an audio file would land. With no
+  // original there is no type to judge by, and recording is one way to supply the first file.
   const recordable =
-    canRecordAudio() && isAudioAsset(asset.contentType, asset.originalFilename);
+    canRecordAudio() &&
+    (!asset.contentType ||
+      isAudioAsset(asset.contentType, asset.originalFilename));
 
   const rows = useMemo(
     () => visibleTranslations(asset, languageTags),
@@ -480,14 +483,20 @@ export const AssetLocalizedFiles = ({
                   </TableCell>
                   <TableCell>
                     <Box display="flex" alignItems="center" gap={0.5}>
-                      <BinaryAssetPreview
-                        projectId={projectId}
-                        assetId={asset.id}
-                        contentType={asset.contentType}
-                        filename={asset.originalFilename}
-                        enabled={inView}
-                        compact
-                      />
+                      {asset.originalFilename ? (
+                        <BinaryAssetPreview
+                          projectId={projectId}
+                          assetId={asset.id}
+                          contentType={asset.contentType}
+                          filename={asset.originalFilename}
+                          enabled={inView}
+                          compact
+                        />
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">
+                          —
+                        </Typography>
+                      )}
                       {canEditSource && recordable && recordButton('source')}
                     </Box>
                   </TableCell>
@@ -508,12 +517,21 @@ export const AssetLocalizedFiles = ({
                       </Box>
                     ) : (
                       <Box display="flex" alignItems="center" gap={0.5}>
-                        <Tooltip title={asset.originalFilename}>
-                          <Typography variant="body2" fontWeight={700}>
-                            {truncateMiddle(asset.originalFilename)} ·{' '}
-                            {formatBytes(asset.byteSize)}
+                        {asset.originalFilename ? (
+                          <Tooltip title={asset.originalFilename}>
+                            <Typography variant="body2" fontWeight={700}>
+                              {truncateMiddle(asset.originalFilename)} ·{' '}
+                              {formatBytes(asset.byteSize)}
+                            </Typography>
+                          </Tooltip>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            {t(
+                              'asset_translation_not_uploaded',
+                              'Not uploaded'
+                            )}
                           </Typography>
-                        </Tooltip>
+                        )}
                       </Box>
                     )}
                   </FileDropTableCell>
@@ -541,26 +559,29 @@ export const AssetLocalizedFiles = ({
                     ) : (
                       <Box display="flex" alignItems="center" gap={0.5}>
                         {/* a chosen source version, else the uploaded source itself — which has
-                            no translation row, so it tickets through the source endpoint */}
-                        <BinaryAssetPreview
-                          projectId={projectId}
-                          assetId={asset.id}
-                          languageId={
-                            asset.chosenVersionId ? sourceLanguageId : null
-                          }
-                          versionId={asset.chosenVersionId}
-                          contentType={
-                            asset.chosenVersionId
-                              ? undefined
-                              : asset.contentType
-                          }
-                          filename={
-                            asset.chosenVersionFilename ??
-                            asset.originalFilename
-                          }
-                          enabled={inView}
-                          compact
-                        />
+                            no translation row, so it tickets through the source endpoint. With
+                            neither, there is nothing to preview yet. */}
+                        {(asset.chosenVersionId || asset.originalFilename) && (
+                          <BinaryAssetPreview
+                            projectId={projectId}
+                            assetId={asset.id}
+                            languageId={
+                              asset.chosenVersionId ? sourceLanguageId : null
+                            }
+                            versionId={asset.chosenVersionId}
+                            contentType={
+                              asset.chosenVersionId
+                                ? undefined
+                                : asset.contentType
+                            }
+                            filename={
+                              asset.chosenVersionFilename ??
+                              asset.originalFilename
+                            }
+                            enabled={inView}
+                            compact
+                          />
+                        )}
                         {recordable &&
                           canRunOnSource &&
                           recordButton(

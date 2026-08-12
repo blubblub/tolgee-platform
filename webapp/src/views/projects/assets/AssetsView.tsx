@@ -104,7 +104,7 @@ const AssetsViewContent = () => {
     () =>
       binaryAssetApi.create(project.id, {
         name: name.trim(),
-        file: file!,
+        file,
       }),
     {
       onSuccess: () => {
@@ -186,7 +186,7 @@ const AssetsViewContent = () => {
           >
             {file
               ? file.name
-              : t('binary_assets_choose_file', 'Choose source file')}
+              : t('binary_assets_choose_file', 'Choose source file (optional)')}
             <input
               hidden
               type="file"
@@ -196,7 +196,7 @@ const AssetsViewContent = () => {
           <Button
             variant="contained"
             startIcon={<Plus />}
-            disabled={!name.trim() || !file || createMutation.isLoading}
+            disabled={!name.trim() || createMutation.isLoading}
             onClick={() => createMutation.mutate()}
             data-cy="binary-assets-create-button"
           >
