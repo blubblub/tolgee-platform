@@ -497,6 +497,7 @@ export interface paths {
   };
   "/v2/projects/{projectId}/binary-assets": {
     get: operations["list_4"];
+    /** Omit the file to create an asset that has no original — one localized purely by its per-language files. A source file can be attached later through PUT /{assetId}/source. */
     post: operations["create_13"];
   };
   "/v2/projects/{projectId}/binary-assets/{assetId}": {
@@ -1738,7 +1739,11 @@ export interface components {
     BinaryAssetModel: {
       /** Format: int64 */
       byteSize: number;
-      contentType: string;
+      chosenVersionFilename?: string;
+      /** Format: int64 */
+      chosenVersionId?: number;
+      chosenVersionTool?: string;
+      contentType?: string;
       /** Format: date-time */
       createdAt?: string;
       /** Format: int32 */
@@ -1747,10 +1752,10 @@ export interface components {
       /** Format: int64 */
       id: number;
       name: string;
-      originalFilename: string;
+      originalFilename?: string;
       /** Format: int32 */
       outdatedCount: number;
-      sha256: string;
+      sha256?: string;
       /** Format: int64 */
       sourceLanguageId: number;
       sourceLanguageTag: string;
@@ -1770,6 +1775,8 @@ export interface components {
       updatedAt?: string;
       /** Format: int64 */
       uploadedById?: number;
+      /** Format: int32 */
+      versionCount: number;
     };
     BinaryAssetReviewRequest: {
       reviewed: boolean;
@@ -3385,6 +3392,7 @@ export interface components {
         | "project_import_missing_project_json"
         | "project_import_corrupt_archive"
         | "binary_asset_not_found"
+        | "binary_asset_source_not_found"
         | "binary_asset_translation_not_found"
         | "binary_asset_name_exists"
         | "binary_asset_name_required"
@@ -7297,6 +7305,7 @@ export interface components {
         | "project_import_missing_project_json"
         | "project_import_corrupt_archive"
         | "binary_asset_not_found"
+        | "binary_asset_source_not_found"
         | "binary_asset_translation_not_found"
         | "binary_asset_name_exists"
         | "binary_asset_name_required"
@@ -14918,6 +14927,7 @@ export interface operations {
       };
     };
   };
+  /** Omit the file to create an asset that has no original — one localized purely by its per-language files. A source file can be attached later through PUT /{assetId}/source. */
   create_13: {
     parameters: {
       path: {
@@ -14963,7 +14973,7 @@ export interface operations {
           description?: string;
           sourceLanguageId?: string;
           /** Format: binary */
-          file: string;
+          file?: string;
         };
       };
     };
