@@ -36,8 +36,13 @@ data class BinaryAssetToolOutput(
 interface BinaryAssetTool {
   val name: String
 
+  /**
+   * [input] is null when the lane being run has no file to work from — a source-less asset's source
+   * lane. Tools that synthesize from scratch (TTS) ignore it; tools that transform existing audio
+   * must reject null rather than assume one is present.
+   */
   fun run(
-    input: FileStream,
+    input: FileStream?,
     params: Map<String, Any?>,
     context: BinaryAssetToolContext,
   ): BinaryAssetToolOutput

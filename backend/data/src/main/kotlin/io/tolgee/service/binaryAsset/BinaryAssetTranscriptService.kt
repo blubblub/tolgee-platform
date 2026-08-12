@@ -227,9 +227,11 @@ class BinaryAssetTranscriptService(
    * asset type — this gates only the "transcribe with AI" affordances.
    */
   private fun isTranscribable(asset: BinaryAsset): Boolean {
-    val type = asset.contentType.lowercase()
+    // ponytail: an asset with no original is never AI-transcribable. Judge it by its translations'
+    // content types if per-language transcription is ever wanted for source-less assets.
+    val type = asset.contentType?.lowercase() ?: return false
     if (type.startsWith("audio/") || type.startsWith("video/")) return true
-    val name = asset.originalFilename.lowercase()
+    val name = asset.originalFilename.orEmpty().lowercase()
     return AUDIO_VIDEO_EXTENSIONS.any { name.endsWith(it) }
   }
 

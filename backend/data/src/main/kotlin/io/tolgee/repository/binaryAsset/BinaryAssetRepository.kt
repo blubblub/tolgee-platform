@@ -20,6 +20,9 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
    * When filterAudio/Video/Image are all false, every type is returned.
    * When any is true, assets matching any selected type are returned (OR).
    * Type is inferred from source contentType and originalFilename.
+   *
+   * ponytail: an asset with no original has no type to infer, so it shows under every chip rather
+   * than disappearing from all of them. Coalesce its translations' content types if that bites.
    */
   @Query(
     """
@@ -31,6 +34,7 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
       and (:search is null or lower(a.name) like lower(concat('%', cast(:search as string), '%')))
       and (
         (:filterAudio = false and :filterVideo = false and :filterImage = false)
+        or a.storageKey is null
         or (
           :filterAudio = true and (
             lower(a.contentType) like 'audio/%'
@@ -75,6 +79,7 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
       and (:search is null or lower(a.name) like lower(concat('%', cast(:search as string), '%')))
       and (
         (:filterAudio = false and :filterVideo = false and :filterImage = false)
+        or a.storageKey is null
         or (
           :filterAudio = true and (
             lower(a.contentType) like 'audio/%'

@@ -19,11 +19,14 @@ class ElevenLabsVoiceChangerTool(
   override val name: String = "voice-changer"
 
   override fun run(
-    input: FileStream,
+    input: FileStream?,
     params: Map<String, Any?>,
     context: BinaryAssetToolContext,
   ): BinaryAssetToolOutput {
     voiceClient.checkConfigured()
+
+    // There is nothing to re-speak without an existing file — upload one, or run TTS first.
+    input ?: throw BadRequestException(Message.BINARY_ASSET_SOURCE_NOT_FOUND)
 
     val voiceId =
       params["voiceId"]?.toString()?.takeIf { it.isNotBlank() }

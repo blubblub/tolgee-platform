@@ -52,22 +52,28 @@ class BinaryAsset(
   @Column(nullable = false)
   var sourceRevision: Long = 1
 
+  /**
+   * Null when the asset has no original file — it is localized purely by its translations, for
+   * keys whose languages get their own file with no source to translate from. The four blob
+   * columns are written together by applySourceFile, so this one decides for all of them.
+   */
   // 512 matches the column; without it Hibernate assumes 255 and diffChangeLog
   // generates a migration that would SHRINK the column.
-  @Column(nullable = false, length = 512)
-  lateinit var storageKey: String
+  @Column(length = 512)
+  var storageKey: String? = null
 
-  @Column(nullable = false)
-  lateinit var originalFilename: String
+  @Column
+  var originalFilename: String? = null
 
-  @Column(nullable = false)
-  lateinit var contentType: String
+  @Column
+  var contentType: String? = null
 
+  /** Stays non-null: a primitive field over a nullable column fails at entity load, not at use. */
   @Column(nullable = false)
   var byteSize: Long = 0
 
-  @Column(nullable = false, length = 64)
-  lateinit var sha256: String
+  @Column(length = 64)
+  var sha256: String? = null
 
   @ManyToOne(fetch = FetchType.LAZY)
   var uploadedBy: UserAccount? = null

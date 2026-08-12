@@ -74,13 +74,18 @@ class BinaryAssetService(
       ?: throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
   }
 
+  /**
+   * [file] is optional: an asset may be created with no original at all, to be localized purely by
+   * per-language files. The source language is still recorded — it is the slot the original would
+   * occupy, and a source file can be attached later through [replaceSource].
+   */
   @Transactional
   fun create(
     projectId: Long,
     name: String,
     description: String?,
     sourceLanguageId: Long?,
-    file: MultipartFile,
+    file: MultipartFile?,
     uploader: UserAccount?,
   ): BinaryAsset {
     requireStreamingStorage()
@@ -93,7 +98,6 @@ class BinaryAssetService(
           ?: throw BadRequestException(Message.BASE_LANGUAGE_NOT_FOUND)
       }
     validateNameAvailable(projectId, name.trim())
-    val stored = storeNewBlob(projectId, file)
     val asset =
       BinaryAsset(project).apply {
         this.name = name.trim()
@@ -101,7 +105,9 @@ class BinaryAssetService(
         this.sourceLanguage = sourceLanguage
         this.sourceRevision = 1
       }
-    applySourceFile(asset, stored, file, uploader)
+    if (file != null) {
+      applySourceFile(asset, storeNewBlob(projectId, file), file, uploader)
+    }
     return binaryAssetRepository.save(asset)
   }
 
@@ -137,12 +143,16 @@ class BinaryAssetService(
         ?: throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
     val previousKey = asset.storageKey
     val stored = storeNewBlob(projectId, file)
-    // every localization is now against an older source, so no confirmation still holds
-    asset.translations.forEach { it.reviewed = false }
-    asset.sourceRevision += 1
+    // Attaching the first original does not invalidate anything: those files were never translations
+    // of it. Replacing a real original does — every localization is now against an older source, so
+    // no confirmation still holds.
+    if (previousKey != null) {
+      asset.translations.forEach { it.reviewed = false }
+      asset.sourceRevision += 1
+    }
     applySourceFile(asset, stored, file, uploader)
     val saved = binaryAssetRepository.save(asset)
-    deleteBlobBestEffort(previousKey)
+    previousKey?.let { deleteBlobBestEffort(it) }
     return saved
   }
 
@@ -177,8 +187,10 @@ class BinaryAssetService(
     translation.reviewed = false
     translation.sourceRevision = translatedAgainstSourceRevision
     translation.storageKey = stored.storageKey
-    // Keep the source name, but make the extension match the uploaded container.
-    translation.originalFilename = resolveTranslationFilename(asset.originalFilename, file)
+    // Keep the source name, but make the extension match the uploaded container. With no original
+    // to borrow a name from, the uploaded file's own name stands.
+    translation.originalFilename =
+      asset.originalFilename?.let { resolveTranslationFilename(it, file) } ?: resolveFilename(file)
     translation.contentType = resolveContentType(file)
     translation.byteSize = stored.info.byteSize
     translation.sha256 = stored.info.sha256
@@ -229,7 +241,7 @@ class BinaryAssetService(
     val asset =
       binaryAssetRepository.findByProjectIdAndId(projectId, assetId)
         ?: throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
-    val keys = mutableListOf(asset.storageKey)
+    val keys = listOfNotNull(asset.storageKey).toMutableList()
     // asset.versions covers the source file's versions too, which hang off no translation
     keys += asset.versions.map { it.storageKey }
     keys += asset.translations.map { it.storageKey }
@@ -243,7 +255,7 @@ class BinaryAssetService(
     val assets = binaryAssetRepository.findAllByProjectId(projectId)
     val keys = mutableListOf<String>()
     assets.forEach { asset ->
-      keys += asset.storageKey
+      asset.storageKey?.let { keys += it }
       keys += asset.versions.map { it.storageKey }
       keys += asset.translations.map { it.storageKey }
     }
@@ -271,18 +283,34 @@ class BinaryAssetService(
     }
   }
 
+  /**
+   * The source blob's identity, or 404 — an asset created without an original file has none.
+   * applySourceFile writes all four fields together, so the storage key alone decides.
+   */
+  fun requireSource(asset: BinaryAsset): SourceBlob {
+    val storageKey =
+      asset.storageKey
+        ?: throw NotFoundException(Message.BINARY_ASSET_SOURCE_NOT_FOUND)
+    return SourceBlob(
+      storageKey = storageKey,
+      contentType = asset.contentType!!,
+      filename = asset.originalFilename!!,
+      byteSize = asset.byteSize,
+    )
+  }
+
   fun openSourceStream(
     projectId: Long,
     assetId: Long,
   ): FileStream {
     requireStreamingStorage()
-    val asset = get(projectId, assetId)
+    val source = requireSource(get(projectId, assetId))
     return FileStream(
-      inputStream = fileStorage.openFileStream(asset.storageKey),
-      contentType = asset.contentType,
-      filename = asset.originalFilename,
-      byteSize = asset.byteSize,
-      storageKey = asset.storageKey,
+      inputStream = fileStorage.openFileStream(source.storageKey),
+      contentType = source.contentType,
+      filename = source.filename,
+      byteSize = source.byteSize,
+      storageKey = source.storageKey,
     )
   }
 
@@ -517,6 +545,14 @@ class BinaryAssetService(
     val filename: String,
     val byteSize: Long,
     val storageKey: String,
+  )
+
+  /** An asset's original file, once it is known to exist. */
+  data class SourceBlob(
+    val storageKey: String,
+    val contentType: String,
+    val filename: String,
+    val byteSize: Long,
   )
 
   companion object {

@@ -16,8 +16,9 @@ class ElevenLabsTtsTool(
 ) : BinaryAssetTool {
   override val name: String = "tts"
 
+  /** Synthesizes from the transcript text, so it needs no [input] and works on a source-less asset. */
   override fun run(
-    input: FileStream,
+    input: FileStream?,
     params: Map<String, Any?>,
     context: BinaryAssetToolContext,
   ): BinaryAssetToolOutput {
@@ -43,7 +44,8 @@ class ElevenLabsTtsTool(
     val bytes = voiceClient.synthesize(text, voiceId, modelId)
 
     val baseName =
-      (context.translation?.originalFilename ?: context.asset.originalFilename).substringBeforeLast('.')
+      (context.translation?.originalFilename ?: context.asset.originalFilename ?: context.asset.name)
+        .substringBeforeLast('.')
     val filename = "$baseName-tts.mp3"
 
     return BinaryAssetToolOutput(bytes = bytes, filename = filename, contentType = "audio/mpeg")

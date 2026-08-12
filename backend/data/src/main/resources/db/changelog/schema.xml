@@ -6075,4 +6075,13 @@
         <sql>CREATE UNIQUE INDEX batv_one_chosen_source ON binary_asset_translation_version (asset_id) WHERE chosen AND translation_id IS NULL</sql>
     </changeSet>
 
+    <changeSet author="blubblub" id="1787200000000-1">
+        <!-- An asset may exist with per-language files only: no original, so no source blob.
+             byte_size stays NOT NULL — the entity field is a primitive and 0 is truthful. -->
+        <dropNotNullConstraint tableName="binary_asset" columnName="storage_key" columnDataType="VARCHAR(512)"/>
+        <dropNotNullConstraint tableName="binary_asset" columnName="original_filename" columnDataType="VARCHAR(255)"/>
+        <dropNotNullConstraint tableName="binary_asset" columnName="content_type" columnDataType="VARCHAR(255)"/>
+        <dropNotNullConstraint tableName="binary_asset" columnName="sha256" columnDataType="VARCHAR(64)"/>
+    </changeSet>
+
 </databaseChangeLog>

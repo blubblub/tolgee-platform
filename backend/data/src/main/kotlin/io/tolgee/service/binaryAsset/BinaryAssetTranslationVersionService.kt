@@ -97,6 +97,8 @@ class BinaryAssetTranslationVersionService(
 
     val tool = binaryAssetToolService.getTool(toolName)
 
+    // Null when this lane has no file yet — a source-less asset's source lane. Tools that need
+    // bytes reject it; TTS synthesizes from the transcript regardless.
     val input =
       if (baseVersionId != null) {
         val baseVersion = getVersion(projectId, assetId, languageId, baseVersionId)
@@ -107,12 +109,24 @@ class BinaryAssetTranslationVersionService(
           baseVersion.byteSize,
         )
       } else {
-        binaryAssetService.openByStorageKey(
-          target.storageKey,
-          target.contentType,
-          target.originalFilename,
-          target.byteSize,
-        )
+        val translation = target.translation
+        if (translation != null) {
+          binaryAssetService.openByStorageKey(
+            translation.storageKey,
+            translation.contentType,
+            translation.originalFilename,
+            translation.byteSize,
+          )
+        } else {
+          target.asset.storageKey?.let {
+            binaryAssetService.openByStorageKey(
+              it,
+              target.asset.contentType!!,
+              target.asset.originalFilename!!,
+              target.asset.byteSize,
+            )
+          }
+        }
       }
 
     val context =
@@ -124,19 +138,16 @@ class BinaryAssetTranslationVersionService(
       )
 
     val output =
-      input.inputStream.use { stream ->
-        tool.run(
-          input =
-            io.tolgee.service.binaryAsset.BinaryAssetService.FileStream(
-              inputStream = stream,
-              contentType = input.contentType,
-              filename = input.filename,
-              byteSize = input.byteSize,
-              storageKey = input.storageKey,
-            ),
-          params = params,
-          context = context,
-        )
+      if (input == null) {
+        tool.run(input = null, params = params, context = context)
+      } else {
+        input.inputStream.use { stream ->
+          tool.run(
+            input = input.copy(inputStream = stream),
+            params = params,
+            context = context,
+          )
+        }
       }
 
     val stored = binaryAssetService.storeBlobBytes(projectId, output.bytes)
@@ -232,9 +243,5 @@ class BinaryAssetTranslationVersionService(
     val translation: BinaryAssetTranslation?,
   ) {
     val language get() = translation?.language ?: asset.sourceLanguage
-    val storageKey get() = translation?.storageKey ?: asset.storageKey
-    val originalFilename get() = translation?.originalFilename ?: asset.originalFilename
-    val contentType get() = translation?.contentType ?: asset.contentType
-    val byteSize get() = translation?.byteSize ?: asset.byteSize
   }
 }
