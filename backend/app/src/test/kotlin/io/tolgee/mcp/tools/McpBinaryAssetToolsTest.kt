@@ -299,6 +299,60 @@ class McpBinaryAssetToolsTest : AbstractMcpTest() {
   }
 
   @Test
+  fun `creates a translation-only asset when both upload args are omitted`() {
+    val created =
+      callToolAndGetJson(
+        client,
+        "create_asset",
+        mapOf("projectId" to data.projectId, "name" to "combo-only"),
+      )
+
+    assertThat(created["name"].asText()).isEqualTo("combo-only")
+    assertThat(created["originalFilename"].isNull).isTrue()
+    assertThat(created["contentType"].isNull).isTrue()
+    assertThat(created["sha256"].isNull).isTrue()
+    assertThat(created["byteSize"].asLong()).isEqualTo(0)
+    assertThat(created["transcriptionAvailable"].asBoolean()).isFalse()
+
+    // it must also be listable and gettable — the row assembler used to blow up on a null contentType
+    val fetched =
+      callToolAndGetJson(client, "get_asset", assetArgs(created["id"].asLong()))
+    assertThat(fetched["originalFilename"].isNull).isTrue()
+
+    val listed = callToolAndGetJson(client, "list_assets", mapOf("projectId" to data.projectId))
+    assertThat(listed.toString()).contains("combo-only")
+  }
+
+  @Test
+  fun `a half-specified upload is still rejected rather than read as no source`() {
+    assertThrows<Exception> {
+      callTool(
+        client,
+        "create_asset",
+        mapOf(
+          "projectId" to data.projectId,
+          "name" to "half",
+          "fileName" to "half.mp3",
+        ),
+      )
+    }
+  }
+
+  @Test
+  fun `source download url is refused for a translation-only asset`() {
+    val created =
+      callToolAndGetJson(
+        client,
+        "create_asset",
+        mapOf("projectId" to data.projectId, "name" to "no-source-download"),
+      )
+
+    assertThrows<Exception> {
+      callTool(client, "get_asset_download_url", assetArgs(created["id"].asLong()))
+    }
+  }
+
+  @Test
   fun `invalid base64 upload is rejected`() {
     assertThrows<Exception> {
       callTool(
