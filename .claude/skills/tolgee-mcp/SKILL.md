@@ -107,7 +107,12 @@ when an agent is driving; use REST when a human or a shell script is.
 Voice-over localization, end to end:
 
 1. `create_asset` — `name`, `fileName`, `fileContentBase64` (≤ 200 MiB decoded),
-   optional `contentType`.
+   optional `contentType`. Omit **both** `fileName` and `fileContentBase64` for a
+   translation-only asset — one with no original file, localized purely by its
+   per-language files. Its source download URL then 404s
+   `binary_asset_source_not_found`, `voice-changer` on the source lane is refused
+   (nothing to re-voice), and `tts` still works because it synthesizes from the
+   transcript. A source can be attached later.
 2. `generate_asset_transcript` — speech-to-text (ElevenLabs Scribe) on the
    source file; writes a `transcript.<assetName>` key. **Synchronous — can take
    minutes.** With `languageId` it transcribes that language's localized file

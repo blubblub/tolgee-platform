@@ -421,6 +421,16 @@ the worked example.
 one. Without it Hibernate assumes 255 and `diffChangeLog` generates a migration
 that *shrinks* the column — this kept Migration Check red until fixed.
 
+**An asset may have no original file.** `BinaryAsset.storageKey` is nullable and
+is *the* discriminator: `originalFilename`, `contentType` and `sha256` are
+written and cleared with it, so one null means all null. `byteSize` stays
+non-null (a primitive field over a nullable column fails at entity load, not at
+use) and `sourceLanguage` stays non-null — it is the not-a-target marker, the
+version-lane router, and the pivot of both native stats queries. Use
+`BinaryAssetService.requireSource(asset)` wherever source bytes are mandatory;
+it 404s `BINARY_ASSET_SOURCE_NOT_FOUND`. Attaching the first original does *not*
+bump `sourceRevision` — those per-language files were never translations of it.
+
 ## Speech-to-text and voice tools
 
 Transcription of binary assets calls ElevenLabs Scribe directly over multipart —

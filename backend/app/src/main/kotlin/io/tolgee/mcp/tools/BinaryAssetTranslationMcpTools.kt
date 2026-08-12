@@ -346,16 +346,16 @@ class BinaryAssetTranslationMcpTools(
                 )
               }
               else -> {
-                val asset = binaryAssetService.get(projectId, assetId)
+                val source = binaryAssetService.requireSource(binaryAssetService.get(projectId, assetId))
                 ticketResult(
                   projectId = projectId,
                   assetId = assetId,
                   languageId = null,
                   versionId = null,
-                  storageKey = asset.storageKey,
-                  contentType = asset.contentType,
-                  filename = asset.originalFilename,
-                  byteSize = asset.byteSize,
+                  storageKey = source.storageKey,
+                  contentType = source.contentType,
+                  filename = source.filename,
+                  byteSize = source.byteSize,
                 )
               }
             }

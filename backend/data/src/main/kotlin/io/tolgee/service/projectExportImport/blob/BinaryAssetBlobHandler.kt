@@ -16,11 +16,14 @@ class BinaryAssetBlobHandler(
 
   override fun export(entity: Any): List<BlobEntry> {
     val asset = entity as BinaryAsset
-    if (!fileStorage.fileExists(asset.storageKey)) {
-      logger.warn("Binary asset ${asset.id} source missing at ${asset.storageKey}; exporting without blob")
+    // No original to export — the asset is localized purely by its translations, whose blobs are
+    // exported separately by BinaryAssetTranslationBlobHandler.
+    val storageKey = asset.storageKey ?: return emptyList()
+    if (!fileStorage.fileExists(storageKey)) {
+      logger.warn("Binary asset ${asset.id} source missing at $storageKey; exporting without blob")
       return emptyList()
     }
-    return listOf(BlobEntry(blobName(asset.id), fileStorage.readFile(asset.storageKey)))
+    return listOf(BlobEntry(blobName(asset.id), fileStorage.readFile(storageKey)))
   }
 
   companion object {

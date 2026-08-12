@@ -269,6 +269,13 @@ class ProjectExportImportImporter(
       val bytes = blobs[name]
       if (bytes == null) {
         logger.warn("Imported binary asset $sourceId has no blob '$name'")
+        // Land as a source-less asset. Keeping the exporting project's storage key would point at a
+        // blob this project does not own — which deleteAsset would later delete out from under it.
+        asset.storageKey = null
+        asset.originalFilename = null
+        asset.contentType = null
+        asset.sha256 = null
+        asset.byteSize = 0
         return@forEach
       }
       val newKey = BinaryAssetStoragePaths.newBlobKey(targetProjectId)

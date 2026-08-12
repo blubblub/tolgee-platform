@@ -112,7 +112,12 @@ class BinaryAssetController(
   }
 
   @PostMapping("", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
-  @Operation(summary = "Create binary asset with source file")
+  @Operation(
+    summary = "Create binary asset, with or without a source file",
+    description =
+      "Omit the file to create an asset that has no original — one localized purely by its " +
+        "per-language files. A source file can be attached later through PUT /{assetId}/source.",
+  )
   @ResponseStatus(HttpStatus.CREATED)
   @RequiresProjectPermissions([Scope.KEYS_CREATE])
   @AllowApiAccess
@@ -121,7 +126,7 @@ class BinaryAssetController(
     @RequestPart("name") name: String,
     @RequestPart("description", required = false) description: String?,
     @RequestPart("sourceLanguageId", required = false) sourceLanguageId: String?,
-    @RequestPart("file") file: MultipartFile,
+    @RequestPart("file", required = false) file: MultipartFile?,
   ): BinaryAssetModel {
     val projectId = projectHolder.project.id
     val asset =
@@ -261,15 +266,15 @@ class BinaryAssetController(
     @PathVariable assetId: Long,
   ): BinaryAssetDownloadTicketModel {
     val projectId = projectHolder.project.id
-    val asset = binaryAssetService.get(projectId, assetId)
+    val source = binaryAssetService.requireSource(binaryAssetService.get(projectId, assetId))
     return ticketModel(
       projectId = projectId,
       assetId = assetId,
       languageId = null,
-      storageKey = asset.storageKey,
-      contentType = asset.contentType,
-      filename = asset.originalFilename,
-      byteSize = asset.byteSize,
+      storageKey = source.storageKey,
+      contentType = source.contentType,
+      filename = source.filename,
+      byteSize = source.byteSize,
     )
   }
 

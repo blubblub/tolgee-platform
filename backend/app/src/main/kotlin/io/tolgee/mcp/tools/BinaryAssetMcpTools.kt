@@ -109,16 +109,17 @@ class BinaryAssetMcpTools(
 
     server.addTool(
       "create_asset",
-      "Create a binary asset with its source file. The file is sent base64-encoded " +
+      "Create a binary asset, with or without its source file. The file is sent base64-encoded " +
         "(max 32 MiB — use the REST multipart endpoint POST /v2/projects/{projectId}/binary-assets " +
-        "for larger files).",
+        "for larger files). Omit both fileName and fileContentBase64 to create a translation-only " +
+        "asset that has no original file.",
       toolSchema {
         number("projectId", "ID of the project (required for PAT, auto-resolved for PAK)")
         string("name", "Asset name (unique within the project)", required = true)
         string("description", "Optional: description of the asset")
         number("sourceLanguageId", "Optional: source language ID (defaults to the project's base language)")
-        string("fileName", "Original file name with extension (e.g. intro.mp3)", required = true)
-        string("fileContentBase64", "Base64-encoded file content", required = true)
+        string("fileName", "Optional: original file name with extension (e.g. intro.mp3)")
+        string("fileContentBase64", "Optional: base64-encoded file content")
         string("contentType", "Optional: MIME type (e.g. audio/mpeg)")
       },
     ) { request ->
@@ -131,7 +132,14 @@ class BinaryAssetMcpTools(
               name = request.arguments.requireString("name"),
               description = request.arguments.getString("description"),
               sourceLanguageId = request.arguments.getLong("sourceLanguageId"),
-              file = request.arguments.decodeUpload(),
+              // Neither part given means a translation-only asset. A half-specified upload still
+              // fails inside decodeUpload, which is the honest answer to an ambiguous request.
+              file =
+                if (request.arguments["fileName"] == null && request.arguments["fileContentBase64"] == null) {
+                  null
+                } else {
+                  request.arguments.decodeUpload()
+                },
               uploader = authenticationFacade.authenticatedUserEntityOrNull,
             )
           textResult(objectMapper.writeValueAsString(detailModel(projectId, asset.id)))
