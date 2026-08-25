@@ -48,6 +48,11 @@ export const useRunErrorText = () => {
         );
       case 'binary_asset_tool_unknown':
         return t('asset_run_error_unknown_tool', 'Unknown pipeline tool.');
+      case 'binary_asset_tool_not_supported':
+        return t(
+          'asset_run_error_tool_not_supported',
+          'The audio tools do not apply to this kind of asset.'
+        );
       case undefined:
         return t('asset_translation_tool_failed', 'Tool failed.');
       default:

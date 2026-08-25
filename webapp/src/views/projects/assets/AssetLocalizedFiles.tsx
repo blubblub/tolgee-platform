@@ -37,7 +37,7 @@ import {
   binaryAssetApi,
   canRecordAudio,
   formatBytes,
-  isAudioAsset,
+  getCapabilities,
   RunPayload,
   truncateMiddle,
   visibleTranslations,
@@ -139,12 +139,12 @@ export const AssetLocalizedFiles = ({
   const sourceBusy =
     recordingFinalLanguageId === sourceLanguageId ||
     regeneratingLanguageIds.includes(sourceLanguageId);
-  // recording produces an audio take, so only offer it where an audio file would land. With no
-  // original there is no type to judge by, and recording is one way to supply the first file.
-  const recordable =
-    canRecordAudio() &&
-    (!asset.contentType ||
-      isAudioAsset(asset.contentType, asset.originalFilename));
+  // an image is localized by another image: no transcript, no audio tools, nothing to record.
+  // Existing transcript text is never hidden, whatever the file turned into since.
+  const capabilities = getCapabilities(asset);
+  const showTranscript = capabilities.transcript || !!asset.transcriptKeyName;
+  const showPipeline = capabilities.pipeline;
+  const recordable = canRecordAudio() && capabilities.record;
 
   const rows = useMemo(
     () => visibleTranslations(asset, languageTags),
@@ -439,11 +439,14 @@ export const AssetLocalizedFiles = ({
                 <TableCell>Status</TableCell>
                 <TableCell>Preview</TableCell>
                 <TableCell>File</TableCell>
-                {/* any asset may carry a transcript; only AI transcription is speech-gated */}
-                <TableCell sx={{ width: '100%' }}>
-                  {t('binary_assets_transcript', 'Transcript')}
-                </TableCell>
-                <TableCell>{t('binary_assets_final', 'Final')}</TableCell>
+                {showTranscript && (
+                  <TableCell sx={{ width: '100%' }}>
+                    {t('binary_assets_transcript', 'Transcript')}
+                  </TableCell>
+                )}
+                {showPipeline && (
+                  <TableCell>{t('binary_assets_final', 'Final')}</TableCell>
+                )}
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -535,67 +538,72 @@ export const AssetLocalizedFiles = ({
                       </Box>
                     )}
                   </FileDropTableCell>
-                  <TableCell
-                    sx={{
-                      minWidth: 200,
-                      whiteSpace: 'normal !important',
-                    }}
-                  >
-                    <AssetSourceTranscript
-                      projectId={projectId}
-                      asset={asset}
-                    />
-                  </TableCell>
-                  <TableCell data-cy="binary-asset-final-cell">
-                    {sourceBusy ? (
-                      <Box
-                        display="flex"
-                        alignItems="center"
-                        py={0.5}
-                        data-cy="binary-asset-regenerating"
-                      >
-                        <CircularProgress size={18} />
-                      </Box>
-                    ) : (
-                      <Box display="flex" alignItems="center" gap={0.5}>
-                        {/* a chosen source version, else the uploaded source itself — which has
+                  {showTranscript && (
+                    <TableCell
+                      sx={{
+                        minWidth: 200,
+                        whiteSpace: 'normal !important',
+                      }}
+                    >
+                      <AssetSourceTranscript
+                        projectId={projectId}
+                        asset={asset}
+                      />
+                    </TableCell>
+                  )}
+                  {showPipeline && (
+                    <TableCell data-cy="binary-asset-final-cell">
+                      {sourceBusy ? (
+                        <Box
+                          display="flex"
+                          alignItems="center"
+                          py={0.5}
+                          data-cy="binary-asset-regenerating"
+                        >
+                          <CircularProgress size={18} />
+                        </Box>
+                      ) : (
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          {/* a chosen source version, else the uploaded source itself — which has
                             no translation row, so it tickets through the source endpoint. With
                             neither, there is nothing to preview yet. */}
-                        {(asset.chosenVersionId || asset.originalFilename) && (
-                          <BinaryAssetPreview
-                            projectId={projectId}
-                            assetId={asset.id}
-                            languageId={
-                              asset.chosenVersionId ? sourceLanguageId : null
-                            }
-                            versionId={asset.chosenVersionId}
-                            contentType={
-                              asset.chosenVersionId
-                                ? undefined
-                                : asset.contentType
-                            }
-                            filename={
-                              asset.chosenVersionFilename ??
-                              asset.originalFilename
-                            }
-                            enabled={inView}
-                            compact
-                          />
-                        )}
-                        {recordable &&
-                          canRunOnSource &&
-                          recordButton(
-                            sourceLanguageId,
-                            true,
-                            recordingFinalLanguageId !== null ||
-                              regeneratingLanguageIds.length > 0
+                          {(asset.chosenVersionId ||
+                            asset.originalFilename) && (
+                            <BinaryAssetPreview
+                              projectId={projectId}
+                              assetId={asset.id}
+                              languageId={
+                                asset.chosenVersionId ? sourceLanguageId : null
+                              }
+                              versionId={asset.chosenVersionId}
+                              contentType={
+                                asset.chosenVersionId
+                                  ? undefined
+                                  : asset.contentType
+                              }
+                              filename={
+                                asset.chosenVersionFilename ??
+                                asset.originalFilename
+                              }
+                              enabled={inView}
+                              compact
+                            />
                           )}
-                      </Box>
-                    )}
-                  </TableCell>
+                          {recordable &&
+                            canRunOnSource &&
+                            recordButton(
+                              sourceLanguageId,
+                              true,
+                              recordingFinalLanguageId !== null ||
+                                regeneratingLanguageIds.length > 0
+                            )}
+                        </Box>
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell align="right">
                     <Box display="flex" gap={1} justifyContent="flex-end">
-                      {canRunOnSource && (
+                      {showPipeline && canRunOnSource && (
                         <Tooltip
                           title={t(
                             'binary_assets_generate_audio',
@@ -744,117 +752,124 @@ export const AssetLocalizedFiles = ({
                       </Box>
                     )}
                   </FileDropTableCell>
-                  <TableCell
-                    // the editor needs room to wrap, unlike every other column
-                    sx={{
-                      minWidth: 200,
-                      whiteSpace: 'normal !important',
-                    }}
-                    data-cy="binary-asset-transcript-cell"
-                  >
-                    <Box display="flex" alignItems="flex-start" gap={0.5}>
-                      <Box flex={1} minWidth={0}>
-                        {asset.transcriptKeyName ? (
-                          <TranscriptEditor
-                            projectId={projectId}
-                            keyName={asset.transcriptKeyName}
-                            languageTag={row.languageTag}
-                            value={row.transcriptText}
-                            canEdit={satisfiesLanguageAccess(
-                              'translations.edit',
-                              row.languageId
-                            )}
-                            placeholder={t(
-                              'binary_assets_transcript_add_translation',
-                              'Add translation'
-                            )}
-                            onSaved={invalidate}
-                          />
-                        ) : canCreateTranscript ? (
-                          // no key yet — typing here creates one seeded in this language,
-                          // whether or not the language has a file uploaded
-                          <TranscriptAddInline
-                            creating={addTranscript.isLoading}
-                            placeholderDataCy="binary-asset-language-transcript-placeholder"
-                            inputDataCy="binary-asset-language-transcript-input"
-                            placeholder={t(
-                              'binary_assets_transcript_add_translation',
-                              'Add translation'
-                            )}
-                            onCreate={(text) =>
-                              addTranscript.mutate(
-                                {
-                                  path: { projectId, assetId: asset.id },
-                                  content: {
-                                    'application/json': {
-                                      text,
-                                      languageTag: row.languageTag,
+                  {showTranscript && (
+                    <TableCell
+                      // the editor needs room to wrap, unlike every other column
+                      sx={{
+                        minWidth: 200,
+                        whiteSpace: 'normal !important',
+                      }}
+                      data-cy="binary-asset-transcript-cell"
+                    >
+                      <Box display="flex" alignItems="flex-start" gap={0.5}>
+                        <Box flex={1} minWidth={0}>
+                          {asset.transcriptKeyName ? (
+                            <TranscriptEditor
+                              projectId={projectId}
+                              keyName={asset.transcriptKeyName}
+                              languageTag={row.languageTag}
+                              value={row.transcriptText}
+                              canEdit={satisfiesLanguageAccess(
+                                'translations.edit',
+                                row.languageId
+                              )}
+                              placeholder={t(
+                                'binary_assets_transcript_add_translation',
+                                'Add translation'
+                              )}
+                              onSaved={invalidate}
+                            />
+                          ) : canCreateTranscript ? (
+                            // no key yet — typing here creates one seeded in this language,
+                            // whether or not the language has a file uploaded
+                            <TranscriptAddInline
+                              creating={addTranscript.isLoading}
+                              placeholderDataCy="binary-asset-language-transcript-placeholder"
+                              inputDataCy="binary-asset-language-transcript-input"
+                              placeholder={t(
+                                'binary_assets_transcript_add_translation',
+                                'Add translation'
+                              )}
+                              onCreate={(text) =>
+                                addTranscript.mutate(
+                                  {
+                                    path: { projectId, assetId: asset.id },
+                                    content: {
+                                      'application/json': {
+                                        text,
+                                        languageTag: row.languageTag,
+                                      },
                                     },
                                   },
-                                },
-                                { onSuccess: invalidate }
-                              )
-                            }
-                          />
-                        ) : (
-                          <Typography variant="caption" color="text.secondary">
-                            —
-                          </Typography>
+                                  { onSuccess: invalidate }
+                                )
+                              }
+                            />
+                          ) : (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              —
+                            </Typography>
+                          )}
+                        </Box>
+                        {transcribeButton(
+                          row.languageId,
+                          row.transcriptionAvailable
                         )}
                       </Box>
-                      {transcribeButton(
-                        row.languageId,
-                        row.transcriptionAvailable
+                    </TableCell>
+                  )}
+                  {showPipeline && (
+                    <TableCell data-cy="binary-asset-final-cell">
+                      {recordingFinalLanguageId === row.languageId ||
+                      regeneratingLanguageIds.includes(row.languageId) ? (
+                        <Box
+                          display="flex"
+                          alignItems="center"
+                          py={0.5}
+                          data-cy="binary-asset-regenerating"
+                        >
+                          <CircularProgress size={18} />
+                        </Box>
+                      ) : row.status === 'MISSING' ? (
+                        <Typography variant="caption" color="text.secondary">
+                          —
+                        </Typography>
+                      ) : (
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          {/* a chosen pipeline/uploaded version, else the OG upload */}
+                          <BinaryAssetPreview
+                            projectId={projectId}
+                            assetId={asset.id}
+                            languageId={row.languageId}
+                            versionId={row.chosenVersionId}
+                            contentType={
+                              row.chosenVersionId ? undefined : row.contentType
+                            }
+                            filename={
+                              row.chosenVersionFilename ?? row.originalFilename
+                            }
+                            enabled={inView}
+                            compact
+                          />
+                          {recordable &&
+                            satisfiesLanguageAccess(
+                              'translations.edit',
+                              row.languageId
+                            ) &&
+                            canReview(row.languageId) &&
+                            recordButton(
+                              row.languageId,
+                              true,
+                              recordingFinalLanguageId !== null ||
+                                regeneratingLanguageIds.length > 0
+                            )}
+                        </Box>
                       )}
-                    </Box>
-                  </TableCell>
-                  <TableCell data-cy="binary-asset-final-cell">
-                    {recordingFinalLanguageId === row.languageId ||
-                    regeneratingLanguageIds.includes(row.languageId) ? (
-                      <Box
-                        display="flex"
-                        alignItems="center"
-                        py={0.5}
-                        data-cy="binary-asset-regenerating"
-                      >
-                        <CircularProgress size={18} />
-                      </Box>
-                    ) : row.status === 'MISSING' ? (
-                      <Typography variant="caption" color="text.secondary">
-                        —
-                      </Typography>
-                    ) : (
-                      <Box display="flex" alignItems="center" gap={0.5}>
-                        {/* a chosen pipeline/uploaded version, else the OG upload */}
-                        <BinaryAssetPreview
-                          projectId={projectId}
-                          assetId={asset.id}
-                          languageId={row.languageId}
-                          versionId={row.chosenVersionId}
-                          contentType={
-                            row.chosenVersionId ? undefined : row.contentType
-                          }
-                          filename={
-                            row.chosenVersionFilename ?? row.originalFilename
-                          }
-                          enabled={inView}
-                          compact
-                        />
-                        {recordable &&
-                          satisfiesLanguageAccess(
-                            'translations.edit',
-                            row.languageId
-                          ) &&
-                          canReview(row.languageId) &&
-                          recordButton(
-                            row.languageId,
-                            true,
-                            recordingFinalLanguageId !== null ||
-                              regeneratingLanguageIds.length > 0
-                          )}
-                      </Box>
-                    )}
-                  </TableCell>
+                    </TableCell>
+                  )}
                   <TableCell align="right">
                     <Box display="flex" gap={1} justifyContent="flex-end">
                       {/* nothing to confirm until a file exists */}
@@ -878,35 +893,39 @@ export const AssetLocalizedFiles = ({
                           </Tooltip>
                         )}
                       {/* a run reads the uploaded file, so there must be one */}
-                      {canTranslate && row.status !== 'MISSING' && (
-                        <Tooltip
-                          title={t(
-                            'binary_assets_generate_audio',
-                            'Generate with AI (pipeline)'
-                          )}
-                        >
-                          <span>
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              disabled={
-                                recordingFinalLanguageId !== null ||
-                                regeneratingLanguageIds.includes(row.languageId)
-                              }
-                              onClick={() => setRunLanguageId(row.languageId)}
-                              data-cy="binary-asset-run-tool"
-                            >
-                              {regeneratingLanguageIds.includes(
-                                row.languageId
-                              ) ? (
-                                <CircularProgress size={16} />
-                              ) : (
-                                <Zap width={16} height={16} />
-                              )}
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      )}
+                      {showPipeline &&
+                        canTranslate &&
+                        row.status !== 'MISSING' && (
+                          <Tooltip
+                            title={t(
+                              'binary_assets_generate_audio',
+                              'Generate with AI (pipeline)'
+                            )}
+                          >
+                            <span>
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                disabled={
+                                  recordingFinalLanguageId !== null ||
+                                  regeneratingLanguageIds.includes(
+                                    row.languageId
+                                  )
+                                }
+                                onClick={() => setRunLanguageId(row.languageId)}
+                                data-cy="binary-asset-run-tool"
+                              >
+                                {regeneratingLanguageIds.includes(
+                                  row.languageId
+                                ) ? (
+                                  <CircularProgress size={16} />
+                                ) : (
+                                  <Zap width={16} height={16} />
+                                )}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        )}
                       {canTranslate && (
                         <Tooltip
                           title={

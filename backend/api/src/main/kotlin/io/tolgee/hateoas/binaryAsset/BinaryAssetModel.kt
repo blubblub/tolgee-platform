@@ -1,5 +1,7 @@
 package io.tolgee.hateoas.binaryAsset
 
+import io.tolgee.model.enums.BinaryAssetCapabilities
+import io.tolgee.model.enums.BinaryAssetMediaType
 import io.tolgee.model.enums.BinaryAssetTranslationStatus
 import org.springframework.hateoas.RepresentationModel
 import org.springframework.hateoas.server.core.Relation
@@ -24,6 +26,10 @@ open class BinaryAssetModel(
   val currentCount: Int,
   val outdatedCount: Int,
   val targetLanguageCount: Int,
+  /** Inferred from the original file; null when there is none or its type is not recognised. */
+  val mediaType: BinaryAssetMediaType? = null,
+  /** Which parts of the workflow apply to this asset — the UI hides the rest. */
+  val capabilities: BinaryAssetCapabilitiesModel = BinaryAssetCapabilitiesModel(),
   val transcriptKeyId: Long? = null,
   val transcriptKeyName: String? = null,
   /** True when the key belongs to this asset and is deleted with it. */
@@ -77,3 +83,19 @@ open class BinaryAssetTranslationModel(
 open class BinaryAssetDownloadTicketModel(
   val url: String,
 )
+
+/** Mirror of [io.tolgee.model.enums.BinaryAssetCapabilities]; see it for what each flag governs. */
+open class BinaryAssetCapabilitiesModel(
+  val transcript: Boolean = true,
+  val pipeline: Boolean = true,
+  val record: Boolean = true,
+) {
+  companion object {
+    fun of(capabilities: BinaryAssetCapabilities) =
+      BinaryAssetCapabilitiesModel(
+        transcript = capabilities.transcript,
+        pipeline = capabilities.pipeline,
+        record = capabilities.record,
+      )
+  }
+}

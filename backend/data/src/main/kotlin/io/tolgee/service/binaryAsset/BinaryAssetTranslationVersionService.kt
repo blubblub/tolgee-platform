@@ -3,6 +3,7 @@ package io.tolgee.service.binaryAsset
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.tolgee.component.binaryAssetTool.BinaryAssetToolService
 import io.tolgee.constants.Message
+import io.tolgee.exceptions.BadRequestException
 import io.tolgee.exceptions.NotFoundException
 import io.tolgee.model.UserAccount
 import io.tolgee.model.binaryAsset.BinaryAsset
@@ -94,6 +95,10 @@ class BinaryAssetTranslationVersionService(
     user: UserAccount?,
   ): BinaryAssetTranslationVersion {
     val target = resolveTarget(projectId, assetId, languageId)
+    // the tools all produce audio — for an image or a video that would be a version of nothing
+    if (!target.asset.capabilities.pipeline) {
+      throw BadRequestException(Message.BINARY_ASSET_TOOL_NOT_SUPPORTED)
+    }
 
     val tool = binaryAssetToolService.getTool(toolName)
 

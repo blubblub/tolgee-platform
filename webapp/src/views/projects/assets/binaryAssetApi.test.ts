@@ -1,5 +1,7 @@
 import {
   binaryAssetApi,
+  getCapabilities,
+  inferMediaType,
   isAudioAsset,
   pickRecordingMime,
   visibleTranslations,
@@ -134,6 +136,62 @@ describe('isAudioAsset', () => {
     expect(isAudioAsset('image/png', 'shot.png')).toBe(false);
     expect(isAudioAsset('video/mp4', 'clip.mp4')).toBe(false);
     expect(isAudioAsset(undefined, undefined)).toBe(false);
+  });
+});
+
+describe('inferMediaType', () => {
+  it('trusts a known content type over the extension', () => {
+    expect(inferMediaType('audio/mpeg', 'voice.bin')).toBe('AUDIO');
+    expect(inferMediaType('video/mp4; codecs=avc1', 'clip.bin')).toBe('VIDEO');
+    expect(inferMediaType('image/png', 'recording.wav')).toBe('IMAGE');
+  });
+
+  it('falls back to the extension for octet-stream or no type', () => {
+    expect(inferMediaType('application/octet-stream', 'line.WAV')).toBe(
+      'AUDIO'
+    );
+    expect(inferMediaType('', 'clip.mov')).toBe('VIDEO');
+    expect(inferMediaType(undefined, 'shot.png')).toBe('IMAGE');
+  });
+
+  it('is null for nothing and for documents', () => {
+    expect(inferMediaType(undefined, undefined)).toBeNull();
+    expect(inferMediaType('application/pdf', 'manual.pdf')).toBeNull();
+  });
+});
+
+describe('getCapabilities', () => {
+  it('prefers what the server says', () => {
+    const capabilities = { transcript: false, pipeline: true, record: false };
+    expect(getCapabilities({ capabilities, contentType: 'audio/wav' })).toBe(
+      capabilities
+    );
+  });
+
+  it('derives per media type when the server did not say', () => {
+    expect(getCapabilities({ contentType: 'audio/wav' })).toEqual({
+      transcript: true,
+      pipeline: true,
+      record: true,
+    });
+    expect(getCapabilities({ contentType: 'video/mp4' })).toEqual({
+      transcript: true,
+      pipeline: false,
+      record: false,
+    });
+    expect(getCapabilities({ originalFilename: 'splash.png' })).toEqual({
+      transcript: false,
+      pipeline: false,
+      record: false,
+    });
+  });
+
+  it('keeps every affordance for an asset with no original', () => {
+    expect(getCapabilities({})).toEqual({
+      transcript: true,
+      pipeline: true,
+      record: true,
+    });
   });
 });
 

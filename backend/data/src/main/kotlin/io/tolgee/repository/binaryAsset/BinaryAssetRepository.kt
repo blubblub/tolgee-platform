@@ -45,6 +45,7 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
             or lower(a.originalFilename) like '%.aac'
             or lower(a.originalFilename) like '%.flac'
             or lower(a.originalFilename) like '%.webm'
+            or lower(a.originalFilename) like '%.opus'
           )
         )
         or (
@@ -90,6 +91,7 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
             or lower(a.originalFilename) like '%.aac'
             or lower(a.originalFilename) like '%.flac'
             or lower(a.originalFilename) like '%.webm'
+            or lower(a.originalFilename) like '%.opus'
           )
         )
         or (

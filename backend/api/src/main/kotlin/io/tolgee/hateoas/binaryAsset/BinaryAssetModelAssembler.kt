@@ -9,6 +9,8 @@ import io.tolgee.model.enums.BinaryAssetTranslationStatus
 import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.binaryAsset.BinaryAssetTranscriptService
 import io.tolgee.service.binaryAsset.BinaryAssetTranslationVersionService
+import io.tolgee.service.binaryAsset.capabilities
+import io.tolgee.service.binaryAsset.mediaType
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport
 import org.springframework.stereotype.Component
 
@@ -152,6 +154,8 @@ class BinaryAssetModelAssembler(
       currentCount = current,
       outdatedCount = outdated,
       targetLanguageCount = targetCount,
+      mediaType = asset.mediaType,
+      capabilities = BinaryAssetCapabilitiesModel.of(asset.capabilities),
       transcriptKeyId = asset.transcriptKey?.id,
       transcriptKeyName = asset.transcriptKey?.name,
       transcriptKeyOwned = asset.transcriptKeyOwned,

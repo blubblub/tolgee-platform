@@ -1,6 +1,8 @@
 import { apiV2HttpService } from 'tg.service/http/ApiV2HttpService';
 import {
   BinaryAsset,
+  BinaryAssetCapabilities,
+  BinaryAssetMediaType,
   BinaryAssetPage,
   BinaryAssetTranslation,
   DownloadTicket,
@@ -133,6 +135,58 @@ export const isAudioAsset = (
   if (type && type !== 'application/octet-stream') return false;
   const name = (filename ?? '').toLowerCase();
   return AUDIO_FILE_EXTENSIONS.some((ext) => name.endsWith(ext));
+};
+
+const VIDEO_FILE_EXTENSIONS = ['.mp4', '.mov', '.m4v', '.mkv', '.avi'];
+const IMAGE_FILE_EXTENSIONS = [
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.bmp',
+];
+
+const ALL_CAPABILITIES: BinaryAssetCapabilities = {
+  transcript: true,
+  pipeline: true,
+  record: true,
+};
+
+/** Same rules as the backend's BinaryAssetMediaType.infer, for assets that predate the field. */
+export const inferMediaType = (
+  contentType?: string | null,
+  filename?: string | null
+): BinaryAssetMediaType | null => {
+  const type = (contentType ?? '').split(';')[0].trim().toLowerCase();
+  if (type.startsWith('audio/')) return 'AUDIO';
+  if (type.startsWith('video/')) return 'VIDEO';
+  if (type.startsWith('image/')) return 'IMAGE';
+  const name = (filename ?? '').toLowerCase();
+  if (AUDIO_FILE_EXTENSIONS.some((ext) => name.endsWith(ext))) return 'AUDIO';
+  if (VIDEO_FILE_EXTENSIONS.some((ext) => name.endsWith(ext))) return 'VIDEO';
+  if (IMAGE_FILE_EXTENSIONS.some((ext) => name.endsWith(ext))) return 'IMAGE';
+  return null;
+};
+
+/**
+ * What the asset's row should offer. The server is the source of truth; the fallback only covers
+ * responses without the field. An unknown type keeps everything — a transcript may be all a
+ * source-less asset has, and recording is one way to give it a first file.
+ */
+export const getCapabilities = (
+  asset: Pick<BinaryAsset, 'capabilities' | 'contentType' | 'originalFilename'>
+): BinaryAssetCapabilities => {
+  if (asset.capabilities) return asset.capabilities;
+  switch (inferMediaType(asset.contentType, asset.originalFilename)) {
+    case 'VIDEO':
+      return { transcript: true, pipeline: false, record: false };
+    case 'IMAGE':
+      return { transcript: false, pipeline: false, record: false };
+    default:
+      return ALL_CAPABILITIES;
+  }
 };
 
 /** In-browser recording needs both getUserMedia and MediaRecorder. */
