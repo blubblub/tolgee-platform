@@ -174,6 +174,7 @@ declare namespace DataCy {
         "binary-asset-preview-image": true;
         "binary-asset-preview-pdf": true;
         "binary-asset-preview-record-audio": true;
+        "binary-asset-preview-retry": true;
         "binary-asset-preview-unsupported": true;
         "binary-asset-preview-video": true;
         "binary-asset-record-dialog": true;

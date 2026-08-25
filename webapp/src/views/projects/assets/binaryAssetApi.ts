@@ -10,6 +10,30 @@ import {
 const base = (projectId: number | string) =>
   `projects/${projectId}/binary-assets`;
 
+export type TicketOptions = {
+  /**
+   * Skip the global error toast — for callers that handle failures themselves
+   * (BinaryAssetPreview retries tickets with backoff).
+   */
+  silent?: boolean;
+};
+
+const postTicket = async (
+  url: string,
+  opts?: TicketOptions
+): Promise<DownloadTicket> => {
+  const r = await apiV2HttpService.fetch(
+    url,
+    {
+      method: 'POST',
+      body: '{}',
+      headers: { 'Content-Type': 'application/json' },
+    },
+    { disableAutoErrorHandle: opts?.silent === true }
+  );
+  return r.json();
+};
+
 export type BinaryAssetTranslationVersionModel = {
   id: number;
   tool: string;
@@ -168,10 +192,10 @@ export const binaryAssetApi = {
       form
     );
   },
-  sourceTicket(projectId: number, assetId: number) {
-    return apiV2HttpService.post<DownloadTicket>(
+  sourceTicket(projectId: number, assetId: number, opts?: TicketOptions) {
+    return postTicket(
       `${base(projectId)}/${assetId}/source/download-ticket`,
-      {}
+      opts
     );
   },
   upsertTranslation(
@@ -192,12 +216,17 @@ export const binaryAssetApi = {
       form
     );
   },
-  translationTicket(projectId: number, assetId: number, languageId: number) {
-    return apiV2HttpService.post<DownloadTicket>(
+  translationTicket(
+    projectId: number,
+    assetId: number,
+    languageId: number,
+    opts?: TicketOptions
+  ) {
+    return postTicket(
       `${base(
         projectId
       )}/${assetId}/translations/${languageId}/download-ticket`,
-      {}
+      opts
     );
   },
   deleteTranslation(projectId: number, assetId: number, languageId: number) {
@@ -273,13 +302,14 @@ export const binaryAssetApi = {
     projectId: number,
     assetId: number,
     languageId: number,
-    versionId: number
+    versionId: number,
+    opts?: TicketOptions
   ): Promise<DownloadTicket> {
-    return apiV2HttpService.post(
+    return postTicket(
       `${base(
         projectId
       )}/${assetId}/translations/${languageId}/versions/${versionId}/download-ticket`,
-      {}
+      opts
     );
   },
 };

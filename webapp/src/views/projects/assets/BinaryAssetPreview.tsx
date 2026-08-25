@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Box, CircularProgress, Typography } from '@mui/material';
+import { Box, CircularProgress, Link, Typography } from '@mui/material';
+import { useInView } from 'react-intersection-observer';
 import { binaryAssetApi } from './binaryAssetApi';
 
 type Kind = 'audio' | 'video' | 'image' | 'pdf' | 'unknown';
@@ -19,6 +20,42 @@ export function previewKind(
   if (ct === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
   return 'unknown';
 }
+
+// A page of asset rows entering the viewport at once would fire a ticket
+// request per preview; unbounded, that burst trips the server's global
+// per-user rate limit (429s, then bodyless 444s once it starts striking).
+const MAX_CONCURRENT_TICKETS = 4;
+let activeTickets = 0;
+const ticketQueue: Array<() => void> = [];
+
+async function withTicketSlot<T>(fn: () => Promise<T>): Promise<T> {
+  if (activeTickets >= MAX_CONCURRENT_TICKETS) {
+    await new Promise<void>((resolve) => ticketQueue.push(resolve));
+  }
+  activeTickets++;
+  try {
+    return await fn();
+  } finally {
+    activeTickets--;
+    ticketQueue.shift()?.();
+  }
+}
+
+const TICKET_RETRIES = 3;
+
+function retryDelayMs(e: unknown, attempt: number): number {
+  // 429 bodies carry the bucket refill time; 444 arrives with no body at all
+  const err = e as { code?: string; params?: unknown[] };
+  if (err?.code === 'rate_limited') {
+    const retryAfter = Number(err.params?.[0]);
+    if (Number.isFinite(retryAfter) && retryAfter > 0) {
+      return Math.min(retryAfter, 30_000);
+    }
+  }
+  return 1000 * 2 ** attempt + Math.random() * 500;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function withInline(url: string): string {
   let u = url;
@@ -66,9 +103,17 @@ export const BinaryAssetPreview = ({
   const [src, setSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
+
+  // Each preview waits for its own visibility, so a tall page only tickets
+  // the rows actually on screen (parents may gate coarser via `enabled`).
+  const { ref: inViewRef, inView } = useInView({
+    rootMargin: '100px',
+    triggerOnce: true,
+  });
 
   useEffect(() => {
-    if (!enabled || kind === 'unknown') {
+    if (!enabled || !inView || kind === 'unknown') {
       setSrc(null);
       return;
     }
@@ -77,25 +122,35 @@ export const BinaryAssetPreview = ({
     setError(null);
     setSrc(null);
 
+    const fetchTicket = () =>
+      languageId == null
+        ? binaryAssetApi.sourceTicket(projectId, assetId, { silent: true })
+        : versionId != null
+        ? binaryAssetApi.versionTicket(
+            projectId,
+            assetId,
+            languageId,
+            versionId,
+            { silent: true }
+          )
+        : binaryAssetApi.translationTicket(projectId, assetId, languageId, {
+            silent: true,
+          });
+
     const load = async () => {
       try {
-        const ticket =
-          languageId == null
-            ? await binaryAssetApi.sourceTicket(projectId, assetId)
-            : versionId != null
-            ? await binaryAssetApi.versionTicket(
-                projectId,
-                assetId,
-                languageId,
-                versionId
-              )
-            : await binaryAssetApi.translationTicket(
-                projectId,
-                assetId,
-                languageId
-              );
-        if (!cancelled) {
-          setSrc(withInline(ticket.url));
+        for (let attempt = 0; ; attempt++) {
+          try {
+            const ticket = await withTicketSlot(fetchTicket);
+            if (!cancelled) {
+              setSrc(withInline(ticket.url));
+            }
+            return;
+          } catch (e) {
+            if (cancelled || attempt >= TICKET_RETRIES) throw e;
+            await sleep(retryDelayMs(e, attempt));
+            if (cancelled) return;
+          }
         }
       } catch (e: any) {
         if (!cancelled) {
@@ -116,8 +171,10 @@ export const BinaryAssetPreview = ({
     versionId,
     kind,
     enabled,
+    inView,
     contentType,
     filename,
+    retryNonce,
   ]);
 
   if (kind === 'unknown') {
@@ -134,7 +191,7 @@ export const BinaryAssetPreview = ({
 
   if (loading) {
     return (
-      <Box display="flex" alignItems="center" gap={1} py={0.5}>
+      <Box ref={inViewRef} display="flex" alignItems="center" gap={1} py={0.5}>
         <CircularProgress size={16} />
         <Typography variant="caption" color="text.secondary">
           Loading preview…
@@ -145,17 +202,35 @@ export const BinaryAssetPreview = ({
 
   if (error) {
     return (
-      <Typography
-        variant="caption"
-        color="error"
-        data-cy="binary-asset-preview-error"
-      >
-        {error}
-      </Typography>
+      <Box ref={inViewRef} display="flex" alignItems="center" gap={1}>
+        <Typography
+          variant="caption"
+          color="error"
+          data-cy="binary-asset-preview-error"
+        >
+          {error}
+        </Typography>
+        <Link
+          component="button"
+          type="button"
+          variant="caption"
+          onClick={(e) => {
+            e.stopPropagation();
+            setRetryNonce((n) => n + 1);
+          }}
+          data-cy="binary-asset-preview-retry"
+        >
+          Retry
+        </Link>
+      </Box>
     );
   }
 
-  if (!src) return null;
+  if (!src) {
+    // Invisible placeholder so the intersection observer has something to
+    // measure before the ticket is requested.
+    return <Box ref={inViewRef} sx={{ minWidth: 1, minHeight: 1 }} />;
+  }
 
   if (kind === 'audio') {
     return (

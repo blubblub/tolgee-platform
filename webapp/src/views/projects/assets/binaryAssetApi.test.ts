@@ -25,6 +25,11 @@ vi.mock('tg.service/http/ApiV2HttpService', () => {
         multipartForms.push(form);
         return Promise.resolve({});
       },
+      // ticket calls go through fetch to opt out of the global error toast
+      fetch: (url: string) => {
+        calls.push(url);
+        return Promise.resolve({ json: () => Promise.resolve({}) });
+      },
     },
   };
 });
