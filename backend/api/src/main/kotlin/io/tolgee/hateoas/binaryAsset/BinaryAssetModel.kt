@@ -1,5 +1,6 @@
 package io.tolgee.hateoas.binaryAsset
 
+import io.tolgee.hateoas.screenshot.ScreenshotModel
 import io.tolgee.model.enums.BinaryAssetCapabilities
 import io.tolgee.model.enums.BinaryAssetMediaType
 import io.tolgee.model.enums.BinaryAssetTranslationStatus
@@ -50,7 +51,17 @@ open class BinaryAssetModel(
   /** Pipeline versions of the source file, not of any translation. */
   val versionCount: Int = 0,
   val translations: List<BinaryAssetTranslationModel>? = null,
-) : RepresentationModel<BinaryAssetModel>()
+  /**
+   * Screens this asset is used on. The list carries the first [LIST_SCREENSHOT_LIMIT] per asset,
+   * the detail carries all of them; [screenshotCount] is always the full count.
+   */
+  val screenshots: List<ScreenshotModel> = emptyList(),
+  val screenshotCount: Int = 0,
+) : RepresentationModel<BinaryAssetModel>() {
+  companion object {
+    const val LIST_SCREENSHOT_LIMIT = 6
+  }
+}
 
 @Relation(collectionRelation = "binaryAssetTranslations", itemRelation = "binaryAssetTranslation")
 open class BinaryAssetTranslationModel(

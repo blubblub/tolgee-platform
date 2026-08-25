@@ -187,6 +187,9 @@ declare namespace DataCy {
         "binary-asset-replace-source": true;
         "binary-asset-review-toggle": true;
         "binary-asset-run-tool": true;
+        "binary-asset-screenshot-upload": true;
+        "binary-asset-screenshots": true;
+        "binary-asset-screenshots-more": true;
         "binary-asset-source-pipeline": true;
         "binary-asset-source-row": true;
         "binary-asset-status": true;
@@ -804,6 +807,7 @@ declare namespace DataCy {
         "regenerate-pat-dialog-content": true;
         "regenerate-pat-dialog-title": true;
         "resend-email-button": true;
+        "screenshot-detail": true;
         "screenshot-image": true;
         "screenshot-thumbnail": true;
         "screenshot-thumbnail-delete": true;

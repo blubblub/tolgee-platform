@@ -15,7 +15,6 @@ import io.tolgee.constants.Message
 import io.tolgee.dtos.request.ScreenshotInfoDto
 import io.tolgee.dtos.request.validators.exceptions.ValidationException
 import io.tolgee.exceptions.NotFoundException
-import io.tolgee.exceptions.PermissionException
 import io.tolgee.hateoas.screenshot.ScreenshotModel
 import io.tolgee.hateoas.screenshot.ScreenshotModelAssembler
 import io.tolgee.model.Screenshot
@@ -113,12 +112,9 @@ class KeyScreenshotController(
     screenshotService.removeScreenshotReferences(key, screenshots)
   }
 
+  // a screenshot referenced by another project's assets is foreign too, not only one by its keys
   private fun Screenshot.checkInProject() {
-    this.keyScreenshotReferences.forEach {
-      if (it.key.project.id != projectHolder.project.id) {
-        throw PermissionException(Message.KEY_NOT_FROM_PROJECT)
-      }
-    }
+    screenshotService.checkInProject(this, projectHolder.project.id)
   }
 
   private fun Key.checkInProject() {

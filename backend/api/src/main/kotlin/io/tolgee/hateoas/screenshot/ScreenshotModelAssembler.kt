@@ -59,6 +59,10 @@ class ScreenshotModelAssembler(
             )
           }
         },
+      assetReferences =
+        entity.binaryAssetScreenshotReferences.map { reference ->
+          AssetInScreenshotModel(reference.asset.id, reference.asset.name)
+        },
       location = entity.location,
       width = entity.width,
       height = entity.height,

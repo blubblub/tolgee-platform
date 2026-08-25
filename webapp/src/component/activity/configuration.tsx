@@ -133,6 +133,18 @@ export const actionsConfiguration: Partial<
     },
     entities: { Screenshot: [] },
   },
+  SCREENSHOT_UPSERT_BY_LOCATION: {
+    label(params) {
+      return (
+        <T
+          keyName="activity_screenshot_upsert_by_location"
+          defaultValue="Updated a screen's screenshot"
+          params={params}
+        />
+      );
+    },
+    entities: { Screenshot: [] },
+  },
   TRANSLATION_COMMENT_ADD: {
     label(params) {
       return <T keyName="activity_translation_comment_add" params={params} />;

@@ -14,6 +14,7 @@ import io.tolgee.security.authentication.AuthenticationFacade
 import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.binaryAsset.BinaryAssetTranscriptService
 import io.tolgee.service.binaryAsset.BinaryAssetTranslationVersionService
+import io.tolgee.service.key.ScreenshotService
 import io.tolgee.service.security.PermissionService
 import io.tolgee.util.executeInNewTransaction
 import org.springframework.data.domain.PageRequest
@@ -32,6 +33,7 @@ class BinaryAssetMcpTools(
   private val authenticationFacade: AuthenticationFacade,
   private val objectMapper: ObjectMapper,
   private val transactionManager: PlatformTransactionManager,
+  private val screenshotService: ScreenshotService,
 ) : McpToolsProvider {
   private val listSpec = buildSpec(BinaryAssetController::list, "list_assets")
   private val getSpec = buildSpec(BinaryAssetController::get, "get_asset")
@@ -70,10 +72,12 @@ class BinaryAssetMcpTools(
             binaryAssetTranscriptService.getTranscriptTranslationsByKey(
               page.content.mapNotNull { it.transcriptKey?.id },
             )
+          val assetIds = page.content.map { it.id }
           val versionsByAsset =
             binaryAssetTranslationVersionService
-              .findByAssetIdIn(page.content.map { it.id })
+              .findByAssetIdIn(assetIds)
               .groupBy { it.asset.id }
+          val screenshotsByAsset = screenshotService.getScreenshotsForAssets(assetIds)
           val result =
             pagedResponse(page) { asset ->
               binaryAssetModelAssembler.toListModel(
@@ -81,6 +85,7 @@ class BinaryAssetMcpTools(
                 languages,
                 transcripts[asset.transcriptKey?.id].orEmpty(),
                 versionsByAsset,
+                screenshotsByAsset,
               )
             }
           textResult(objectMapper.writeValueAsString(result))

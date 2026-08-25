@@ -6,12 +6,14 @@ package io.tolgee.model
 
 import io.tolgee.activity.annotation.ActivityEntityDescribingPaths
 import io.tolgee.activity.annotation.ActivityLoggedEntity
+import io.tolgee.model.binaryAsset.BinaryAssetScreenshotReference
 import io.tolgee.model.key.screenshotReference.KeyScreenshotReference
 import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import org.apache.commons.codec.digest.DigestUtils
+import org.hibernate.annotations.BatchSize
 import org.hibernate.annotations.ColumnDefault
 
 @Entity
@@ -19,8 +21,19 @@ import org.hibernate.annotations.ColumnDefault
 @ActivityEntityDescribingPaths(paths = ["key"])
 @Table(indexes = [Index(name = "screenshot_location_idx", columnList = "location")])
 class Screenshot : StandardAuditModel() {
+  // Two List collections cannot be fetch-joined in one query (MultipleBagFetchException), so a
+  // batch size lets a page of screenshots load either list in a few queries instead of one each.
   @OneToMany(mappedBy = "screenshot", orphanRemoval = true)
+  @BatchSize(size = 100)
   var keyScreenshotReferences: MutableList<KeyScreenshotReference> = mutableListOf()
+
+  /**
+   * Binary assets shown on this screen. A screenshot is owned by whatever references it — keys,
+   * assets, or both — and is deleted once nothing does.
+   */
+  @OneToMany(mappedBy = "screenshot", orphanRemoval = true)
+  @BatchSize(size = 100)
+  var binaryAssetScreenshotReferences: MutableList<BinaryAssetScreenshotReference> = mutableListOf()
 
   /**
    * For legacy projects the path was ${key.project.id}/${key.id}

@@ -1,3 +1,5 @@
+import { components } from 'tg.service/apiSchema.generated';
+
 export type BinaryAssetTranslationStatus = 'MISSING' | 'CURRENT' | 'OUTDATED';
 
 export type BinaryAssetTranslation = {
@@ -70,6 +72,31 @@ export type BinaryAsset = {
   /** Versions of the source file, not of any translation. */
   versionCount?: number;
   translations?: BinaryAssetTranslation[] | null;
+  /** Screens this asset is used on: the list carries the first few, the detail all of them. */
+  screenshots?: Screenshot[];
+  screenshotCount?: number;
+};
+
+/** The generated shape, so the shared screenshot components accept it as is. */
+export type KeyInScreenshot = components['schemas']['KeyInScreenshotModel'];
+
+export type AssetInScreenshot = {
+  assetId: number;
+  assetName: string;
+};
+
+/** A screen of the app; shared by every key and asset shown on it. */
+export type Screenshot = {
+  id: number;
+  fileUrl: string;
+  middleSizedUrl?: string | null;
+  thumbnailUrl: string;
+  width?: number | null;
+  height?: number | null;
+  location?: string | null;
+  createdAt?: string | null;
+  keyReferences: KeyInScreenshot[];
+  assetReferences?: AssetInScreenshot[];
 };
 
 export type BinaryAssetPage = {

@@ -6,6 +6,7 @@ import {
   BinaryAssetPage,
   BinaryAssetTranslation,
   DownloadTicket,
+  Screenshot,
 } from './types';
 
 // apiV2HttpService already prefixes with /v2/
@@ -350,6 +351,47 @@ export const binaryAssetApi = {
     return apiV2HttpService.put(
       `projects/${projectId}/binary-asset-voices`,
       body
+    );
+  },
+  listScreenshots(projectId: number, assetId: number): Promise<Screenshot[]> {
+    return apiV2HttpService
+      .get<{ _embedded?: { screenshots?: Screenshot[] } }>(
+        `${base(projectId)}/${assetId}/screenshots`
+      )
+      .then((r) => r._embedded?.screenshots ?? []);
+  },
+  uploadScreenshot(
+    projectId: number,
+    assetId: number,
+    file: File,
+    location?: string
+  ): Promise<Screenshot> {
+    const form = new FormData();
+    form.append('screenshot', file);
+    if (location) {
+      form.append(
+        'info',
+        new Blob([JSON.stringify({ location })], { type: 'application/json' })
+      );
+    }
+    return apiV2HttpService.postMultipart<Screenshot>(
+      `${base(projectId)}/${assetId}/screenshots`,
+      form
+    );
+  },
+  linkScreenshot(
+    projectId: number,
+    assetId: number,
+    screenshotId: number
+  ): Promise<Screenshot> {
+    return apiV2HttpService.post(
+      `${base(projectId)}/${assetId}/screenshots/link`,
+      { screenshotId }
+    );
+  },
+  unlinkScreenshot(projectId: number, assetId: number, screenshotId: number) {
+    return apiV2HttpService.delete(
+      `${base(projectId)}/${assetId}/screenshots/${screenshotId}`
     );
   },
   versionTicket(

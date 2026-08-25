@@ -29,6 +29,8 @@ When images are secured. Encrypted timestamp is appended to the filename.
   val thumbnailUrl: String,
   val createdAt: Date?,
   val keyReferences: List<KeyInScreenshotModel>,
+  /** Binary assets used on this screen. */
+  val assetReferences: List<AssetInScreenshotModel> = emptyList(),
   val location: String?,
   val width: Int?,
   val height: Int?,

@@ -139,7 +139,8 @@ class BranchCleanupService(
 
     // --- Screenshots: service deletes files from storage before we remove DB rows ---
     screenshotService.deleteFilesByBranch(branchId)
-    // Collect orphan screenshot IDs (only referenced by this branch's keys) before deleting refs.
+    // Collect orphan screenshot IDs (only referenced by this branch's keys, and by no binary asset)
+    // before deleting refs.
     @Suppress("UNCHECKED_CAST")
     val orphanScreenshotIds =
       entityManager
@@ -152,6 +153,10 @@ class BranchCleanupService(
               SELECT 1 FROM key_screenshot_reference other
               JOIN key ok ON ok.id = other.key_id
               WHERE other.screenshot_id = ksr.screenshot_id AND ok.branch_id != :branchId
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM binary_asset_screenshot_reference basr
+              WHERE basr.screenshot_id = ksr.screenshot_id
             )
           """.trimIndent(),
         ).setParameter("branchId", branchId)

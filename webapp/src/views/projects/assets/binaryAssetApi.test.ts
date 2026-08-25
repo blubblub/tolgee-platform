@@ -63,6 +63,28 @@ describe('binaryAssetApi pipeline paths', () => {
   });
 });
 
+describe('binaryAssetApi screenshot paths', () => {
+  beforeEach(() => {
+    calls.length = 0;
+    multipartForms.length = 0;
+  });
+
+  it('hangs every screenshot endpoint off the asset', async () => {
+    const prefix = 'projects/1/binary-assets/2/screenshots';
+    const file = new File(['png'], 'screen.png', { type: 'image/png' });
+
+    await binaryAssetApi.listScreenshots(1, 2);
+    await binaryAssetApi.uploadScreenshot(1, 2, file, 'home');
+    await binaryAssetApi.linkScreenshot(1, 2, 9);
+    await binaryAssetApi.unlinkScreenshot(1, 2, 9);
+
+    expect(calls).toEqual([prefix, prefix, `${prefix}/link`, `${prefix}/9`]);
+    expect(multipartForms[0].get('screenshot')).toBe(file);
+    // the location travels as a JSON part, the shape the controller binds to
+    expect(multipartForms[0].get('info')).toBeInstanceOf(Blob);
+  });
+});
+
 // An empty "file" part is rejected by the backend as an empty file, not read as "no source",
 // so a source-less create has to omit the part entirely.
 describe('binaryAssetApi.create', () => {

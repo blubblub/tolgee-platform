@@ -2,6 +2,8 @@ package io.tolgee.hateoas.binaryAsset
 
 import io.tolgee.api.v2.controllers.binaryAsset.BinaryAssetController
 import io.tolgee.dtos.cacheable.LanguageDto
+import io.tolgee.hateoas.screenshot.ScreenshotModelAssembler
+import io.tolgee.model.Screenshot
 import io.tolgee.model.binaryAsset.BinaryAsset
 import io.tolgee.model.binaryAsset.BinaryAssetTranslation
 import io.tolgee.model.binaryAsset.BinaryAssetTranslationVersion
@@ -11,6 +13,7 @@ import io.tolgee.service.binaryAsset.BinaryAssetTranscriptService
 import io.tolgee.service.binaryAsset.BinaryAssetTranslationVersionService
 import io.tolgee.service.binaryAsset.capabilities
 import io.tolgee.service.binaryAsset.mediaType
+import io.tolgee.service.key.ScreenshotService
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport
 import org.springframework.stereotype.Component
 
@@ -19,13 +22,15 @@ class BinaryAssetModelAssembler(
   private val binaryAssetService: BinaryAssetService,
   private val binaryAssetTranscriptService: BinaryAssetTranscriptService,
   private val binaryAssetTranslationVersionService: BinaryAssetTranslationVersionService,
+  private val screenshotService: ScreenshotService,
+  private val screenshotModelAssembler: ScreenshotModelAssembler,
 ) : RepresentationModelAssemblerSupport<BinaryAsset, BinaryAssetModel>(
     BinaryAssetController::class.java,
     BinaryAssetModel::class.java,
   ) {
   /**
-   * List rows carry their localized files too — the assets page edits them in place. Versions are
-   * pre-fetched for the whole page so listing costs one version query, not one per asset.
+   * List rows carry their localized files too — the assets page edits them in place. Versions and
+   * screenshots are pre-fetched for the whole page so listing costs one query each, not one per asset.
    *
    * [targetLanguages] must already be the caller's permitted view languages: a translator scoped to
    * one language must not see the other languages' files here either.
@@ -35,25 +40,42 @@ class BinaryAssetModelAssembler(
     targetLanguages: Collection<LanguageDto>,
     transcripts: Map<Long, BinaryAssetTranscriptService.TranscriptText> = emptyMap(),
     versionsByAsset: Map<Long, List<BinaryAssetTranslationVersion>> = emptyMap(),
-  ): BinaryAssetModel = build(asset, targetLanguages, transcripts, versionsByAsset[asset.id].orEmpty())
+    screenshotsByAsset: Map<Long, List<Screenshot>> = emptyMap(),
+  ): BinaryAssetModel {
+    val screenshots = screenshotsByAsset[asset.id].orEmpty()
+    return build(
+      asset,
+      targetLanguages,
+      transcripts,
+      versionsByAsset[asset.id].orEmpty(),
+      screenshots.take(BinaryAssetModel.LIST_SCREENSHOT_LIMIT),
+      screenshots.size,
+    )
+  }
 
   fun toDetailModel(
     asset: BinaryAsset,
     targetLanguages: Collection<LanguageDto>,
     transcripts: Map<Long, BinaryAssetTranscriptService.TranscriptText> = emptyMap(),
-  ): BinaryAssetModel =
-    build(
+  ): BinaryAssetModel {
+    val screenshots = screenshotService.findAll(asset)
+    return build(
       asset,
       targetLanguages,
       transcripts,
       binaryAssetTranslationVersionService.findByAssetIdIn(listOf(asset.id)),
+      screenshots,
+      screenshots.size,
     )
+  }
 
   private fun build(
     asset: BinaryAsset,
     targetLanguages: Collection<LanguageDto>,
     transcripts: Map<Long, BinaryAssetTranscriptService.TranscriptText>,
     versions: List<BinaryAssetTranslationVersion>,
+    screenshots: List<Screenshot>,
+    screenshotCount: Int,
   ): BinaryAssetModel {
     // source-file versions have no translation, so they land under the null key
     val versionsByTranslation = versions.groupBy { it.translation?.id }
@@ -90,6 +112,8 @@ class BinaryAssetModelAssembler(
       transcripts[asset.sourceLanguage.id]?.text,
       binaryAssetTranscriptService.canTranscribe(asset),
       sourceVersions,
+      screenshots,
+      screenshotCount,
     )
   }
 
@@ -135,6 +159,8 @@ class BinaryAssetModelAssembler(
     transcriptSourceText: String? = null,
     transcriptionAvailable: Boolean = false,
     sourceVersions: List<BinaryAssetTranslationVersion> = emptyList(),
+    screenshots: List<Screenshot> = emptyList(),
+    screenshotCount: Int = 0,
   ): BinaryAssetModel {
     val chosenSource = sourceVersions.firstOrNull { it.chosen }
     return BinaryAssetModel(
@@ -167,6 +193,8 @@ class BinaryAssetModelAssembler(
       chosenVersionTool = chosenSource?.tool,
       versionCount = sourceVersions.size,
       translations = translations,
+      screenshots = screenshots.map { screenshotModelAssembler.toModel(it) },
+      screenshotCount = screenshotCount,
     )
   }
 

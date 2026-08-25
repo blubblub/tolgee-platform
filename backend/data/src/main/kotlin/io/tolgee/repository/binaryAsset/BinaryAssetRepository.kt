@@ -168,6 +168,11 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
   @Query("from BinaryAsset a where a.project.id = :projectId")
   fun findAllByProjectId(projectId: Long): List<BinaryAsset>
 
+  fun findAllByProjectIdAndNameIn(
+    projectId: Long,
+    names: Collection<String>,
+  ): List<BinaryAsset>
+
   @Query(
     """
     from BinaryAsset a

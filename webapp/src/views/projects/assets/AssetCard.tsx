@@ -5,6 +5,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import { LINKS, PARAMS } from 'tg.constants/links';
 import { visibleTranslations } from './binaryAssetApi';
 import { AssetLocalizedFiles } from './AssetLocalizedFiles';
+import { AssetScreenshots } from './AssetScreenshots';
 import { BinaryAsset } from './types';
 
 type Props = {
@@ -94,6 +95,14 @@ export const AssetCard = ({
           )}
           {actions}
         </Box>
+      </Box>
+
+      <Box mt={1.5}>
+        <AssetScreenshots
+          projectId={projectId}
+          asset={asset}
+          compact={linkToDetail}
+        />
       </Box>
 
       <Box mt={2}>

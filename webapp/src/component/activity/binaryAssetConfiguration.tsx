@@ -158,4 +158,26 @@ export const binaryAssetConfiguration: Record<
     },
     entities: { BinaryAssetTranslation: true },
   },
+  BINARY_ASSET_SCREENSHOT_ADD: {
+    label() {
+      return (
+        <T
+          keyName="activity_binary_asset_screenshot_add"
+          defaultValue="Added a screenshot to an asset"
+        />
+      );
+    },
+    entities: { BinaryAsset: true },
+  },
+  BINARY_ASSET_SCREENSHOT_DELETE: {
+    label() {
+      return (
+        <T
+          keyName="activity_binary_asset_screenshot_delete"
+          defaultValue="Removed a screenshot from an asset"
+        />
+      );
+    },
+    entities: { BinaryAsset: true },
+  },
 };

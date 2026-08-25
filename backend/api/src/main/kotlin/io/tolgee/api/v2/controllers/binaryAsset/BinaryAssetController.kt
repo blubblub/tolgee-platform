@@ -23,6 +23,7 @@ import io.tolgee.security.authorization.RequiresProjectPermissions
 import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.binaryAsset.BinaryAssetTranscriptService
 import io.tolgee.service.binaryAsset.BinaryAssetTranslationVersionService
+import io.tolgee.service.key.ScreenshotService
 import io.tolgee.service.security.PermissionService
 import io.tolgee.service.security.SecurityService
 import jakarta.servlet.http.HttpServletRequest
@@ -68,6 +69,7 @@ class BinaryAssetController(
   private val securityService: SecurityService,
   private val authenticationFacade: AuthenticationFacade,
   private val jwtService: JwtService,
+  private val screenshotService: ScreenshotService,
 ) : IController {
   @GetMapping("")
   @Operation(summary = "List binary assets")
@@ -87,16 +89,19 @@ class BinaryAssetController(
       binaryAssetTranscriptService.getTranscriptTranslationsByKey(
         page.content.mapNotNull { it.transcriptKey?.id },
       )
+    val assetIds = page.content.map { it.id }
     val versionsByAsset =
       binaryAssetTranslationVersionService
-        .findByAssetIdIn(page.content.map { it.id })
+        .findByAssetIdIn(assetIds)
         .groupBy { it.asset.id }
+    val screenshotsByAsset = screenshotService.getScreenshotsForAssets(assetIds)
     return pagedAssembler.toModel(page) { asset ->
       binaryAssetModelAssembler.toListModel(
         asset,
         languages,
         transcripts[asset.transcriptKey?.id].orEmpty(),
         versionsByAsset,
+        screenshotsByAsset,
       )
     }
   }

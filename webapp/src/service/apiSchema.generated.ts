@@ -157,7 +157,7 @@ export interface paths {
     put: operations["setLicenseKey"];
   };
   "/v2/image-upload": {
-    post: operations["upload"];
+    post: operations["upload_1"];
   };
   "/v2/image-upload/{ids}": {
     delete: operations["delete_21"];
@@ -344,7 +344,7 @@ export interface paths {
   };
   "/v2/organizations/{organizationId}/translation-memories/{translationMemoryId}/entries": {
     /** Pagination is row-level: each STORED bucket (manual entries on a source collapse into one row; each TMX `tuid` is its own row) and each VIRTUAL origin (one row per project key) gets its own page item. The `targetLanguageTag` filter narrows the *cells* of a row to a subset of target languages; rows themselves still appear with empty cells so the user can add a translation. */
-    get: operations["list_5"];
+    get: operations["list_6"];
     post: operations["create_17"];
     /** For every entry ID in the payload, deletes the entire group that shares the same source text (and key). The request is deduplicated to distinct groups so passing multiple entries from the same row is a no-op past the first one. */
     delete: operations["deleteMultipleGroups"];
@@ -478,7 +478,7 @@ export interface paths {
     delete: operations["removeAvatar_1"];
   };
   "/v2/projects/{projectId}/batch-jobs": {
-    get: operations["list_6"];
+    get: operations["list_7"];
   };
   "/v2/projects/{projectId}/batch-jobs/{id}": {
     get: operations["get_23"];
@@ -504,6 +504,19 @@ export interface paths {
     get: operations["get_12"];
     put: operations["update_7"];
     delete: operations["delete_6"];
+  };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/screenshots": {
+    get: operations["list_5"];
+    /** Stores a new screenshot and links it to the asset. `info.location` names the screen. */
+    post: operations["upload"];
+  };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/screenshots/link": {
+    /** The screenshot must belong to this project — attached to one of its keys or assets. */
+    post: operations["link"];
+  };
+  "/v2/projects/{projectId}/binary-assets/{assetId}/screenshots/{ids}": {
+    /** A screenshot nothing else references any more is deleted with its files. */
+    delete: operations["unlink"];
   };
   "/v2/projects/{projectId}/binary-assets/{assetId}/source": {
     put: operations["replaceSource"];
@@ -799,7 +812,7 @@ export interface paths {
     get: operations["selectKeys_2"];
   };
   "/v2/projects/{projectId}/keys/trash": {
-    get: operations["list_10"];
+    get: operations["list_11"];
   };
   "/v2/projects/{projectId}/keys/trash/deleters": {
     get: operations["listDeleters"];
@@ -981,6 +994,10 @@ export interface paths {
   "/v2/projects/{projectId}/qa-settings/languages/{languageId}/resolved": {
     get: operations["getLanguageSettingsResolved"];
   };
+  "/v2/projects/{projectId}/screenshots/by-location": {
+    /** Identified by `info.location`. Uploading the same location again replaces the image in place and links exactly the keys and assets listed — links not listed are dropped. Keys and assets are never created or deleted; unknown names are reported back. Idempotent, safe to rerun. */
+    put: operations["upsertByLocation_1"];
+  };
   "/v2/projects/{projectId}/single-step-import": {
     /** Unlike the /v2/projects/{projectId}/import endpoint, imports the data in single request by provided files and parameters. This is useful for automated importing via API or CLI. */
     post: operations["singleStepFromFiles"];
@@ -1123,7 +1140,7 @@ export interface paths {
   };
   "/v2/projects/{projectId}/translation-memories": {
     /** Always readable. When the TRANSLATION_MEMORY feature is not enabled for the organization, only the project-type assignment (if any) is returned so the settings page can still show the row that already drives in-project suggestions. */
-    get: operations["list_8"];
+    get: operations["list_9"];
   };
   "/v2/projects/{projectId}/translation-memories/project-tm-settings": {
     /** Sets TM-level flags on the project's own PROJECT-type TM. The shared-TM update endpoint rejects PROJECT TMs; this narrow endpoint exists so project admins can toggle the `writeOnlyReviewed` flag without org-level privileges. */
@@ -1589,6 +1606,11 @@ export interface components {
     ApplyBranchMergeRequest: {
       deleteBranch: boolean;
     };
+    AssetInScreenshotModel: {
+      /** Format: int64 */
+      assetId: number;
+      assetName: string;
+    };
     AssignSharedTranslationMemoryRequest: {
       /**
        * Format: int32
@@ -1733,12 +1755,18 @@ export interface components {
       /** @description Keys in the document used as a context for machine translation. Keys in the same order as they appear in the document. The order is important! We are using it for graph distance calculation. */
       relatedKeysInOrder?: components["schemas"]["RelatedKeyDto"][];
     };
+    BinaryAssetCapabilitiesModel: {
+      pipeline: boolean;
+      record: boolean;
+      transcript: boolean;
+    };
     BinaryAssetDownloadTicketModel: {
       url: string;
     };
     BinaryAssetModel: {
       /** Format: int64 */
       byteSize: number;
+      capabilities: components["schemas"]["BinaryAssetCapabilitiesModel"];
       chosenVersionFilename?: string;
       /** Format: int64 */
       chosenVersionId?: number;
@@ -1751,10 +1779,15 @@ export interface components {
       description?: string;
       /** Format: int64 */
       id: number;
+      /** @enum {string} */
+      mediaType?: "AUDIO" | "VIDEO" | "IMAGE";
       name: string;
       originalFilename?: string;
       /** Format: int32 */
       outdatedCount: number;
+      /** Format: int32 */
+      screenshotCount: number;
+      screenshots: components["schemas"]["ScreenshotModel"][];
       sha256?: string;
       /** Format: int64 */
       sourceLanguageId: number;
@@ -1780,6 +1813,13 @@ export interface components {
     };
     BinaryAssetReviewRequest: {
       reviewed: boolean;
+    };
+    BinaryAssetScreenshotLinkRequest: {
+      /**
+       * Format: int64
+       * @description Id of a screenshot that already exists in this project, e.g. one attached to a key.
+       */
+      screenshotId: number;
     };
     BinaryAssetTranscriptRequest: {
       /**
@@ -3405,6 +3445,12 @@ export interface components {
         | "binary_asset_transcript_not_found"
         | "binary_asset_transcript_text_or_key_required"
         | "binary_asset_not_transcribable"
+        | "binary_asset_transcript_not_supported"
+        | "binary_asset_tool_not_supported"
+        | "screenshot_not_found"
+        | "screenshot_not_from_project"
+        | "screenshot_location_required"
+        | "screenshot_too_many_references"
         | "transcription_not_configured"
         | "transcription_file_too_large"
         | "transcription_empty_result"
@@ -5510,6 +5556,9 @@ export interface components {
         | "BINARY_ASSET_TRANSLATION_VERSION_RUN"
         | "BINARY_ASSET_TRANSLATION_VERSION_CHOOSE"
         | "BINARY_ASSET_TRANSLATION_VERSION_DELETE"
+        | "BINARY_ASSET_SCREENSHOT_ADD"
+        | "BINARY_ASSET_SCREENSHOT_DELETE"
+        | "SCREENSHOT_UPSERT_BY_LOCATION"
         | "KEY_TAGS_EDIT"
         | "KEY_NAME_EDIT"
         | "KEY_CHARACTER_LIMIT_EDIT"
@@ -6450,12 +6499,48 @@ export interface components {
       path: string;
       signingRegion: string;
     };
+    ScreenshotAssetReferenceRequest: {
+      name: string;
+    };
+    ScreenshotByLocationRequest: {
+      /** @description Binary assets used on this screen. Names not found in the project are reported, not created. */
+      assets: components["schemas"]["ScreenshotAssetReferenceRequest"][];
+      /** @description Keys visible on this screen. Names not found in the project are reported, not created. */
+      keys: components["schemas"]["ScreenshotKeyReferenceRequest"][];
+      /** @description Identity of the screen (route, flow step, …). Uploading the same location again replaces the image in place and resets the linked keys and assets to what this request lists. */
+      location: string;
+    };
+    ScreenshotByLocationResultModel: {
+      /** @description True when no screenshot existed at this location before. */
+      created: boolean;
+      linkedAssets: string[];
+      linkedKeys: string[];
+      /**
+       * Format: int32
+       * @description Older screenshots at the same location that were folded into this one.
+       */
+      replacedScreenshots: number;
+      screenshot: components["schemas"]["ScreenshotModel"];
+      /** @description Requested asset names that do not exist in the project. Nothing was created for them. */
+      unknownAssets: string[];
+      /** @description Requested key names that do not exist in the project. Nothing was created for them. */
+      unknownKeys: string[];
+    };
     ScreenshotInfoDto: {
       location?: string;
       positions?: components["schemas"]["KeyInScreenshotPositionDto"][];
       text?: string;
     };
+    ScreenshotKeyReferenceRequest: {
+      name: string;
+      namespace?: string;
+      /** @description Where the key's text is on the image, in pixels of the uploaded image. */
+      positions?: components["schemas"]["KeyInScreenshotPositionDto"][];
+      /** @description The text as rendered on this screen. */
+      text?: string;
+    };
     ScreenshotModel: {
+      assetReferences: components["schemas"]["AssetInScreenshotModel"][];
       /** Format: date-time */
       createdAt?: string;
       fileUrl: string;
@@ -7318,6 +7403,12 @@ export interface components {
         | "binary_asset_transcript_not_found"
         | "binary_asset_transcript_text_or_key_required"
         | "binary_asset_not_transcribable"
+        | "binary_asset_transcript_not_supported"
+        | "binary_asset_tool_not_supported"
+        | "screenshot_not_found"
+        | "screenshot_not_from_project"
+        | "screenshot_location_required"
+        | "screenshot_too_many_references"
         | "transcription_not_configured"
         | "transcription_file_too_large"
         | "transcription_empty_result"
@@ -9866,7 +9957,7 @@ export interface operations {
       };
     };
   };
-  upload: {
+  upload_1: {
     responses: {
       /** Created */
       201: {
@@ -12704,7 +12795,7 @@ export interface operations {
     };
   };
   /** Pagination is row-level: each STORED bucket (manual entries on a source collapse into one row; each TMX `tuid` is its own row) and each VIRTUAL origin (one row per project key) gets its own page item. The `targetLanguageTag` filter narrows the *cells* of a row to a subset of target languages; rows themselves still appear with empty cells so the user can add a translation. */
-  list_5: {
+  list_6: {
     parameters: {
       path: {
         organizationId: number;
@@ -14630,7 +14721,7 @@ export interface operations {
       };
     };
   };
-  list_6: {
+  list_7: {
     parameters: {
       query: {
         /** Zero-based page index (0..N) */
@@ -15067,6 +15158,180 @@ export interface operations {
     parameters: {
       path: {
         assetId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** No Content */
+      204: never;
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  list_5: {
+    parameters: {
+      path: {
+        assetId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["CollectionModelScreenshotModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  /** Stores a new screenshot and links it to the asset. `info.location` names the screen. */
+  upload: {
+    parameters: {
+      path: {
+        assetId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** Created */
+      201: {
+        content: {
+          "*/*": components["schemas"]["ScreenshotModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": {
+          /** Format: binary */
+          screenshot: string;
+          info?: components["schemas"]["ScreenshotInfoDto"];
+        };
+      };
+    };
+  };
+  /** The screenshot must belong to this project — attached to one of its keys or assets. */
+  link: {
+    parameters: {
+      path: {
+        assetId: number;
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ScreenshotModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BinaryAssetScreenshotLinkRequest"];
+      };
+    };
+  };
+  /** A screenshot nothing else references any more is deleted with its files. */
+  unlink: {
+    parameters: {
+      path: {
+        assetId: number;
+        ids: number[];
         projectId: number;
       };
     };
@@ -18998,7 +19263,7 @@ export interface operations {
       };
     };
   };
-  list_10: {
+  list_11: {
     parameters: {
       query: {
         /** Zero-based page index (0..N) */
@@ -22226,6 +22491,55 @@ export interface operations {
       };
     };
   };
+  /** Identified by `info.location`. Uploading the same location again replaces the image in place and links exactly the keys and assets listed — links not listed are dropped. Keys and assets are never created or deleted; unknown names are reported back. Idempotent, safe to rerun. */
+  upsertByLocation_1: {
+    parameters: {
+      path: {
+        projectId: number;
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ScreenshotByLocationResultModel"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": {
+          /** Format: binary */
+          image: string;
+          info: components["schemas"]["ScreenshotByLocationRequest"];
+        };
+      };
+    };
+  };
   /** Unlike the /v2/projects/{projectId}/import endpoint, imports the data in single request by provided files and parameters. This is useful for automated importing via API or CLI. */
   singleStepFromFiles: {
     parameters: {
@@ -24204,7 +24518,7 @@ export interface operations {
     };
   };
   /** Always readable. When the TRANSLATION_MEMORY feature is not enabled for the organization, only the project-type assignment (if any) is returned so the settings page can still show the row that already drives in-project suggestions. */
-  list_8: {
+  list_9: {
     parameters: {
       path: {
         projectId: number;

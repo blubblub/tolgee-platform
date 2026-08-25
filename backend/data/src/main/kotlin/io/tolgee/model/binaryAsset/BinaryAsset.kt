@@ -101,4 +101,8 @@ class BinaryAsset(
   /** Every pipeline version of this asset — the source file's and every language's. */
   @OneToMany(mappedBy = "asset", orphanRemoval = true)
   var versions: MutableList<BinaryAssetTranslationVersion> = mutableListOf()
+
+  /** Screens this asset is used on. The screenshots themselves are shared with keys. */
+  @OneToMany(mappedBy = "asset", orphanRemoval = true)
+  var screenshotReferences: MutableList<BinaryAssetScreenshotReference> = mutableListOf()
 }
