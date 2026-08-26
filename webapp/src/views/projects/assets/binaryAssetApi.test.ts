@@ -1,6 +1,7 @@
 import {
   binaryAssetApi,
   getCapabilities,
+  getMediaType,
   inferMediaType,
   isAudioAsset,
   pickRecordingMime,
@@ -197,7 +198,7 @@ describe('getCapabilities', () => {
       record: true,
     });
     expect(getCapabilities({ contentType: 'video/mp4' })).toEqual({
-      transcript: true,
+      transcript: false,
       pipeline: false,
       record: false,
     });
@@ -214,6 +215,38 @@ describe('getCapabilities', () => {
       pipeline: true,
       record: true,
     });
+  });
+});
+
+describe('getMediaType', () => {
+  it('reads the localized files when there is no original', () => {
+    expect(
+      getMediaType({
+        translations: [
+          {
+            languageId: 1,
+            languageTag: 'de',
+            languageName: 'German',
+            status: 'MISSING',
+          },
+          {
+            languageId: 2,
+            languageTag: 'sl',
+            languageName: 'Slovenian',
+            status: 'CURRENT',
+            originalFilename: 'vox_sl.m4a',
+            contentType: 'application/octet-stream',
+          },
+        ],
+      })
+    ).toBe('AUDIO');
+  });
+
+  it('prefers what the server said', () => {
+    expect(getMediaType({ mediaType: 'IMAGE', contentType: 'audio/wav' })).toBe(
+      'IMAGE'
+    );
+    expect(getMediaType({})).toBeNull();
   });
 });
 

@@ -3,7 +3,7 @@ import { Box, Chip, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 
 import { LINKS, PARAMS } from 'tg.constants/links';
-import { visibleTranslations } from './binaryAssetApi';
+import { getMediaType, visibleTranslations } from './binaryAssetApi';
 import { AssetLocalizedFiles } from './AssetLocalizedFiles';
 import { AssetScreenshots } from './AssetScreenshots';
 import { BinaryAsset } from './types';
@@ -37,6 +37,7 @@ export const AssetCard = ({
   const rows = visibleTranslations(asset, languageTags);
   const currentCount = rows.filter((r) => r.status === 'CURRENT').length;
   const outdatedCount = rows.filter((r) => r.status === 'OUTDATED').length;
+  const mediaType = getMediaType(asset);
 
   return (
     <Box
@@ -78,11 +79,22 @@ export const AssetCard = ({
           ) : (
             <Typography fontWeight={600}>{asset.name}</Typography>
           )}
-          <Typography variant="body2" color="text.secondary">
-            {/* the filename lives in the source row now */}
-            {asset.sourceLanguageTag} r{asset.sourceRevision}
-            {asset.contentType ? ` · ${asset.contentType}` : ''}
-          </Typography>
+          <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+            {/* the type is known even with no original — the localized files say what it is */}
+            {mediaType && (
+              <Chip
+                size="small"
+                variant="outlined"
+                label={mediaType}
+                data-cy="binary-asset-media-type"
+              />
+            )}
+            <Typography variant="body2" color="text.secondary">
+              {/* the filename lives in the source row now */}
+              {asset.sourceLanguageTag} r{asset.sourceRevision}
+              {asset.contentType ? ` · ${asset.contentType}` : ''}
+            </Typography>
+          </Box>
         </Box>
         <Box display="flex" gap={1} alignItems="center">
           <Chip size="small" label={`${currentCount}/${rows.length} current`} />

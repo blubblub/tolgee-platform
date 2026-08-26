@@ -169,6 +169,7 @@ declare namespace DataCy {
         "binary-asset-final-record-audio": true;
         "binary-asset-language-transcript-input": true;
         "binary-asset-language-transcript-placeholder": true;
+        "binary-asset-media-type": true;
         "binary-asset-preview-audio": true;
         "binary-asset-preview-error": true;
         "binary-asset-preview-image": true;

@@ -3,6 +3,7 @@ package io.tolgee.api.v2.controllers.binaryAsset
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.tolgee.ProjectAuthControllerTest
 import io.tolgee.component.transcription.ElevenLabsVoiceClient
+import io.tolgee.fixtures.AuthorizedRequestFactory
 import io.tolgee.fixtures.andAssertThatJson
 import io.tolgee.fixtures.andIsBadRequest
 import io.tolgee.fixtures.andIsCreated
@@ -19,6 +20,9 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+import org.springframework.test.web.servlet.request.RequestPostProcessor
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers
 
 /**
  * An image is localized by another image, a video by another video — only a voice-over goes
@@ -88,16 +92,71 @@ class BinaryAssetMediaTypeTest : ProjectAuthControllerTest("/v2/projects/") {
 
   @Test
   @ProjectJWTAuthTestMethod
-  fun `a video can be transcribed but not re-voiced`() {
+  fun `a video is localized by another video, with no transcript`() {
     val assetId = createAsset("clip", "clip.mp4", "video/mp4")
 
     performProjectAuthGet("binary-assets/$assetId").andIsOk.andAssertThatJson {
       node("mediaType").isEqualTo("VIDEO")
-      node("capabilities.transcript").isEqualTo(true)
+      node("capabilities.transcript").isEqualTo(false)
       node("capabilities.pipeline").isEqualTo(false)
       node("capabilities.record").isEqualTo(false)
+      node("transcriptionAvailable").isEqualTo(false)
     }
-    performProjectAuthPost("binary-assets/$assetId/transcript", mapOf("text" to "Spoken in the clip.")).andIsOk
+    performProjectAuthPost("binary-assets/$assetId/transcript", mapOf("text" to "Spoken in the clip."))
+      .andIsBadRequest
+      .andAssertThatJson { node("code").isEqualTo("binary_asset_transcript_not_supported") }
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `an asset with no original takes its type from its localized files`() {
+    val assetId = createAsset("sourceless-voice", null)
+    val langId = languageId("de")
+    val builder =
+      MockMvcRequestBuilders
+        .multipart("${projectUrlPrefix}${project.id}/binary-assets/$assetId/translations/$langId")
+        .file(MockMultipartFile("file", "voice_de.m4a", "application/octet-stream", byteArrayOf(1, 2, 3, 4)))
+        .file(MockMultipartFile("translatedAgainstSourceRevision", null, MediaType.TEXT_PLAIN_VALUE, "1".toByteArray()))
+    builder.with(
+      RequestPostProcessor { req ->
+        req.method = "PUT"
+        req
+      },
+    )
+    mvc.perform(AuthorizedRequestFactory.addToken(builder)).andExpect(MockMvcResultMatchers.status().isOk)
+
+    performProjectAuthGet("binary-assets/$assetId").andIsOk.andAssertThatJson {
+      node("mediaType").isEqualTo("AUDIO")
+      node("capabilities.transcript").isEqualTo(true)
+    }
+    // the list filter agrees with the model: found under AUDIO, absent under IMAGE
+    assertThat(listedNames("AUDIO")).contains("sourceless-voice")
+    assertThat(listedNames("IMAGE")).doesNotContain("sourceless-voice")
+  }
+
+  private fun listedNames(mediaType: String): List<String> {
+    val body =
+      performProjectAuthGet("binary-assets?filterMediaType=$mediaType&size=50")
+        .andIsOk
+        .andReturn()
+        .response.contentAsString
+    val embedded = jacksonObjectMapper().readTree(body).get("_embedded") ?: return emptyList()
+    return embedded.get("binaryAssets").map { it.get("name").asText() }
+  }
+
+  private fun languageId(tag: String): Long {
+    val body =
+      performProjectAuthGet("languages")
+        .andIsOk
+        .andReturn()
+        .response.contentAsString
+    val tree = jacksonObjectMapper().readTree(body)
+    return tree
+      .get("_embedded")
+      .get("languages")
+      .first { it.get("tag").asText() == tag }
+      .get("id")
+      .asLong()
   }
 
   @Test

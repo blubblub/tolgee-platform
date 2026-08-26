@@ -172,17 +172,40 @@ export const inferMediaType = (
 };
 
 /**
+ * The asset's media type: what the server said, else inferred from the original, else from the
+ * first localized file that says anything (an asset with no original still has a type).
+ */
+export const getMediaType = (
+  asset: Pick<
+    BinaryAsset,
+    'mediaType' | 'contentType' | 'originalFilename' | 'translations'
+  >
+): BinaryAssetMediaType | null =>
+  asset.mediaType ??
+  inferMediaType(asset.contentType, asset.originalFilename) ??
+  (asset.translations ?? [])
+    .map((t) => inferMediaType(t.contentType, t.originalFilename))
+    .find((type) => type !== null) ??
+  null;
+
+/**
  * What the asset's row should offer. The server is the source of truth; the fallback only covers
  * responses without the field. An unknown type keeps everything — a transcript may be all a
  * source-less asset has, and recording is one way to give it a first file.
  */
 export const getCapabilities = (
-  asset: Pick<BinaryAsset, 'capabilities' | 'contentType' | 'originalFilename'>
+  asset: Pick<
+    BinaryAsset,
+    | 'capabilities'
+    | 'mediaType'
+    | 'contentType'
+    | 'originalFilename'
+    | 'translations'
+  >
 ): BinaryAssetCapabilities => {
   if (asset.capabilities) return asset.capabilities;
-  switch (inferMediaType(asset.contentType, asset.originalFilename)) {
+  switch (getMediaType(asset)) {
     case 'VIDEO':
-      return { transcript: true, pipeline: false, record: false };
     case 'IMAGE':
       return { transcript: false, pipeline: false, record: false };
     default:

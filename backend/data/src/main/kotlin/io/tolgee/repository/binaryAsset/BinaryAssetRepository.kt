@@ -19,106 +19,22 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
   /**
    * When filterAudio/Video/Image are all false, every type is returned.
    * When any is true, assets matching any selected type are returned (OR).
-   * Type is inferred from source contentType and originalFilename.
-   *
-   * ponytail: an asset with no original has no type to infer, so it shows under every chip rather
-   * than disappearing from all of them. Coalesce its translations' content types if that bites.
+   * Type is inferred from the source file, or — with no original — from any localized file, the
+   * same way [io.tolgee.service.binaryAsset.mediaType] does. An asset with no file at all shows
+   * under every chip rather than disappearing from all of them.
    */
   @Query(
-    """
-    from BinaryAsset a
-    left join fetch a.sourceLanguage
-    left join fetch a.uploadedBy
-    left join fetch a.transcriptKey
-    where a.project.id = :projectId
-      and (:search is null or lower(a.name) like lower(concat('%', cast(:search as string), '%')))
-      and (
-        (:filterAudio = false and :filterVideo = false and :filterImage = false)
-        or a.storageKey is null
-        or (
-          :filterAudio = true and (
-            lower(a.contentType) like 'audio/%'
-            or lower(a.originalFilename) like '%.mp3'
-            or lower(a.originalFilename) like '%.wav'
-            or lower(a.originalFilename) like '%.ogg'
-            or lower(a.originalFilename) like '%.m4a'
-            or lower(a.originalFilename) like '%.aac'
-            or lower(a.originalFilename) like '%.flac'
-            or lower(a.originalFilename) like '%.webm'
-            or lower(a.originalFilename) like '%.opus'
-          )
-        )
-        or (
-          :filterVideo = true and (
-            lower(a.contentType) like 'video/%'
-            or lower(a.originalFilename) like '%.mp4'
-            or lower(a.originalFilename) like '%.mov'
-            or lower(a.originalFilename) like '%.m4v'
-            or lower(a.originalFilename) like '%.webm'
-            or lower(a.originalFilename) like '%.mkv'
-            or lower(a.originalFilename) like '%.avi'
-          )
-        )
-        or (
-          :filterImage = true and (
-            lower(a.contentType) like 'image/%'
-            or lower(a.originalFilename) like '%.png'
-            or lower(a.originalFilename) like '%.jpg'
-            or lower(a.originalFilename) like '%.jpeg'
-            or lower(a.originalFilename) like '%.gif'
-            or lower(a.originalFilename) like '%.webp'
-            or lower(a.originalFilename) like '%.svg'
-            or lower(a.originalFilename) like '%.bmp'
-          )
-        )
-      )
-    order by a.id
-    """,
-    countQuery = """
-    select count(a) from BinaryAsset a
-    where a.project.id = :projectId
-      and (:search is null or lower(a.name) like lower(concat('%', cast(:search as string), '%')))
-      and (
-        (:filterAudio = false and :filterVideo = false and :filterImage = false)
-        or a.storageKey is null
-        or (
-          :filterAudio = true and (
-            lower(a.contentType) like 'audio/%'
-            or lower(a.originalFilename) like '%.mp3'
-            or lower(a.originalFilename) like '%.wav'
-            or lower(a.originalFilename) like '%.ogg'
-            or lower(a.originalFilename) like '%.m4a'
-            or lower(a.originalFilename) like '%.aac'
-            or lower(a.originalFilename) like '%.flac'
-            or lower(a.originalFilename) like '%.webm'
-            or lower(a.originalFilename) like '%.opus'
-          )
-        )
-        or (
-          :filterVideo = true and (
-            lower(a.contentType) like 'video/%'
-            or lower(a.originalFilename) like '%.mp4'
-            or lower(a.originalFilename) like '%.mov'
-            or lower(a.originalFilename) like '%.m4v'
-            or lower(a.originalFilename) like '%.webm'
-            or lower(a.originalFilename) like '%.mkv'
-            or lower(a.originalFilename) like '%.avi'
-          )
-        )
-        or (
-          :filterImage = true and (
-            lower(a.contentType) like 'image/%'
-            or lower(a.originalFilename) like '%.png'
-            or lower(a.originalFilename) like '%.jpg'
-            or lower(a.originalFilename) like '%.jpeg'
-            or lower(a.originalFilename) like '%.gif'
-            or lower(a.originalFilename) like '%.webp'
-            or lower(a.originalFilename) like '%.svg'
-            or lower(a.originalFilename) like '%.bmp'
-          )
-        )
-      )
-    """,
+    "from BinaryAsset a " +
+      "left join fetch a.sourceLanguage " +
+      "left join fetch a.uploadedBy " +
+      "left join fetch a.transcriptKey " +
+      "where a.project.id = :projectId " +
+      MEDIA_TYPE_FILTER +
+      " order by a.id",
+    countQuery =
+      "select count(a) from BinaryAsset a " +
+        "where a.project.id = :projectId " +
+        MEDIA_TYPE_FILTER,
   )
   fun findAllByProjectId(
     projectId: Long,
@@ -276,3 +192,35 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
   )
   fun clearTranscriptKeyByKeyProjectId(projectId: Long)
 }
+
+/** Media-type filter shared by the page and count queries; see findAllByProjectId. */
+private const val MEDIA_TYPE_FILTER =
+  "and (:search is null or lower(a.name) like lower(concat('%', cast(:search as string), '%'))) and " +
+    "((:filterAudio = false and :filterVideo = false and :filterImage = false) or (a.storageKey is null " +
+    "and not exists (select t2.id from BinaryAssetTranslation t2 where t2.asset.id = a.id)) or " +
+    "(:filterAudio = true and ((lower(a.contentType) like 'audio/%' or lower(a.originalFilename) like " +
+    "'%.mp3' or lower(a.originalFilename) like '%.wav' or lower(a.originalFilename) like '%.ogg' or " +
+    "lower(a.originalFilename) like '%.m4a' or lower(a.originalFilename) like '%.aac' or " +
+    "lower(a.originalFilename) like '%.flac' or lower(a.originalFilename) like '%.webm' or " +
+    "lower(a.originalFilename) like '%.opus') or (a.storageKey is null and exists (select t.id from " +
+    "BinaryAssetTranslation t where t.asset.id = a.id and (lower(t.contentType) like 'audio/%' or " +
+    "lower(t.originalFilename) like '%.mp3' or lower(t.originalFilename) like '%.wav' or " +
+    "lower(t.originalFilename) like '%.ogg' or lower(t.originalFilename) like '%.m4a' or " +
+    "lower(t.originalFilename) like '%.aac' or lower(t.originalFilename) like '%.flac' or " +
+    "lower(t.originalFilename) like '%.webm' or lower(t.originalFilename) like '%.opus'))))) or " +
+    "(:filterVideo = true and ((lower(a.contentType) like 'video/%' or lower(a.originalFilename) like " +
+    "'%.mp4' or lower(a.originalFilename) like '%.mov' or lower(a.originalFilename) like '%.m4v' or " +
+    "lower(a.originalFilename) like '%.mkv' or lower(a.originalFilename) like '%.avi') or (a.storageKey " +
+    "is null and exists (select t.id from BinaryAssetTranslation t where t.asset.id = a.id and " +
+    "(lower(t.contentType) like 'video/%' or lower(t.originalFilename) like '%.mp4' or " +
+    "lower(t.originalFilename) like '%.mov' or lower(t.originalFilename) like '%.m4v' or " +
+    "lower(t.originalFilename) like '%.mkv' or lower(t.originalFilename) like '%.avi'))))) or " +
+    "(:filterImage = true and ((lower(a.contentType) like 'image/%' or lower(a.originalFilename) like " +
+    "'%.png' or lower(a.originalFilename) like '%.jpg' or lower(a.originalFilename) like '%.jpeg' or " +
+    "lower(a.originalFilename) like '%.gif' or lower(a.originalFilename) like '%.webp' or " +
+    "lower(a.originalFilename) like '%.svg' or lower(a.originalFilename) like '%.bmp') or (a.storageKey " +
+    "is null and exists (select t.id from BinaryAssetTranslation t where t.asset.id = a.id and " +
+    "(lower(t.contentType) like 'image/%' or lower(t.originalFilename) like '%.png' or " +
+    "lower(t.originalFilename) like '%.jpg' or lower(t.originalFilename) like '%.jpeg' or " +
+    "lower(t.originalFilename) like '%.gif' or lower(t.originalFilename) like '%.webp' or " +
+    "lower(t.originalFilename) like '%.svg' or lower(t.originalFilename) like '%.bmp'))))))"

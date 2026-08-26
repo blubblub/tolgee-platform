@@ -9,11 +9,11 @@ package io.tolgee.model.enums
 enum class BinaryAssetMediaType(
   val capabilities: BinaryAssetCapabilities,
 ) {
-  /** Voice-over: transcript, TTS / voice-changer pipeline and in-browser recording all apply. */
+  /** Sound: the only type with a transcript, the TTS / voice-changer pipeline and in-browser recording. */
   AUDIO(BinaryAssetCapabilities(transcript = true, pipeline = true, record = true)),
 
-  /** Speech can be transcribed, but the audio tools would produce audio, not video. */
-  VIDEO(BinaryAssetCapabilities(transcript = true, pipeline = false, record = false)),
+  /** Localized by another video; the transcript and the audio tools are for spoken sound only. */
+  VIDEO(BinaryAssetCapabilities(transcript = false, pipeline = false, record = false)),
 
   /** Localized by swapping in a whole other file; nothing is spoken. */
   IMAGE(BinaryAssetCapabilities(transcript = false, pipeline = false, record = false)),

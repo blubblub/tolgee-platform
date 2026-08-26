@@ -390,7 +390,7 @@ describe('AssetLocalizedFiles', () => {
     ).not.toBeNull();
   });
 
-  it('keeps the transcript but drops the audio tools for a video', () => {
+  it('treats a video like an image: no transcript, no audio tools', () => {
     permissions.satisfiesPermission.mockImplementation(() => true);
     permissions.satisfiesLanguageAccess.mockImplementation(() => true);
     render(
@@ -399,14 +399,14 @@ describe('AssetLocalizedFiles', () => {
         originalFilename: 'clip.mp4',
         contentType: 'video/mp4',
         mediaType: 'VIDEO',
-        capabilities: { transcript: true, pipeline: false, record: false },
+        capabilities: { transcript: false, pipeline: false, record: false },
       },
       'English'
     );
 
     expect(
       container.querySelector('[data-cy="binary-asset-transcript-cell"]')
-    ).not.toBeNull();
+    ).toBeNull();
     expect(
       container.querySelector('[data-cy="binary-asset-final-cell"]')
     ).toBeNull();

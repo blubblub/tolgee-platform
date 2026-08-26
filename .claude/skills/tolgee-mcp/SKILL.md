@@ -166,11 +166,12 @@ shown on it. The atlas screenshot bot drives this; humans rarely need to.
 - Asset models carry `screenshots` (first 6 in lists, all in `get_asset`) and
   `screenshotCount`; screenshot models carry `keyReferences` and
   `assetReferences`.
-- Media types: `mediaType` (AUDIO/VIDEO/IMAGE) and `capabilities`
-  (`transcript`, `pipeline`, `record`) say what applies to an asset. An image
-  is localized by a replacement file only — transcript and tool calls on it
-  are refused (`binary_asset_transcript_not_supported`,
-  `binary_asset_tool_not_supported`).
+- Media types: `mediaType` (AUDIO/VIDEO/IMAGE, inferred from the original or,
+  without one, from any localized file) and `capabilities` (`transcript`,
+  `pipeline`, `record`) say what applies to an asset. Only AUDIO has a
+  transcript and the audio tools; an image or video is localized by a
+  replacement file only — transcript and tool calls on it are refused
+  (`binary_asset_transcript_not_supported`, `binary_asset_tool_not_supported`).
 
 ## Limits & gotchas
 

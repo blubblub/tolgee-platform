@@ -216,10 +216,7 @@ class BinaryAssetTranscriptService(
     // ponytail: an asset with no original is never AI-transcribable. Judge it by its translations'
     // content types if per-language transcription is ever wanted for source-less assets.
     if (asset.storageKey == null) return false
-    return when (asset.mediaType) {
-      BinaryAssetMediaType.AUDIO, BinaryAssetMediaType.VIDEO -> true
-      else -> false
-    }
+    return asset.mediaType == BinaryAssetMediaType.AUDIO
   }
 
   /** An image is localized by another image; there is nothing to transcribe, so no key either. */
