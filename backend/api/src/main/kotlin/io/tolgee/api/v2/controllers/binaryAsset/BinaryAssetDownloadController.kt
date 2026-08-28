@@ -12,7 +12,10 @@ import io.tolgee.service.binaryAsset.BinaryAssetService
 import io.tolgee.service.binaryAsset.BinaryAssetTranslationVersionService
 import io.tolgee.service.security.PermissionService
 import io.tolgee.service.security.SecurityService
+import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpRange
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.CrossOrigin
 import org.springframework.web.bind.annotation.GetMapping
@@ -39,11 +42,13 @@ class BinaryAssetDownloadController(
     summary = "Download or inline-preview a binary asset file via short-lived ticket",
     description =
       "Pass inline=true (or omit when content type is audio/image/video) to stream with " +
-        "Content-Disposition: inline so browsers can play/preview in-page.",
+        "Content-Disposition: inline so browsers can play/preview in-page. " +
+        "Supports HTTP byte ranges (a single `Range: bytes=…` → 206 Partial Content).",
   )
   fun download(
     @RequestParam token: String,
     @RequestParam(required = false, defaultValue = "false") inline: Boolean,
+    request: HttpServletRequest,
   ): ResponseEntity<StreamingResponseBody> {
     val auth =
       try {
@@ -98,7 +103,28 @@ class BinaryAssetDownloadController(
       if (streamMeta.storageKey != storageKey) throw NotFoundException()
     }
 
-    val fileStream = binaryAssetService.openByStorageKey(storageKey, rawContentType, filename, byteSize)
+    // Byte ranges let browsers reach the MP4 index (`moov`) when it sits at the end of the
+    // file and seek without downloading everything. Resolved only after authorization so a
+    // 416 never reveals anything about a file the caller may not access.
+    val range = resolveRange(request, byteSize)
+    if (range is RangeResolution.Unsatisfiable) {
+      return ResponseEntity
+        .status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+        .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+        .header(HttpHeaders.CONTENT_RANGE, "bytes */$byteSize")
+        .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+        .build()
+    }
+    val partial = range as? RangeResolution.Partial
+
+    val fileStream =
+      binaryAssetService.openByStorageKey(
+        storageKey,
+        rawContentType,
+        filename,
+        byteSize,
+        partial?.let { it.start..it.endInclusive },
+      )
     val contentType = normalizeMediaContentType(fileStream.contentType, fileStream.filename)
     val encoded = URLEncoder.encode(fileStream.filename, StandardCharsets.UTF_8).replace("+", "%20")
     val safeName = fileStream.filename.replace("\"", "")
@@ -113,15 +139,59 @@ class BinaryAssetDownloadController(
       StreamingResponseBody { output ->
         fileStream.inputStream.use { input -> input.copyTo(output) }
       }
-    return ResponseEntity
-      .ok()
-      .header(HttpHeaders.CONTENT_TYPE, contentType)
-      .header(HttpHeaders.CONTENT_LENGTH, fileStream.byteSize.toString())
-      .header(HttpHeaders.CONTENT_DISPOSITION, disposition)
-      .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
-      .header("X-Content-Type-Options", "nosniff")
-      .header(HttpHeaders.ACCEPT_RANGES, "none")
-      .body(body)
+    val contentLength = partial?.let { it.endInclusive - it.start + 1 } ?: fileStream.byteSize
+    val response =
+      ResponseEntity
+        .status(if (partial != null) HttpStatus.PARTIAL_CONTENT else HttpStatus.OK)
+        .header(HttpHeaders.CONTENT_TYPE, contentType)
+        .header(HttpHeaders.CONTENT_LENGTH, contentLength.toString())
+        .header(HttpHeaders.CONTENT_DISPOSITION, disposition)
+        .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+        .header("X-Content-Type-Options", "nosniff")
+        .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+    if (partial != null) {
+      response.header(
+        HttpHeaders.CONTENT_RANGE,
+        "bytes ${partial.start}-${partial.endInclusive}/${fileStream.byteSize}",
+      )
+    }
+    return response.body(body)
+  }
+
+  private sealed interface RangeResolution {
+    data object Full : RangeResolution
+
+    data object Unsatisfiable : RangeResolution
+
+    data class Partial(
+      val start: Long,
+      val endInclusive: Long,
+    ) : RangeResolution
+  }
+
+  /**
+   * RFC 9110 §14: a malformed `Range` is ignored, a multi-range request may be answered with the
+   * full representation (browsers never send one), and `If-Range` can only match a validator —
+   * we emit none, so its presence means "send the whole file".
+   */
+  private fun resolveRange(
+    request: HttpServletRequest,
+    totalSize: Long,
+  ): RangeResolution {
+    val header = request.getHeader(HttpHeaders.RANGE) ?: return RangeResolution.Full
+    if (request.getHeader(HttpHeaders.IF_RANGE) != null) return RangeResolution.Full
+    val ranges =
+      try {
+        HttpRange.parseRanges(header)
+      } catch (_: IllegalArgumentException) {
+        return RangeResolution.Full
+      }
+    val single = ranges.singleOrNull() ?: return RangeResolution.Full
+    if (totalSize <= 0) return RangeResolution.Unsatisfiable
+    val start = single.getRangeStart(totalSize)
+    val end = single.getRangeEnd(totalSize)
+    if (start >= totalSize || start > end) return RangeResolution.Unsatisfiable
+    return RangeResolution.Partial(start, end)
   }
 
   private fun isBrowserPreviewable(contentType: String): Boolean {

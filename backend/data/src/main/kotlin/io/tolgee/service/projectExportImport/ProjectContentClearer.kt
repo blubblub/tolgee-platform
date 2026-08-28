@@ -5,6 +5,7 @@ import io.tolgee.model.Project
 import io.tolgee.model.Screenshot
 import io.tolgee.model.TranslationSuggestion
 import io.tolgee.model.binaryAsset.BinaryAsset
+import io.tolgee.model.binaryAsset.BinaryAssetScreenshotReference
 import io.tolgee.model.binaryAsset.BinaryAssetTranslation
 import io.tolgee.model.branching.Branch
 import io.tolgee.model.branching.snapshot.KeyMetaSnapshot
@@ -243,6 +244,8 @@ class ProjectContentClearer(
         KeyScreenshotReference::class,
         BinaryAsset::class,
         BinaryAssetTranslation::class,
+        // Cascades from the asset delete; asset-only screenshots are removed with it.
+        BinaryAssetScreenshotReference::class,
         Branch::class,
         Task::class,
         TaskKey::class,

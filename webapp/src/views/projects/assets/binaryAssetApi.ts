@@ -1,14 +1,41 @@
 import { apiV2HttpService } from 'tg.service/http/ApiV2HttpService';
 import {
   BinaryAsset,
+  BinaryAssetCapabilities,
+  BinaryAssetMediaType,
   BinaryAssetPage,
   BinaryAssetTranslation,
   DownloadTicket,
+  Screenshot,
 } from './types';
 
 // apiV2HttpService already prefixes with /v2/
 const base = (projectId: number | string) =>
   `projects/${projectId}/binary-assets`;
+
+export type TicketOptions = {
+  /**
+   * Skip the global error toast — for callers that handle failures themselves
+   * (BinaryAssetPreview retries tickets with backoff).
+   */
+  silent?: boolean;
+};
+
+const postTicket = async (
+  url: string,
+  opts?: TicketOptions
+): Promise<DownloadTicket> => {
+  const r = await apiV2HttpService.fetch(
+    url,
+    {
+      method: 'POST',
+      body: '{}',
+      headers: { 'Content-Type': 'application/json' },
+    },
+    { disableAutoErrorHandle: opts?.silent === true }
+  );
+  return r.json();
+};
 
 export type BinaryAssetTranslationVersionModel = {
   id: number;
@@ -111,6 +138,81 @@ export const isAudioAsset = (
   return AUDIO_FILE_EXTENSIONS.some((ext) => name.endsWith(ext));
 };
 
+const VIDEO_FILE_EXTENSIONS = ['.mp4', '.mov', '.m4v', '.mkv', '.avi'];
+const IMAGE_FILE_EXTENSIONS = [
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.bmp',
+];
+
+const ALL_CAPABILITIES: BinaryAssetCapabilities = {
+  transcript: true,
+  pipeline: true,
+  record: true,
+};
+
+/** Same rules as the backend's BinaryAssetMediaType.infer, for assets that predate the field. */
+export const inferMediaType = (
+  contentType?: string | null,
+  filename?: string | null
+): BinaryAssetMediaType | null => {
+  const type = (contentType ?? '').split(';')[0].trim().toLowerCase();
+  if (type.startsWith('audio/')) return 'AUDIO';
+  if (type.startsWith('video/')) return 'VIDEO';
+  if (type.startsWith('image/')) return 'IMAGE';
+  const name = (filename ?? '').toLowerCase();
+  if (AUDIO_FILE_EXTENSIONS.some((ext) => name.endsWith(ext))) return 'AUDIO';
+  if (VIDEO_FILE_EXTENSIONS.some((ext) => name.endsWith(ext))) return 'VIDEO';
+  if (IMAGE_FILE_EXTENSIONS.some((ext) => name.endsWith(ext))) return 'IMAGE';
+  return null;
+};
+
+/**
+ * The asset's media type: what the server said, else inferred from the original, else from the
+ * first localized file that says anything (an asset with no original still has a type).
+ */
+export const getMediaType = (
+  asset: Pick<
+    BinaryAsset,
+    'mediaType' | 'contentType' | 'originalFilename' | 'translations'
+  >
+): BinaryAssetMediaType | null =>
+  asset.mediaType ??
+  inferMediaType(asset.contentType, asset.originalFilename) ??
+  (asset.translations ?? [])
+    .map((t) => inferMediaType(t.contentType, t.originalFilename))
+    .find((type) => type !== null) ??
+  null;
+
+/**
+ * What the asset's row should offer. The server is the source of truth; the fallback only covers
+ * responses without the field. An unknown type keeps everything — a transcript may be all a
+ * source-less asset has, and recording is one way to give it a first file.
+ */
+export const getCapabilities = (
+  asset: Pick<
+    BinaryAsset,
+    | 'capabilities'
+    | 'mediaType'
+    | 'contentType'
+    | 'originalFilename'
+    | 'translations'
+  >
+): BinaryAssetCapabilities => {
+  if (asset.capabilities) return asset.capabilities;
+  switch (getMediaType(asset)) {
+    case 'VIDEO':
+    case 'IMAGE':
+      return { transcript: false, pipeline: false, record: false };
+    default:
+      return ALL_CAPABILITIES;
+  }
+};
+
 /** In-browser recording needs both getUserMedia and MediaRecorder. */
 export const canRecordAudio = () =>
   typeof navigator !== 'undefined' &&
@@ -168,10 +270,10 @@ export const binaryAssetApi = {
       form
     );
   },
-  sourceTicket(projectId: number, assetId: number) {
-    return apiV2HttpService.post<DownloadTicket>(
+  sourceTicket(projectId: number, assetId: number, opts?: TicketOptions) {
+    return postTicket(
       `${base(projectId)}/${assetId}/source/download-ticket`,
-      {}
+      opts
     );
   },
   upsertTranslation(
@@ -192,12 +294,17 @@ export const binaryAssetApi = {
       form
     );
   },
-  translationTicket(projectId: number, assetId: number, languageId: number) {
-    return apiV2HttpService.post<DownloadTicket>(
+  translationTicket(
+    projectId: number,
+    assetId: number,
+    languageId: number,
+    opts?: TicketOptions
+  ) {
+    return postTicket(
       `${base(
         projectId
       )}/${assetId}/translations/${languageId}/download-ticket`,
-      {}
+      opts
     );
   },
   deleteTranslation(projectId: number, assetId: number, languageId: number) {
@@ -269,17 +376,59 @@ export const binaryAssetApi = {
       body
     );
   },
+  listScreenshots(projectId: number, assetId: number): Promise<Screenshot[]> {
+    return apiV2HttpService
+      .get<{ _embedded?: { screenshots?: Screenshot[] } }>(
+        `${base(projectId)}/${assetId}/screenshots`
+      )
+      .then((r) => r._embedded?.screenshots ?? []);
+  },
+  uploadScreenshot(
+    projectId: number,
+    assetId: number,
+    file: File,
+    location?: string
+  ): Promise<Screenshot> {
+    const form = new FormData();
+    form.append('screenshot', file);
+    if (location) {
+      form.append(
+        'info',
+        new Blob([JSON.stringify({ location })], { type: 'application/json' })
+      );
+    }
+    return apiV2HttpService.postMultipart<Screenshot>(
+      `${base(projectId)}/${assetId}/screenshots`,
+      form
+    );
+  },
+  linkScreenshot(
+    projectId: number,
+    assetId: number,
+    screenshotId: number
+  ): Promise<Screenshot> {
+    return apiV2HttpService.post(
+      `${base(projectId)}/${assetId}/screenshots/link`,
+      { screenshotId }
+    );
+  },
+  unlinkScreenshot(projectId: number, assetId: number, screenshotId: number) {
+    return apiV2HttpService.delete(
+      `${base(projectId)}/${assetId}/screenshots/${screenshotId}`
+    );
+  },
   versionTicket(
     projectId: number,
     assetId: number,
     languageId: number,
-    versionId: number
+    versionId: number,
+    opts?: TicketOptions
   ): Promise<DownloadTicket> {
-    return apiV2HttpService.post(
+    return postTicket(
       `${base(
         projectId
       )}/${assetId}/translations/${languageId}/versions/${versionId}/download-ticket`,
-      {}
+      opts
     );
   },
 };

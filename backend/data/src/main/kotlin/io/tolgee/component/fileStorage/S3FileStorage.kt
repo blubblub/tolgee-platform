@@ -41,6 +41,21 @@ open class S3FileStorage(
     }
   }
 
+  override fun openFileStreamRange(
+    storageFilePath: String,
+    start: Long,
+    endInclusive: Long,
+  ): InputStream {
+    require(start >= 0 && endInclusive >= start) { "Invalid byte range $start-$endInclusive" }
+    try {
+      return s3.getObject { b ->
+        b.bucket(bucketName).key("$canonicalPath$storageFilePath").range("bytes=$start-$endInclusive")
+      }
+    } catch (e: Exception) {
+      throw FileStoreException("Can not obtain file", storageFilePath, e)
+    }
+  }
+
   override fun deleteFile(storageFilePath: String) {
     try {
       s3.deleteObject { b -> b.bucket(bucketName).key("$canonicalPath$storageFilePath") }

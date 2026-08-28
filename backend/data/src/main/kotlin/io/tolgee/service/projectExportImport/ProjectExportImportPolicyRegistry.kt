@@ -35,7 +35,10 @@ import io.tolgee.model.automations.AutomationTrigger
 import io.tolgee.model.batch.BatchJob
 import io.tolgee.model.batch.BatchJobChunkExecution
 import io.tolgee.model.binaryAsset.BinaryAsset
+import io.tolgee.model.binaryAsset.BinaryAssetScreenshotReference
 import io.tolgee.model.binaryAsset.BinaryAssetTranslation
+import io.tolgee.model.binaryAsset.BinaryAssetTranslationVersion
+import io.tolgee.model.binaryAsset.BinaryAssetVoice
 import io.tolgee.model.branching.Branch
 import io.tolgee.model.branching.BranchMerge
 import io.tolgee.model.branching.BranchMergeChange
@@ -123,6 +126,7 @@ object ProjectExportImportPolicyRegistry {
         KeyMetaSnapshot::class,
         BinaryAsset::class,
         BinaryAssetTranslation::class,
+        BinaryAssetScreenshotReference::class,
       )
 
       classify(UserAccount::class, ExportImportPolicy.USER_REF)
@@ -194,6 +198,10 @@ object ProjectExportImportPolicyRegistry {
         TranslationAgency::class,
         InstanceId::class,
         ForcedServerDateTime::class,
+        // Pipeline versions are derived outputs whose blobs are not exported; voices are per-instance
+        // ElevenLabs configuration. Neither round-trips, and the asset itself does.
+        BinaryAssetTranslationVersion::class,
+        BinaryAssetVoice::class,
       )
       ignoredByName(
         "io.tolgee.ee.model.EeSubscription",

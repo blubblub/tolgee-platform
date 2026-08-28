@@ -1,5 +1,8 @@
 import {
   binaryAssetApi,
+  getCapabilities,
+  getMediaType,
+  inferMediaType,
   isAudioAsset,
   pickRecordingMime,
   visibleTranslations,
@@ -24,6 +27,11 @@ vi.mock('tg.service/http/ApiV2HttpService', () => {
         calls.push(url);
         multipartForms.push(form);
         return Promise.resolve({});
+      },
+      // ticket calls go through fetch to opt out of the global error toast
+      fetch: (url: string) => {
+        calls.push(url);
+        return Promise.resolve({ json: () => Promise.resolve({}) });
       },
     },
   };
@@ -53,6 +61,28 @@ describe('binaryAssetApi pipeline paths', () => {
       `${prefix}/4`,
       `${prefix}/4/download-ticket`,
     ]);
+  });
+});
+
+describe('binaryAssetApi screenshot paths', () => {
+  beforeEach(() => {
+    calls.length = 0;
+    multipartForms.length = 0;
+  });
+
+  it('hangs every screenshot endpoint off the asset', async () => {
+    const prefix = 'projects/1/binary-assets/2/screenshots';
+    const file = new File(['png'], 'screen.png', { type: 'image/png' });
+
+    await binaryAssetApi.listScreenshots(1, 2);
+    await binaryAssetApi.uploadScreenshot(1, 2, file, 'home');
+    await binaryAssetApi.linkScreenshot(1, 2, 9);
+    await binaryAssetApi.unlinkScreenshot(1, 2, 9);
+
+    expect(calls).toEqual([prefix, prefix, `${prefix}/link`, `${prefix}/9`]);
+    expect(multipartForms[0].get('screenshot')).toBe(file);
+    // the location travels as a JSON part, the shape the controller binds to
+    expect(multipartForms[0].get('info')).toBeInstanceOf(Blob);
   });
 });
 
@@ -129,6 +159,94 @@ describe('isAudioAsset', () => {
     expect(isAudioAsset('image/png', 'shot.png')).toBe(false);
     expect(isAudioAsset('video/mp4', 'clip.mp4')).toBe(false);
     expect(isAudioAsset(undefined, undefined)).toBe(false);
+  });
+});
+
+describe('inferMediaType', () => {
+  it('trusts a known content type over the extension', () => {
+    expect(inferMediaType('audio/mpeg', 'voice.bin')).toBe('AUDIO');
+    expect(inferMediaType('video/mp4; codecs=avc1', 'clip.bin')).toBe('VIDEO');
+    expect(inferMediaType('image/png', 'recording.wav')).toBe('IMAGE');
+  });
+
+  it('falls back to the extension for octet-stream or no type', () => {
+    expect(inferMediaType('application/octet-stream', 'line.WAV')).toBe(
+      'AUDIO'
+    );
+    expect(inferMediaType('', 'clip.mov')).toBe('VIDEO');
+    expect(inferMediaType(undefined, 'shot.png')).toBe('IMAGE');
+  });
+
+  it('is null for nothing and for documents', () => {
+    expect(inferMediaType(undefined, undefined)).toBeNull();
+    expect(inferMediaType('application/pdf', 'manual.pdf')).toBeNull();
+  });
+});
+
+describe('getCapabilities', () => {
+  it('prefers what the server says', () => {
+    const capabilities = { transcript: false, pipeline: true, record: false };
+    expect(getCapabilities({ capabilities, contentType: 'audio/wav' })).toBe(
+      capabilities
+    );
+  });
+
+  it('derives per media type when the server did not say', () => {
+    expect(getCapabilities({ contentType: 'audio/wav' })).toEqual({
+      transcript: true,
+      pipeline: true,
+      record: true,
+    });
+    expect(getCapabilities({ contentType: 'video/mp4' })).toEqual({
+      transcript: false,
+      pipeline: false,
+      record: false,
+    });
+    expect(getCapabilities({ originalFilename: 'splash.png' })).toEqual({
+      transcript: false,
+      pipeline: false,
+      record: false,
+    });
+  });
+
+  it('keeps every affordance for an asset with no original', () => {
+    expect(getCapabilities({})).toEqual({
+      transcript: true,
+      pipeline: true,
+      record: true,
+    });
+  });
+});
+
+describe('getMediaType', () => {
+  it('reads the localized files when there is no original', () => {
+    expect(
+      getMediaType({
+        translations: [
+          {
+            languageId: 1,
+            languageTag: 'de',
+            languageName: 'German',
+            status: 'MISSING',
+          },
+          {
+            languageId: 2,
+            languageTag: 'sl',
+            languageName: 'Slovenian',
+            status: 'CURRENT',
+            originalFilename: 'vox_sl.m4a',
+            contentType: 'application/octet-stream',
+          },
+        ],
+      })
+    ).toBe('AUDIO');
+  });
+
+  it('prefers what the server said', () => {
+    expect(getMediaType({ mediaType: 'IMAGE', contentType: 'audio/wav' })).toBe(
+      'IMAGE'
+    );
+    expect(getMediaType({})).toBeNull();
   });
 });
 

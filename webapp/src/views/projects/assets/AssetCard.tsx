@@ -1,10 +1,11 @@
-import { ReactNode } from 'react';
+import { memo, ReactNode } from 'react';
 import { Box, Chip, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 
 import { LINKS, PARAMS } from 'tg.constants/links';
-import { visibleTranslations } from './binaryAssetApi';
+import { getMediaType, visibleTranslations } from './binaryAssetApi';
 import { AssetLocalizedFiles } from './AssetLocalizedFiles';
+import { AssetScreenshots } from './AssetScreenshots';
 import { BinaryAsset } from './types';
 
 type Props = {
@@ -23,19 +24,24 @@ type Props = {
 /**
  * One asset card: header with counts plus the per-language files table. The assets list renders
  * one per asset and the detail page renders the same card, just filtered to a single asset.
+ *
+ * Memoized: the list re-renders on every search keystroke and filter toggle, and a page of these
+ * (each a table of media players per language) is far too heavy to rebuild before the input can
+ * even show the typed character. Callers must pass referentially stable `languageTags`.
  */
-export const AssetCard = ({
+export const AssetCard = memo(function AssetCard({
   projectId,
   asset,
   languageTags,
   sourceLanguageName,
   linkToDetail,
   actions,
-}: Props) => {
+}: Props) {
   // counts follow the language selection, so they match the rows below
   const rows = visibleTranslations(asset, languageTags);
   const currentCount = rows.filter((r) => r.status === 'CURRENT').length;
   const outdatedCount = rows.filter((r) => r.status === 'OUTDATED').length;
+  const mediaType = getMediaType(asset);
 
   return (
     <Box
@@ -77,11 +83,22 @@ export const AssetCard = ({
           ) : (
             <Typography fontWeight={600}>{asset.name}</Typography>
           )}
-          <Typography variant="body2" color="text.secondary">
-            {/* the filename lives in the source row now */}
-            {asset.sourceLanguageTag} r{asset.sourceRevision}
-            {asset.contentType ? ` · ${asset.contentType}` : ''}
-          </Typography>
+          <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+            {/* the type is known even with no original — the localized files say what it is */}
+            {mediaType && (
+              <Chip
+                size="small"
+                variant="outlined"
+                label={mediaType}
+                data-cy="binary-asset-media-type"
+              />
+            )}
+            <Typography variant="body2" color="text.secondary">
+              {/* the filename lives in the source row now */}
+              {asset.sourceLanguageTag} r{asset.sourceRevision}
+              {asset.contentType ? ` · ${asset.contentType}` : ''}
+            </Typography>
+          </Box>
         </Box>
         <Box display="flex" gap={1} alignItems="center">
           <Chip size="small" label={`${currentCount}/${rows.length} current`} />
@@ -96,6 +113,14 @@ export const AssetCard = ({
         </Box>
       </Box>
 
+      <Box mt={1.5}>
+        <AssetScreenshots
+          projectId={projectId}
+          asset={asset}
+          compact={linkToDetail}
+        />
+      </Box>
+
       <Box mt={2}>
         <AssetLocalizedFiles
           projectId={projectId}
@@ -106,4 +131,4 @@ export const AssetCard = ({
       </Box>
     </Box>
   );
-};
+});

@@ -19,104 +19,22 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
   /**
    * When filterAudio/Video/Image are all false, every type is returned.
    * When any is true, assets matching any selected type are returned (OR).
-   * Type is inferred from source contentType and originalFilename.
-   *
-   * ponytail: an asset with no original has no type to infer, so it shows under every chip rather
-   * than disappearing from all of them. Coalesce its translations' content types if that bites.
+   * Type is inferred from the source file, or — with no original — from the oldest localized file
+   * that has one, the same way [io.tolgee.service.binaryAsset.mediaType] does. An asset with no
+   * recognised file at all has no type and matches no chip.
    */
   @Query(
-    """
-    from BinaryAsset a
-    left join fetch a.sourceLanguage
-    left join fetch a.uploadedBy
-    left join fetch a.transcriptKey
-    where a.project.id = :projectId
-      and (:search is null or lower(a.name) like lower(concat('%', cast(:search as string), '%')))
-      and (
-        (:filterAudio = false and :filterVideo = false and :filterImage = false)
-        or a.storageKey is null
-        or (
-          :filterAudio = true and (
-            lower(a.contentType) like 'audio/%'
-            or lower(a.originalFilename) like '%.mp3'
-            or lower(a.originalFilename) like '%.wav'
-            or lower(a.originalFilename) like '%.ogg'
-            or lower(a.originalFilename) like '%.m4a'
-            or lower(a.originalFilename) like '%.aac'
-            or lower(a.originalFilename) like '%.flac'
-            or lower(a.originalFilename) like '%.webm'
-          )
-        )
-        or (
-          :filterVideo = true and (
-            lower(a.contentType) like 'video/%'
-            or lower(a.originalFilename) like '%.mp4'
-            or lower(a.originalFilename) like '%.mov'
-            or lower(a.originalFilename) like '%.m4v'
-            or lower(a.originalFilename) like '%.webm'
-            or lower(a.originalFilename) like '%.mkv'
-            or lower(a.originalFilename) like '%.avi'
-          )
-        )
-        or (
-          :filterImage = true and (
-            lower(a.contentType) like 'image/%'
-            or lower(a.originalFilename) like '%.png'
-            or lower(a.originalFilename) like '%.jpg'
-            or lower(a.originalFilename) like '%.jpeg'
-            or lower(a.originalFilename) like '%.gif'
-            or lower(a.originalFilename) like '%.webp'
-            or lower(a.originalFilename) like '%.svg'
-            or lower(a.originalFilename) like '%.bmp'
-          )
-        )
-      )
-    order by a.id
-    """,
-    countQuery = """
-    select count(a) from BinaryAsset a
-    where a.project.id = :projectId
-      and (:search is null or lower(a.name) like lower(concat('%', cast(:search as string), '%')))
-      and (
-        (:filterAudio = false and :filterVideo = false and :filterImage = false)
-        or a.storageKey is null
-        or (
-          :filterAudio = true and (
-            lower(a.contentType) like 'audio/%'
-            or lower(a.originalFilename) like '%.mp3'
-            or lower(a.originalFilename) like '%.wav'
-            or lower(a.originalFilename) like '%.ogg'
-            or lower(a.originalFilename) like '%.m4a'
-            or lower(a.originalFilename) like '%.aac'
-            or lower(a.originalFilename) like '%.flac'
-            or lower(a.originalFilename) like '%.webm'
-          )
-        )
-        or (
-          :filterVideo = true and (
-            lower(a.contentType) like 'video/%'
-            or lower(a.originalFilename) like '%.mp4'
-            or lower(a.originalFilename) like '%.mov'
-            or lower(a.originalFilename) like '%.m4v'
-            or lower(a.originalFilename) like '%.webm'
-            or lower(a.originalFilename) like '%.mkv'
-            or lower(a.originalFilename) like '%.avi'
-          )
-        )
-        or (
-          :filterImage = true and (
-            lower(a.contentType) like 'image/%'
-            or lower(a.originalFilename) like '%.png'
-            or lower(a.originalFilename) like '%.jpg'
-            or lower(a.originalFilename) like '%.jpeg'
-            or lower(a.originalFilename) like '%.gif'
-            or lower(a.originalFilename) like '%.webp'
-            or lower(a.originalFilename) like '%.svg'
-            or lower(a.originalFilename) like '%.bmp'
-          )
-        )
-      )
-    """,
+    "from BinaryAsset a " +
+      "left join fetch a.sourceLanguage " +
+      "left join fetch a.uploadedBy " +
+      "left join fetch a.transcriptKey " +
+      "where a.project.id = :projectId " +
+      MEDIA_TYPE_FILTER +
+      " order by a.id",
+    countQuery =
+      "select count(a) from BinaryAsset a " +
+        "where a.project.id = :projectId " +
+        MEDIA_TYPE_FILTER,
   )
   fun findAllByProjectId(
     projectId: Long,
@@ -165,6 +83,11 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
 
   @Query("from BinaryAsset a where a.project.id = :projectId")
   fun findAllByProjectId(projectId: Long): List<BinaryAsset>
+
+  fun findAllByProjectIdAndNameIn(
+    projectId: Long,
+    names: Collection<String>,
+  ): List<BinaryAsset>
 
   @Query(
     """
@@ -269,3 +192,90 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
   )
   fun clearTranscriptKeyByKeyProjectId(projectId: Long)
 }
+
+// The extension lists mirror BinaryAssetMediaType.infer — JPQL cannot share Kotlin constants.
+// Precedence too: a content type that names a major type wins outright, the extension is consulted
+// only when it does not (`video/webm` + `.webm` is a video, not also an audio).
+// A source-less asset has null type and filename; coalesce keeps `not (...)` a real boolean.
+private const val SRC_TYPE = "lower(coalesce(a.contentType, ''))"
+private const val SRC_NAME = "lower(coalesce(a.originalFilename, ''))"
+private const val SOURCE_AUDIO =
+  "($SRC_TYPE like 'audio/%' or ($SRC_TYPE not like 'audio/%' and $SRC_TYPE not like 'video/%' and " +
+    "$SRC_TYPE not like 'image/%' and (" +
+    "$SRC_NAME like '%.mp3' or $SRC_NAME like '%.wav' or $SRC_NAME like '%.ogg' or " +
+    "$SRC_NAME like '%.m4a' or $SRC_NAME like '%.aac' or $SRC_NAME like '%.flac' or " +
+    "$SRC_NAME like '%.webm' or $SRC_NAME like '%.opus')))"
+private const val SOURCE_VIDEO =
+  "($SRC_TYPE like 'video/%' or ($SRC_TYPE not like 'audio/%' and $SRC_TYPE not like 'video/%' and " +
+    "$SRC_TYPE not like 'image/%' and (" +
+    "$SRC_NAME like '%.mp4' or $SRC_NAME like '%.mov' or $SRC_NAME like '%.m4v' or " +
+    "$SRC_NAME like '%.mkv' or $SRC_NAME like '%.avi')))"
+private const val SOURCE_IMAGE =
+  "($SRC_TYPE like 'image/%' or ($SRC_TYPE not like 'audio/%' and $SRC_TYPE not like 'video/%' and " +
+    "$SRC_TYPE not like 'image/%' and (" +
+    "$SRC_NAME like '%.png' or $SRC_NAME like '%.jpg' or $SRC_NAME like '%.jpeg' or " +
+    "$SRC_NAME like '%.gif' or $SRC_NAME like '%.webp' or $SRC_NAME like '%.svg' or " +
+    "$SRC_NAME like '%.bmp')))"
+
+private const val LANE_TYPE = "lower(t.contentType)"
+private const val LANE_NAME = "lower(t.originalFilename)"
+private const val LANE_AUDIO =
+  "($LANE_TYPE like 'audio/%' or ($LANE_TYPE not like 'audio/%' and $LANE_TYPE not like 'video/%' and " +
+    "$LANE_TYPE not like 'image/%' and (" +
+    "$LANE_NAME like '%.mp3' or $LANE_NAME like '%.wav' or $LANE_NAME like '%.ogg' or " +
+    "$LANE_NAME like '%.m4a' or $LANE_NAME like '%.aac' or $LANE_NAME like '%.flac' or " +
+    "$LANE_NAME like '%.webm' or $LANE_NAME like '%.opus')))"
+private const val LANE_VIDEO =
+  "($LANE_TYPE like 'video/%' or ($LANE_TYPE not like 'audio/%' and $LANE_TYPE not like 'video/%' and " +
+    "$LANE_TYPE not like 'image/%' and (" +
+    "$LANE_NAME like '%.mp4' or $LANE_NAME like '%.mov' or $LANE_NAME like '%.m4v' or " +
+    "$LANE_NAME like '%.mkv' or $LANE_NAME like '%.avi')))"
+private const val LANE_IMAGE =
+  "($LANE_TYPE like 'image/%' or ($LANE_TYPE not like 'audio/%' and $LANE_TYPE not like 'video/%' and " +
+    "$LANE_TYPE not like 'image/%' and (" +
+    "$LANE_NAME like '%.png' or $LANE_NAME like '%.jpg' or $LANE_NAME like '%.jpeg' or " +
+    "$LANE_NAME like '%.gif' or $LANE_NAME like '%.webp' or $LANE_NAME like '%.svg' or " +
+    "$LANE_NAME like '%.bmp')))"
+
+/** Any older lane (`x`) of the same asset that already has a recognised type — it decides, not `t`. */
+private const val OLDER_TYPED_LANE =
+  "exists (select x.id from BinaryAssetTranslation x where x.asset.id = a.id and x.id < t.id and (" +
+    "lower(x.contentType) like 'audio/%' or lower(x.contentType) like 'video/%' or " +
+    "lower(x.contentType) like 'image/%' or lower(x.originalFilename) like '%.mp3' or " +
+    "lower(x.originalFilename) like '%.wav' or lower(x.originalFilename) like '%.ogg' or " +
+    "lower(x.originalFilename) like '%.m4a' or lower(x.originalFilename) like '%.aac' or " +
+    "lower(x.originalFilename) like '%.flac' or lower(x.originalFilename) like '%.webm' or " +
+    "lower(x.originalFilename) like '%.opus' or lower(x.originalFilename) like '%.mp4' or " +
+    "lower(x.originalFilename) like '%.mov' or lower(x.originalFilename) like '%.m4v' or " +
+    "lower(x.originalFilename) like '%.mkv' or lower(x.originalFilename) like '%.avi' or " +
+    "lower(x.originalFilename) like '%.png' or lower(x.originalFilename) like '%.jpg' or " +
+    "lower(x.originalFilename) like '%.jpeg' or lower(x.originalFilename) like '%.gif' or " +
+    "lower(x.originalFilename) like '%.webp' or lower(x.originalFilename) like '%.svg' or " +
+    "lower(x.originalFilename) like '%.bmp'))"
+
+/** The original says nothing about the type (missing or not a media file), so the lanes decide. */
+private const val SOURCE_UNTYPED = "not ($SOURCE_AUDIO or $SOURCE_VIDEO or $SOURCE_IMAGE)"
+
+private const val LANE_FALLBACK_AUDIO =
+  "($SOURCE_UNTYPED and exists (select t.id from BinaryAssetTranslation t where t.asset.id = a.id and " +
+    "$LANE_AUDIO and not $OLDER_TYPED_LANE))"
+private const val LANE_FALLBACK_VIDEO =
+  "($SOURCE_UNTYPED and exists (select t.id from BinaryAssetTranslation t where t.asset.id = a.id and " +
+    "$LANE_VIDEO and not $OLDER_TYPED_LANE))"
+private const val LANE_FALLBACK_IMAGE =
+  "($SOURCE_UNTYPED and exists (select t.id from BinaryAssetTranslation t where t.asset.id = a.id and " +
+    "$LANE_IMAGE and not $OLDER_TYPED_LANE))"
+
+/**
+ * Media-type filter shared by the page and count queries; see [BinaryAssetRepository.findAllByProjectId].
+ *
+ * Resolution mirrors `BinaryAsset.mediaType`: the original file's type wins; when there is no
+ * original (or it is not a recognised media file) the asset takes the type of its oldest localized
+ * file that has one. An asset with no recognised file at all has no type and matches no filter.
+ */
+private const val MEDIA_TYPE_FILTER =
+  "and (:search is null or lower(a.name) like lower(concat('%', cast(:search as string), '%'))) and " +
+    "((:filterAudio = false and :filterVideo = false and :filterImage = false) or " +
+    "(:filterAudio = true and ($SOURCE_AUDIO or $LANE_FALLBACK_AUDIO)) or " +
+    "(:filterVideo = true and ($SOURCE_VIDEO or $LANE_FALLBACK_VIDEO)) or " +
+    "(:filterImage = true and ($SOURCE_IMAGE or $LANE_FALLBACK_IMAGE)))"

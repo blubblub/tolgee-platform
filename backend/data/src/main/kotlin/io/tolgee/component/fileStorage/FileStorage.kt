@@ -57,6 +57,27 @@ interface FileStorage {
     return ByteArrayInputStream(readFile(storageFilePath))
   }
 
+  /**
+   * Open a stream over the inclusive byte range [start, endInclusive] (HTTP Range semantics).
+   * Caller must close it. Default skips into a full [openFileStream]; backends that can seek
+   * or issue ranged reads should override so serving the tail of a file does not read its head.
+   */
+  fun openFileStreamRange(
+    storageFilePath: String,
+    start: Long,
+    endInclusive: Long,
+  ): InputStream {
+    require(start >= 0 && endInclusive >= start) { "Invalid byte range $start-$endInclusive" }
+    val stream = openFileStream(storageFilePath)
+    try {
+      stream.skipFully(start)
+    } catch (e: Exception) {
+      stream.close()
+      throw e
+    }
+    return BoundedInputStream(stream, endInclusive - start + 1)
+  }
+
   fun test() {
     try {
       this.storeFile("test", "test".toByteArray())
@@ -71,3 +92,48 @@ interface FileStorage {
 fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 
 fun MessageDigest.digestHex(): String = digest().toHex()
+
+/** [InputStream.skip] may stop early; loop until [count] bytes are gone or the stream ends. */
+fun InputStream.skipFully(count: Long) {
+  var remaining = count
+  while (remaining > 0) {
+    val skipped = skip(remaining)
+    if (skipped > 0) {
+      remaining -= skipped
+      continue
+    }
+    // skip() made no progress — fall back to a read to distinguish "slow" from EOF
+    if (read() < 0) return
+    remaining--
+  }
+}
+
+/** Reads at most [limit] bytes from [delegate], then reports EOF. Closing closes the delegate. */
+class BoundedInputStream(
+  private val delegate: InputStream,
+  limit: Long,
+) : InputStream() {
+  private var remaining = limit
+
+  override fun read(): Int {
+    if (remaining <= 0) return -1
+    val b = delegate.read()
+    if (b >= 0) remaining--
+    return b
+  }
+
+  override fun read(
+    b: ByteArray,
+    off: Int,
+    len: Int,
+  ): Int {
+    if (remaining <= 0) return -1
+    val n = delegate.read(b, off, minOf(len.toLong(), remaining).toInt())
+    if (n > 0) remaining -= n
+    return n
+  }
+
+  override fun available(): Int = minOf(delegate.available().toLong(), remaining).toInt()
+
+  override fun close() = delegate.close()
+}

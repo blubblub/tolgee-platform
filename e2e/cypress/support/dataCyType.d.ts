@@ -118,9 +118,6 @@ declare namespace DataCy {
         "asset-version-download": true;
         "asset-version-final-badge": true;
         "asset-version-model-id": true;
-        "asset-version-preview-audio": true;
-        "asset-version-preview-image": true;
-        "asset-version-preview-video": true;
         "asset-version-remove-background-noise": true;
         "asset-version-row": true;
         "asset-version-run-dialog": true;
@@ -169,11 +166,13 @@ declare namespace DataCy {
         "binary-asset-final-record-audio": true;
         "binary-asset-language-transcript-input": true;
         "binary-asset-language-transcript-placeholder": true;
+        "binary-asset-media-type": true;
         "binary-asset-preview-audio": true;
         "binary-asset-preview-error": true;
         "binary-asset-preview-image": true;
         "binary-asset-preview-pdf": true;
         "binary-asset-preview-record-audio": true;
+        "binary-asset-preview-retry": true;
         "binary-asset-preview-unsupported": true;
         "binary-asset-preview-video": true;
         "binary-asset-record-dialog": true;
@@ -186,6 +185,9 @@ declare namespace DataCy {
         "binary-asset-replace-source": true;
         "binary-asset-review-toggle": true;
         "binary-asset-run-tool": true;
+        "binary-asset-screenshot-upload": true;
+        "binary-asset-screenshots": true;
+        "binary-asset-screenshots-more": true;
         "binary-asset-source-pipeline": true;
         "binary-asset-source-row": true;
         "binary-asset-status": true;
@@ -803,6 +805,7 @@ declare namespace DataCy {
         "regenerate-pat-dialog-content": true;
         "regenerate-pat-dialog-title": true;
         "resend-email-button": true;
+        "screenshot-detail": true;
         "screenshot-image": true;
         "screenshot-thumbnail": true;
         "screenshot-thumbnail-delete": true;

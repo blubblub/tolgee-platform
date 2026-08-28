@@ -4,6 +4,7 @@ import io.tolgee.model.Language
 import io.tolgee.model.Screenshot
 import io.tolgee.model.TranslationSuggestion
 import io.tolgee.model.binaryAsset.BinaryAsset
+import io.tolgee.model.binaryAsset.BinaryAssetScreenshotReference
 import io.tolgee.model.binaryAsset.BinaryAssetTranslation
 import io.tolgee.model.branching.Branch
 import io.tolgee.model.branching.snapshot.KeyMetaSnapshot
@@ -86,8 +87,16 @@ object ProjectScopedCollectorQueries {
       query(Label::class, "select e from Label e where e.project.id = :projectId")
       query(
         Screenshot::class,
-        "select distinct s from KeyScreenshotReference r join r.screenshot s join r.key k left join k.branch b " +
-          "where k.project.id = :projectId and k.deletedAt is null and (b is null or b.deletedAt is null)",
+        "select distinct s from Screenshot s where s.id in (" +
+          "select r.screenshot.id from KeyScreenshotReference r join r.key k left join k.branch b " +
+          "where k.project.id = :projectId and k.deletedAt is null and (b is null or b.deletedAt is null)" +
+          ") or s.id in (" +
+          "select ar.screenshot.id from BinaryAssetScreenshotReference ar where ar.asset.project.id = :projectId" +
+          ")",
+      )
+      query(
+        BinaryAssetScreenshotReference::class,
+        "select e from BinaryAssetScreenshotReference e where e.asset.project.id = :projectId",
       )
       query(
         KeyScreenshotReference::class,

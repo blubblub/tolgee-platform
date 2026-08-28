@@ -15,22 +15,34 @@ import io.tolgee.exceptions.NotFoundException
 import io.tolgee.exceptions.PermissionException
 import io.tolgee.model.Screenshot
 import io.tolgee.model.UploadedImage
+import io.tolgee.model.binaryAsset.BinaryAsset
+import io.tolgee.model.binaryAsset.BinaryAssetScreenshotReference
 import io.tolgee.model.key.Key
 import io.tolgee.model.key.screenshotReference.KeyInScreenshotPosition
 import io.tolgee.model.key.screenshotReference.KeyScreenshotReference
 import io.tolgee.repository.KeyScreenshotReferenceRepository
 import io.tolgee.repository.ScreenshotRepository
+import io.tolgee.repository.binaryAsset.BinaryAssetScreenshotReferenceRepository
 import io.tolgee.security.authentication.AuthenticationFacade
 import io.tolgee.service.ImageUploadService
 import io.tolgee.service.ImageUploadService.Companion.UPLOADED_IMAGES_STORAGE_FOLDER_NAME
 import io.tolgee.util.ImageConverter
+import io.tolgee.util.Logging
+import io.tolgee.util.logger
 import jakarta.persistence.EntityManager
 import org.springframework.core.io.InputStreamSource
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.awt.Dimension
 import kotlin.math.roundToInt
 
+/**
+ * A screenshot is owned by whatever references it — keys, binary assets, or both — and is deleted
+ * (row and files) once nothing does. Every path that drops a reference goes through
+ * [deleteIfOrphaned] so neither side can strand or steal the other's screenshots.
+ */
 @Service
 class ScreenshotService(
   private val screenshotRepository: ScreenshotRepository,
@@ -40,7 +52,8 @@ class ScreenshotService(
   private val authenticationFacade: AuthenticationFacade,
   private val entityManager: EntityManager,
   private val keyScreenshotReferenceRepository: KeyScreenshotReferenceRepository,
-) {
+  private val binaryAssetScreenshotReferenceRepository: BinaryAssetScreenshotReferenceRepository,
+) : Logging {
   companion object {
     const val SCREENSHOTS_STORAGE_FOLDER_NAME = "screenshots"
     const val MIDDLE_SIZED_MAX_DIMENSION = 600
@@ -60,6 +73,23 @@ class ScreenshotService(
       )
     }
 
+    val result = storeNew(screenshotImage, info?.location)
+
+    return addReference(
+      key = key,
+      screenshot = result.screenshot,
+      info = info,
+      originalDimension = result.originalDimension,
+      targetDimension = result.targetDimension,
+    )
+  }
+
+  /** Converts and stores an image as a new screenshot with no references yet. */
+  @Transactional
+  fun storeNew(
+    screenshotImage: InputStreamSource,
+    location: String?,
+  ): CreateScreenshotResult {
     val converter = ImageConverter(screenshotImage.inputStream)
     val image = converter.getImage()
     val middleSized = converter.getThumbnail(MIDDLE_SIZED_MAX_DIMENSION)
@@ -70,14 +100,45 @@ class ScreenshotService(
         image.toByteArray(),
         middleSized.toByteArray(),
         thumbnail.toByteArray(),
-        info?.location,
+        location,
         converter.targetDimension,
       )
-
-    return addReference(
-      key = key,
+    return CreateScreenshotResult(
       screenshot = screenshot,
-      info = info,
+      originalDimension = converter.originalDimension,
+      targetDimension = converter.targetDimension,
+    )
+  }
+
+  /**
+   * Replaces the image of an existing screenshot in place, keeping its id and every reference.
+   *
+   * Old files go first: the filename carries the extension, and a legacy `.jpg` becomes `.png` here,
+   * so the new files may land on a different name. Both derived sizes are always written, which is
+   * why the flags are forced on — a legacy row may still carry the schema default `false`.
+   */
+  @Transactional
+  fun replaceImage(
+    screenshot: Screenshot,
+    screenshotImage: InputStreamSource,
+  ): CreateScreenshotResult {
+    val converter = ImageConverter(screenshotImage.inputStream)
+    val image = converter.getImage()
+    val middleSized = converter.getThumbnail(MIDDLE_SIZED_MAX_DIMENSION)
+    val thumbnail = converter.getThumbnail(THUMBNAIL_MAX_DIMENSION)
+
+    val previousFiles = filePaths(screenshot)
+    screenshot.extension = "png"
+    screenshot.hasThumbnail = true
+    screenshot.hasMiddleSized = true
+    screenshot.width = converter.targetDimension.width
+    screenshot.height = converter.targetDimension.height
+    screenshotRepository.save(screenshot)
+    storeFiles(screenshot, image.toByteArray(), middleSized.toByteArray(), thumbnail.toByteArray())
+    // files the new image did not overwrite (a legacy .jpg, say) go once the row change is safe
+    deleteFilesAfterCommit(previousFiles - filePaths(screenshot).toSet())
+    return CreateScreenshotResult(
+      screenshot = screenshot,
       originalDimension = converter.originalDimension,
       targetDimension = converter.targetDimension,
     )
@@ -234,7 +295,7 @@ class ScreenshotService(
     thumbnail: ByteArray?,
   ) {
     thumbnail?.let { fileStorage.storeFile(screenshot.getThumbnailPath(), it) }
-    middleSized?.let { fileStorage.storeFile(screenshot.getMiddleSizedPath(), it) }
+    middleSized?.let { bytes -> screenshot.getMiddleSizedPath()?.let { fileStorage.storeFile(it, bytes) } }
     image?.let { fileStorage.storeFile(screenshot.getFilePath(), it) }
   }
 
@@ -242,6 +303,44 @@ class ScreenshotService(
   fun findAll(key: Key): List<Screenshot> {
     return screenshotRepository.findAllByKey(key)
   }
+
+  @Transactional
+  fun findAll(asset: BinaryAsset): List<Screenshot> {
+    return screenshotRepository.findAllByAssetId(asset.id).also { initializeReferences(it) }
+  }
+
+  /** Screenshots per asset for a page of assets — a few queries for the page, not one per row. */
+  @Transactional(readOnly = true)
+  fun getScreenshotsForAssets(assetIds: Collection<Long>): Map<Long, List<Screenshot>> {
+    if (assetIds.isEmpty()) return emptyMap()
+    val byAsset =
+      binaryAssetScreenshotReferenceRepository
+        .findAllByAssetIdIn(assetIds)
+        .groupBy({ it.asset.id }, { it.screenshot })
+        .mapValues { (_, screenshots) -> screenshots.distinctBy { it.id } }
+    initializeReferences(byAsset.values.flatten())
+    return byAsset
+  }
+
+  /**
+   * Loads what the model needs once the transaction is over: both reference lists and the names
+   * they point at. Callers build models outside the session, so lazy access there would fail.
+   */
+  fun initializeReferences(screenshots: Collection<Screenshot>) {
+    screenshots.forEach { screenshot ->
+      screenshot.keyScreenshotReferences.forEach {
+        it.key.name
+        it.key.namespace?.name
+      }
+      screenshot.binaryAssetScreenshotReferences.forEach { it.asset.name }
+    }
+  }
+
+  @Transactional(readOnly = true)
+  fun findAllByProjectAndLocation(
+    projectId: Long,
+    location: String,
+  ): List<Screenshot> = screenshotRepository.findAllByProjectIdAndLocation(projectId, location)
 
   @Transactional
   fun delete(screenshots: Collection<Screenshot>) {
@@ -279,34 +378,84 @@ class ScreenshotService(
     screenshotIds ?: return
     val references = keyScreenshotReferenceRepository.findAll(key, screenshotIds)
     keyScreenshotReferenceRepository.deleteAll(references)
-    val screenshotReferences =
-      keyScreenshotReferenceRepository
-        .findAll(screenshotIds)
-        .groupBy { it.screenshot.id }
-    screenshotIds.forEach {
-      if (screenshotReferences[it] == null) {
-        delete(it)
-      }
-    }
+    deleteIfOrphaned(screenshotIds)
   }
 
   @Transactional
   fun removeScreenshotReferences(references: List<KeyScreenshotReference>) {
     val screenshotIds = references.map { it.screenshot.id }.toSet()
     keyScreenshotReferenceRepository.deleteAll(references)
-    val screenshotReferences =
-      keyScreenshotReferenceRepository
-        .findAll(screenshotIds)
-        .groupBy { it.screenshot.id }
-    screenshotIds.forEach {
-      if (screenshotReferences[it].isNullOrEmpty()) {
-        delete(it)
-      }
-    }
+    deleteIfOrphaned(screenshotIds)
   }
 
-  private fun delete(it: Long) {
-    screenshotRepository.deleteById(it)
+  /** Links an asset to a screenshot; a link that already exists is left alone. */
+  @Transactional
+  fun addAssetReference(
+    asset: BinaryAsset,
+    screenshot: Screenshot,
+  ): BinaryAssetScreenshotReference {
+    binaryAssetScreenshotReferenceRepository
+      .findAllByAssetIdAndScreenshotIdIn(asset.id, listOf(screenshot.id))
+      .firstOrNull()
+      ?.let { return it }
+    val reference = BinaryAssetScreenshotReference(asset, screenshot)
+    screenshot.binaryAssetScreenshotReferences.add(reference)
+    asset.screenshotReferences.add(reference)
+    entityManager.persist(reference)
+    return reference
+  }
+
+  @Transactional
+  fun removeAssetReferences(
+    asset: BinaryAsset,
+    screenshotIds: Collection<Long>,
+  ) {
+    if (screenshotIds.isEmpty()) return
+    val references = binaryAssetScreenshotReferenceRepository.findAllByAssetIdAndScreenshotIdIn(asset.id, screenshotIds)
+    removeAssetReferences(references)
+  }
+
+  @Transactional
+  fun removeAssetReferences(references: List<BinaryAssetScreenshotReference>) {
+    if (references.isEmpty()) return
+    val screenshotIds = references.map { it.screenshot.id }.toSet()
+    references.forEach { reference ->
+      reference.asset.screenshotReferences.remove(reference)
+      reference.screenshot.binaryAssetScreenshotReferences.remove(reference)
+    }
+    binaryAssetScreenshotReferenceRepository.deleteAll(references)
+    deleteIfOrphaned(screenshotIds)
+  }
+
+  /**
+   * Deletes, with files, every screenshot in [screenshotIds] that no key and no asset references
+   * any more. Call after removing references; pending removals are flushed by the lookups.
+   */
+  @Transactional
+  fun deleteIfOrphaned(screenshotIds: Collection<Long>) {
+    if (screenshotIds.isEmpty()) return
+    val ids = screenshotIds.toSet()
+    val keyed = keyScreenshotReferenceRepository.findAll(ids).map { it.screenshot.id }.toSet()
+    val onAssets = binaryAssetScreenshotReferenceRepository.findReferencedScreenshotIds(ids)
+    val orphans = ids - keyed - onAssets
+    if (orphans.isEmpty()) return
+    screenshotRepository.findAllById(orphans).forEach { delete(it) }
+  }
+
+  /**
+   * A screenshot belongs to a project through its references. One referenced from another
+   * project — by a key or by an asset — must not be readable or deletable here; one with no
+   * references at all belongs to nobody yet and passes.
+   */
+  fun checkInProject(
+    screenshot: Screenshot,
+    projectId: Long,
+  ) {
+    val foreignKey = screenshot.keyScreenshotReferences.any { it.key.project.id != projectId }
+    val foreignAsset = screenshot.binaryAssetScreenshotReferences.any { it.asset.project.id != projectId }
+    if (foreignKey || foreignAsset) {
+      throw PermissionException(Message.SCREENSHOT_NOT_FROM_PROJECT)
+    }
   }
 
   fun findByIdIn(ids: Collection<Long>): List<Screenshot> {
@@ -317,8 +466,12 @@ class ScreenshotService(
     return screenshotRepository.findById(id).orElse(null)
   }
 
+  fun get(id: Long): Screenshot = find(id) ?: throw NotFoundException(Message.SCREENSHOT_NOT_FOUND)
+
   fun deleteAllByProject(projectId: Long) {
-    val all = screenshotRepository.getAllByKeyProjectId(projectId)
+    val all =
+      (screenshotRepository.getAllByKeyProjectId(projectId) + screenshotRepository.getAllByAssetProjectId(projectId))
+        .distinctBy { it.id }
     all.forEach { this.deleteFile(it) }
 
     entityManager
@@ -334,13 +487,23 @@ class ScreenshotService(
     entityManager
       .createNativeQuery(
         """
-      DELETE FROM screenshot WHERE id IN (
-        SELECT screenshot_id FROM key_screenshot_reference WHERE key_id IN (
-          SELECT id FROM key WHERE project_id = :projectId
-        )
+      DELETE FROM binary_asset_screenshot_reference WHERE asset_id IN (
+        SELECT id FROM binary_asset WHERE project_id = :projectId
       )
     """,
       ).setParameter("projectId", projectId)
+      .executeUpdate()
+
+    if (all.isEmpty()) return
+    // ids were collected before the references went, so the rows can actually be found now
+    entityManager
+      .createNativeQuery(
+        """
+      DELETE FROM screenshot s WHERE s.id IN (:ids)
+        AND NOT EXISTS (SELECT 1 FROM key_screenshot_reference k WHERE k.screenshot_id = s.id)
+        AND NOT EXISTS (SELECT 1 FROM binary_asset_screenshot_reference a WHERE a.screenshot_id = s.id)
+    """,
+      ).setParameter("ids", all.map { it.id })
       .executeUpdate()
   }
 
@@ -364,16 +527,49 @@ class ScreenshotService(
     }
   }
 
-  private fun deleteFile(screenshot: Screenshot) {
-    fileStorage.deleteFile(screenshot.getFilePath())
+  /** Removes every stored size. A missing derived file is not an error — legacy rows never had them. */
+  private fun deleteFile(screenshot: Screenshot) = deleteFilesAfterCommit(filePaths(screenshot))
+
+  private fun filePaths(screenshot: Screenshot): List<String> =
+    listOfNotNull(
+      screenshot.getFilePath(),
+      screenshot.getMiddleSizedPath(),
+      screenshot.getThumbnailPath().takeIf { it != screenshot.getFilePath() },
+    )
+
+  /**
+   * Rows roll back with the transaction; blobs do not. Deleting them before commit would leave
+   * surviving rows whose images 404 when anything later in the request fails.
+   */
+  private fun deleteFilesAfterCommit(paths: Collection<String>) {
+    if (paths.isEmpty()) return
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      deleteFilesNow(paths)
+      return
+    }
+    TransactionSynchronizationManager.registerSynchronization(
+      object : TransactionSynchronization {
+        override fun afterCommit() = deleteFilesNow(paths)
+      },
+    )
+  }
+
+  private fun deleteFilesNow(paths: Collection<String>) {
+    paths.forEach { path ->
+      try {
+        fileStorage.deleteFile(path)
+      } catch (e: Exception) {
+        logger.warn("Failed to delete screenshot file $path: ${e.message}")
+      }
+    }
   }
 
   private fun Screenshot.getFilePath(): String {
     return "$SCREENSHOTS_STORAGE_FOLDER_NAME/${this.filename}"
   }
 
-  private fun Screenshot.getMiddleSizedPath(): String {
-    return "$SCREENSHOTS_STORAGE_FOLDER_NAME/${this.middleSizedFilename}"
+  private fun Screenshot.getMiddleSizedPath(): String? {
+    return this.middleSizedFilename?.let { "$SCREENSHOTS_STORAGE_FOLDER_NAME/$it" }
   }
 
   private fun Screenshot.getThumbnailPath(): String {

@@ -6,6 +6,7 @@ import io.tolgee.dtos.request.key.CreateKeyDto
 import io.tolgee.exceptions.BadRequestException
 import io.tolgee.exceptions.NotFoundException
 import io.tolgee.model.binaryAsset.BinaryAsset
+import io.tolgee.model.enums.BinaryAssetMediaType
 import io.tolgee.model.key.Key
 import io.tolgee.repository.KeyRepository
 import io.tolgee.repository.TranslationRepository
@@ -43,23 +44,6 @@ class BinaryAssetTranscriptService(
   companion object {
     const val TRANSCRIPT_KEY_PREFIX = "transcript."
     const val TRANSCRIPT_TAG = "transcript"
-
-    /** Uploads often arrive as application/octet-stream, so fall back to the extension. */
-    private val AUDIO_VIDEO_EXTENSIONS =
-      listOf(
-        ".mp3",
-        ".wav",
-        ".ogg",
-        ".m4a",
-        ".aac",
-        ".flac",
-        ".mp4",
-        ".mov",
-        ".m4v",
-        ".webm",
-        ".mkv",
-        ".avi",
-      )
   }
 
   /**
@@ -75,6 +59,7 @@ class BinaryAssetTranscriptService(
     languageTag: String? = null,
   ): BinaryAsset {
     val asset = lockAsset(projectId, assetId)
+    requireTranscriptSupported(asset)
     if (asset.transcriptKey != null) {
       throw BadRequestException(Message.BINARY_ASSET_TRANSCRIPT_EXISTS)
     }
@@ -108,6 +93,7 @@ class BinaryAssetTranscriptService(
     keyId: Long,
   ): BinaryAsset {
     val asset = lockAsset(projectId, assetId)
+    requireTranscriptSupported(asset)
     if (asset.transcriptKey != null) {
       throw BadRequestException(Message.BINARY_ASSET_TRANSCRIPT_EXISTS)
     }
@@ -223,16 +209,21 @@ class BinaryAssetTranscriptService(
   fun canTranscribe(asset: BinaryAsset): Boolean = transcriptionClient.isConfigured && isTranscribable(asset)
 
   /**
-   * AI transcription is only offered for speech. A transcript key itself can be attached to any
-   * asset type — this gates only the "transcribe with AI" affordances.
+   * AI transcription is only offered for speech. A transcript key can be attached to anything the
+   * media type allows (see [requireTranscriptSupported]) — this gates only "transcribe with AI".
    */
   private fun isTranscribable(asset: BinaryAsset): Boolean {
     // ponytail: an asset with no original is never AI-transcribable. Judge it by its translations'
     // content types if per-language transcription is ever wanted for source-less assets.
-    val type = asset.contentType?.lowercase() ?: return false
-    if (type.startsWith("audio/") || type.startsWith("video/")) return true
-    val name = asset.originalFilename.orEmpty().lowercase()
-    return AUDIO_VIDEO_EXTENSIONS.any { name.endsWith(it) }
+    if (asset.storageKey == null) return false
+    return asset.mediaType == BinaryAssetMediaType.AUDIO
+  }
+
+  /** An image is localized by another image; there is nothing to transcribe, so no key either. */
+  private fun requireTranscriptSupported(asset: BinaryAsset) {
+    if (!asset.capabilities.transcript) {
+      throw BadRequestException(Message.BINARY_ASSET_TRANSCRIPT_NOT_SUPPORTED)
+    }
   }
 
   /** Transcript translations of the linked key, by language id. Empty when nothing is linked. */

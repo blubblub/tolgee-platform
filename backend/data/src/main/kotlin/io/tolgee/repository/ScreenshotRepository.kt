@@ -44,14 +44,51 @@ interface ScreenshotRepository : JpaRepository<Screenshot, Long> {
   )
   fun getKeysWithScreenshots(keyIds: Collection<Long>): List<Key>
 
+  // left join: a screenshot referenced only by assets has no key references and must still be found
   @Query(
     """
-    from Screenshot s 
-      join fetch s.keyScreenshotReferences ksr
+    from Screenshot s
+      left join fetch s.keyScreenshotReferences ksr
     where s.id in :ids
   """,
   )
   fun findAllById(ids: Collection<Long>): List<Screenshot>
+
+  @Query(
+    """
+    from Screenshot s
+    where s.id in (select r.screenshot.id from BinaryAssetScreenshotReference r where r.asset.id = :assetId)
+    order by s.id
+  """,
+  )
+  fun findAllByAssetId(assetId: Long): List<Screenshot>
+
+  @Query(
+    """
+    from Screenshot s
+    where s.id in (select r.screenshot.id from BinaryAssetScreenshotReference r where r.asset.project.id = :projectId)
+  """,
+  )
+  fun getAllByAssetProjectId(projectId: Long): List<Screenshot>
+
+  /**
+   * Every screenshot at [location] that belongs to the project through any reference. `location` is
+   * neither unique nor project-scoped in the schema, so membership is derived from what references it.
+   */
+  @Query(
+    """
+    from Screenshot s
+    where s.location = :location and (
+      s.id in (select ksr.screenshot.id from KeyScreenshotReference ksr where ksr.key.project.id = :projectId)
+      or s.id in (select r.screenshot.id from BinaryAssetScreenshotReference r where r.asset.project.id = :projectId)
+    )
+    order by s.id
+  """,
+  )
+  fun findAllByProjectIdAndLocation(
+    projectId: Long,
+    location: String,
+  ): List<Screenshot>
 
   @Query(
     """
@@ -80,7 +117,7 @@ interface ScreenshotRepository : JpaRepository<Screenshot, Long> {
   /**
    * Returns screenshots that will become orphans after all key_screenshot_reference
    * rows for [branchId]'s keys are deleted — i.e., screenshots referenced ONLY by branch keys
-   * and by no key on any other branch.
+   * and by no key on any other branch and by no binary asset.
    *
    * Uses JPQL (not nativeQuery) because Screenshot.filename is a Kotlin computed property,
    * not a DB column — so it cannot be selected in native SQL.
@@ -95,6 +132,9 @@ interface ScreenshotRepository : JpaRepository<Screenshot, Long> {
     AND s.id NOT IN (
       SELECT ksr.screenshot.id FROM KeyScreenshotReference ksr
       WHERE ksr.key.id NOT IN (SELECT k.id FROM Key k WHERE k.branch.id = :branchId)
+    )
+    AND s.id NOT IN (
+      SELECT r.screenshot.id FROM BinaryAssetScreenshotReference r
     )
     """,
   )

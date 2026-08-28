@@ -15,6 +15,7 @@ import io.tolgee.model.enums.BinaryAssetMediaType
 import io.tolgee.model.enums.BinaryAssetTranslationStatus
 import io.tolgee.repository.binaryAsset.BinaryAssetRepository
 import io.tolgee.repository.binaryAsset.BinaryAssetTranslationRepository
+import io.tolgee.service.key.ScreenshotService
 import io.tolgee.service.language.LanguageService
 import io.tolgee.service.project.ProjectService
 import io.tolgee.util.Logging
@@ -36,6 +37,7 @@ class BinaryAssetService(
   private val languageService: LanguageService,
   private val entityManager: EntityManager,
   private val tolgeeProperties: TolgeeProperties,
+  private val screenshotService: ScreenshotService,
 ) : Logging {
   fun requireStreamingStorage() {
     if (!fileStorage.supportsStreaming()) {
@@ -245,8 +247,11 @@ class BinaryAssetService(
     // asset.versions covers the source file's versions too, which hang off no translation
     keys += asset.versions.map { it.storageKey }
     keys += asset.translations.map { it.storageKey }
+    // the references go with the asset; a screenshot nothing else uses goes with them
+    val screenshotIds = asset.screenshotReferences.map { it.screenshot.id }
     binaryAssetRepository.delete(asset)
     entityManager.flush()
+    screenshotService.deleteIfOrphaned(screenshotIds)
     keys.forEach { deleteBlobBestEffort(it) }
   }
 
@@ -254,15 +259,18 @@ class BinaryAssetService(
   fun deleteAllByProject(projectId: Long) {
     val assets = binaryAssetRepository.findAllByProjectId(projectId)
     val keys = mutableListOf<String>()
+    val screenshotIds = mutableSetOf<Long>()
     assets.forEach { asset ->
       asset.storageKey?.let { keys += it }
       keys += asset.versions.map { it.storageKey }
       keys += asset.translations.map { it.storageKey }
+      screenshotIds += asset.screenshotReferences.map { it.screenshot.id }
     }
     if (assets.isNotEmpty()) {
       binaryAssetRepository.deleteAll(assets)
       entityManager.flush()
     }
+    screenshotService.deleteIfOrphaned(screenshotIds)
     keys.forEach { deleteBlobBestEffort(it) }
   }
 
@@ -332,18 +340,29 @@ class BinaryAssetService(
     )
   }
 
+  /**
+   * @param range inclusive byte range to serve (HTTP Range); null streams the whole file.
+   *   [FileStream.byteSize] stays the full size so callers can build `Content-Range`.
+   */
   fun openByStorageKey(
     storageKey: String,
     contentType: String,
     filename: String,
     byteSize: Long,
+    range: LongRange? = null,
   ): FileStream {
     requireStreamingStorage()
     if (!fileStorage.fileExists(storageKey)) {
       throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
     }
+    val inputStream =
+      if (range == null) {
+        fileStorage.openFileStream(storageKey)
+      } else {
+        fileStorage.openFileStreamRange(storageKey, range.first, range.last)
+      }
     return FileStream(
-      inputStream = fileStorage.openFileStream(storageKey),
+      inputStream = inputStream,
       contentType = contentType,
       filename = filename,
       byteSize = byteSize,

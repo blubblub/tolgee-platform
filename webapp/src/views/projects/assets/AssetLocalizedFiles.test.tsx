@@ -336,6 +336,103 @@ describe('AssetLocalizedFiles', () => {
     expect(sourceRow.textContent).not.toContain('prompt.wav');
   });
 
+  it('strips transcript, pipeline and recording from an image asset', () => {
+    permissions.satisfiesPermission.mockImplementation(() => true);
+    permissions.satisfiesLanguageAccess.mockImplementation(() => true);
+    render(
+      {
+        ...asset,
+        originalFilename: 'splash.png',
+        contentType: 'image/png',
+        mediaType: 'IMAGE',
+        capabilities: { transcript: false, pipeline: false, record: false },
+        translations: asset.translations?.map((translation) =>
+          translation.languageId === 2
+            ? {
+                ...translation,
+                originalFilename: 'splash-fr.png',
+                contentType: 'image/png',
+              }
+            : translation
+        ),
+      },
+      'English'
+    );
+
+    const headers = Array.from(container.querySelectorAll('thead th')).map(
+      (th) => th.textContent
+    );
+    expect(headers).toEqual([
+      'Language',
+      'Status',
+      'Preview',
+      'File',
+      'Actions',
+    ]);
+    expect(
+      container.querySelector('[data-cy="binary-asset-transcript-cell"]')
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-cy="binary-asset-final-cell"]')
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-cy="binary-asset-run-tool"]')
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-cy="binary-asset-preview-record-audio"]')
+    ).toBeNull();
+    // the file itself is still fully editable
+    expect(
+      row('French').querySelector('[data-cy="binary-asset-upload-translation"]')
+    ).not.toBeNull();
+    expect(
+      row('French').querySelector('[data-cy="binary-asset-review-toggle"]')
+    ).not.toBeNull();
+  });
+
+  it('treats a video like an image: no transcript, no audio tools', () => {
+    permissions.satisfiesPermission.mockImplementation(() => true);
+    permissions.satisfiesLanguageAccess.mockImplementation(() => true);
+    render(
+      {
+        ...asset,
+        originalFilename: 'clip.mp4',
+        contentType: 'video/mp4',
+        mediaType: 'VIDEO',
+        capabilities: { transcript: false, pipeline: false, record: false },
+      },
+      'English'
+    );
+
+    expect(
+      container.querySelector('[data-cy="binary-asset-transcript-cell"]')
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-cy="binary-asset-final-cell"]')
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-cy="binary-asset-run-tool"]')
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-cy="binary-asset-preview-record-audio"]')
+    ).toBeNull();
+  });
+
+  it('keeps showing a transcript an asset already has, whatever its file became', () => {
+    permissions.satisfiesPermission.mockImplementation(() => true);
+    render({
+      ...asset,
+      originalFilename: 'splash.png',
+      contentType: 'image/png',
+      capabilities: { transcript: false, pipeline: false, record: false },
+      transcriptKeyName: 'transcript.Voice prompt',
+    });
+
+    expect(
+      container.querySelector('[data-cy="binary-asset-transcript-cell"]')
+    ).not.toBeNull();
+  });
+
   it('shows recording only for a language the user can edit', () => {
     render();
 

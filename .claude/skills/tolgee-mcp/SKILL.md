@@ -18,15 +18,16 @@ Auth: `X-API-Key` header on **every** request.
 
 ## Which interface — MCP, REST, or the CLI
 
-- **MCP** — everything here. All 42 tools, including the complete binary-asset
+- **MCP** — everything here. All 47 tools, including the complete binary-asset
   surface (every asset REST endpoint has a tool).
 - **REST** — needed only for **very large uploads**. MCP arguments are JSON, so
   uploads are base64 with a 200 MiB cap; above that use the REST multipart
   endpoints, which stream and accept 512 MiB on `localize.blubtools.com`.
   Downloads never need REST: `get_asset_download_url` returns a ticket URL that
-  works without authentication, so a plain HTTP GET fetches the bytes. REST is
+  works without authentication, so a plain HTTP GET fetches the bytes (HTTP
+  byte ranges are honoured, so `curl -C -` resumes and players can seek). REST is
   also the only way to reach non-asset endpoints that have no tools (export,
-  import, screenshots).
+  import).
 - **`@tolgee/cli`** (`tolgee pull/push/sync/extract/tag`) — **not for assets.**
   It syncs translation strings between source code and a project and has no
   asset, transcript, TTS, or version commands. Reach for it when wiring string
@@ -101,6 +102,9 @@ when an agent is driving; use REST when a human or a shell script is.
   `list_asset_versions`, `upload_asset_version`, `run_asset_tool`,
   `set_asset_chosen_version`, `delete_asset_version`, `get_asset_download_url`
 - **Voices**: `list_asset_voices`, `set_asset_voice`
+- **Screenshots**: `upload_screenshot_by_location` (one screen, all its keys
+  and assets), `list_asset_screenshots`, `upload_asset_screenshot`,
+  `link_asset_screenshot`, `unlink_asset_screenshot`
 
 ## The asset pipeline (most common workflow)
 
@@ -143,6 +147,42 @@ Notes:
 - Any change to "what final is" (new upload, different chosen version,
   replaced source) clears that language's `reviewed` flag — re-confirm after.
 
+## Screenshots (where a key or asset is used)
+
+A screenshot is one screen of the app, shared by every key and binary asset
+shown on it. The atlas screenshot bot drives this; humans rarely need to.
+
+- `upload_screenshot_by_location` — `location` identifies the screen (route,
+  flow step, …). Uploading the same location again **replaces the image in
+  place** and sets the linked `keys` (name, optional namespace/text/positions)
+  and `assets` (names) to exactly what was sent. Keys and assets are never
+  created or deleted; unknown names come back in `unknownKeys` /
+  `unknownAssets`. Idempotent — rerun freely. Needs both `SCREENSHOTS_UPLOAD`
+  and `SCREENSHOTS_DELETE` (it replaces images and drops links). REST: `PUT
+  /v2/projects/{projectId}/screenshots/by-location` (multipart `image` +
+  JSON `info`). Shapes differ: the MCP tool takes `assets` as plain strings
+  (`["vox-intro"]`); REST `info.assets` is `[{"name": "vox-intro"}]` and
+  `info.keys` is `[{"name", "namespace"?, "text"?, "positions"?}]`. Likewise
+  `list_asset_screenshots` returns a bare array where REST wraps it in
+  `_embedded.screenshots`.
+- Per asset: `list_asset_screenshots`, `upload_asset_screenshot`,
+  `link_asset_screenshot` (attach a screenshot a key already has),
+  `unlink_asset_screenshot` (the screenshot is deleted only when nothing else
+  references it). REST: `…/binary-assets/{assetId}/screenshots[/link|/{ids}]`.
+- Asset models carry `screenshots` (first 6 in lists, all in `get_asset`) and
+  `screenshotCount`; screenshot models carry `keyReferences` and
+  `assetReferences`.
+- Media types: `mediaType` (AUDIO/VIDEO/IMAGE, inferred from the original or,
+  without one, from the oldest localized file that has a type) and
+  `capabilities` (`transcript`, `pipeline`, `record`) say what applies to an
+  asset. `contentType`/`byteSize`/`sha256` stay null/0 for a source-less asset
+  — they describe the original only. `list_assets` `filterMediaType` uses the
+  same resolution, so a source-less voiceover is listed under `audio` alone;
+  an asset with no file at all has no type and matches no filter. Only AUDIO has a
+  transcript and the audio tools; an image or video is localized by a
+  replacement file only — transcript and tool calls on it are refused
+  (`binary_asset_transcript_not_supported`, `binary_asset_tool_not_supported`).
+
 ## Limits & gotchas
 
 - **MCP uploads cap at 200 MiB decoded**, and hold the whole file in memory.
@@ -158,7 +198,7 @@ Notes:
   `PUT …/translations/{languageId}`, `POST …/versions`.
 - AI calls are synchronous; give MCP client requests a generous timeout
   (≥ 5 min) for long audio.
-- Transcription needs audio/video assets; images/documents are rejected.
+- Transcription needs audio assets; video, images and documents are rejected.
 - `delete_*` tools are destructive (versions and files are unrecoverable) —
   always confirm with the user first.
 - MCP responses carry the same JSON models as the REST API

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Alert,
   AlertTitle,
@@ -48,7 +48,7 @@ import {
   BinaryAssetTranslationWithVersions,
   canRecordAudio,
   formatBytes,
-  isAudioAsset,
+  getCapabilities,
   RunPayload,
   TOOL_LABELS,
 } from './binaryAssetApi';
@@ -447,11 +447,12 @@ const AssetTranslationContent = () => {
   const ogMissing = isSource
     ? !asset.originalFilename
     : translation?.status === 'MISSING';
-  const recordable =
-    canEditOg &&
-    canRecordAudio() &&
-    (!asset.contentType ||
-      isAudioAsset(asset.contentType, asset.originalFilename));
+  // an image is localized by another image: no transcript, no audio tools, nothing to record.
+  // Existing transcript text is never hidden, whatever the file turned into since.
+  const capabilities = getCapabilities(asset);
+  const showTranscript = capabilities.transcript || !!asset.transcriptKeyName;
+  const showPipeline = capabilities.pipeline;
+  const recordable = canEditOg && canRecordAudio() && capabilities.record;
 
   const statusChip = isSource ? (
     <Chip
@@ -701,9 +702,11 @@ const AssetTranslationContent = () => {
               <TableCell>{finalLabel}</TableCell>
               <TableCell>File</TableCell>
               <TableCell>Preview</TableCell>
-              <TableCell sx={{ width: '100%' }}>
-                {t('binary_assets_transcript', 'Transcript')}
-              </TableCell>
+              {showTranscript && (
+                <TableCell sx={{ width: '100%' }}>
+                  {t('binary_assets_transcript', 'Transcript')}
+                </TableCell>
+              )}
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -791,84 +794,86 @@ const AssetTranslationContent = () => {
                   />
                 )}
               </TableCell>
-              <TableCell
-                // the editor needs room to wrap, unlike every other column
-                sx={{ minWidth: 200, whiteSpace: 'normal !important' }}
-                data-cy="binary-asset-transcript-cell"
-              >
-                <Box display="flex" alignItems="flex-start" gap={0.5}>
-                  <Box flex={1} minWidth={0}>
-                    {asset.transcriptKeyName ? (
-                      <TranscriptEditor
-                        projectId={project.id}
-                        keyName={asset.transcriptKeyName}
-                        languageTag={language?.tag ?? String(languageId)}
-                        value={
-                          isSource
-                            ? asset.transcriptSourceText
-                            : translation?.transcriptText
-                        }
-                        canEdit={canEdit}
-                        placeholder={t(
-                          'binary_assets_transcript_add_translation',
-                          'Add translation'
-                        )}
-                        onSaved={invalidate}
-                      />
-                    ) : canCreateTranscript ? (
-                      // no key yet — typing here creates one seeded in this language
-                      <TranscriptAddInline
-                        creating={addTranscript.isLoading}
-                        placeholderDataCy="binary-asset-language-transcript-placeholder"
-                        inputDataCy="binary-asset-language-transcript-input"
-                        placeholder={t(
-                          'binary_assets_transcript_add_translation',
-                          'Add translation'
-                        )}
-                        onCreate={(text) =>
-                          addTranscript.mutate(
-                            {
-                              path: { projectId: project.id, assetId },
-                              content: {
-                                'application/json': {
-                                  text,
-                                  languageTag: language?.tag,
+              {showTranscript && (
+                <TableCell
+                  // the editor needs room to wrap, unlike every other column
+                  sx={{ minWidth: 200, whiteSpace: 'normal !important' }}
+                  data-cy="binary-asset-transcript-cell"
+                >
+                  <Box display="flex" alignItems="flex-start" gap={0.5}>
+                    <Box flex={1} minWidth={0}>
+                      {asset.transcriptKeyName ? (
+                        <TranscriptEditor
+                          projectId={project.id}
+                          keyName={asset.transcriptKeyName}
+                          languageTag={language?.tag ?? String(languageId)}
+                          value={
+                            isSource
+                              ? asset.transcriptSourceText
+                              : translation?.transcriptText
+                          }
+                          canEdit={canEdit}
+                          placeholder={t(
+                            'binary_assets_transcript_add_translation',
+                            'Add translation'
+                          )}
+                          onSaved={invalidate}
+                        />
+                      ) : canCreateTranscript ? (
+                        // no key yet — typing here creates one seeded in this language
+                        <TranscriptAddInline
+                          creating={addTranscript.isLoading}
+                          placeholderDataCy="binary-asset-language-transcript-placeholder"
+                          inputDataCy="binary-asset-language-transcript-input"
+                          placeholder={t(
+                            'binary_assets_transcript_add_translation',
+                            'Add translation'
+                          )}
+                          onCreate={(text) =>
+                            addTranscript.mutate(
+                              {
+                                path: { projectId: project.id, assetId },
+                                content: {
+                                  'application/json': {
+                                    text,
+                                    languageTag: language?.tag,
+                                  },
                                 },
                               },
-                            },
-                            { onSuccess: invalidate }
-                          )
-                        }
-                      />
-                    ) : (
-                      <Typography variant="caption" color="text.secondary">
-                        —
-                      </Typography>
-                    )}
+                              { onSuccess: invalidate }
+                            )
+                          }
+                        />
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">
+                          —
+                        </Typography>
+                      )}
+                    </Box>
+                    {canEdit &&
+                      (isSource
+                        ? asset.transcriptionAvailable
+                        : translation?.transcriptionAvailable) && (
+                        <IconAction
+                          label={t(
+                            'binary_assets_transcript_generate_language',
+                            "Transcribe this language's audio with AI"
+                          )}
+                          icon={
+                            transcribing ? (
+                              <CircularProgress size={16} />
+                            ) : (
+                              <Stars01 width={16} height={16} />
+                            )
+                          }
+                          disabled={transcribing}
+                          onClick={() => void transcribe()}
+                          dataCy="binary-asset-transcript-generate-language"
+                        />
+                      )}
                   </Box>
-                  {canEdit &&
-                    (isSource
-                      ? asset.transcriptionAvailable
-                      : translation?.transcriptionAvailable) && (
-                      <IconAction
-                        label={t(
-                          'binary_assets_transcript_generate_language',
-                          "Transcribe this language's audio with AI"
-                        )}
-                        icon={
-                          transcribing ? (
-                            <CircularProgress size={16} />
-                          ) : (
-                            <Stars01 width={16} height={16} />
-                          )
-                        }
-                        disabled={transcribing}
-                        onClick={() => void transcribe()}
-                        dataCy="binary-asset-transcript-generate-language"
-                      />
-                    )}
-                </Box>
-              </TableCell>
+                </TableCell>
+              )}
               <TableCell align="right">
                 {uploadingOg ? (
                   <Box py={0.5} data-cy="binary-asset-file-uploading">
@@ -883,7 +888,7 @@ const AssetTranslationContent = () => {
                       onClick={isSource ? downloadSource : downloadTranslation}
                       dataCy="asset-translation-og-download"
                     />
-                    {canEdit && !ogMissing && (
+                    {showPipeline && canEdit && !ogMissing && (
                       <IconAction
                         label={t('asset_translation_run_tool', 'Run tool')}
                         icon={<Zap width={16} height={16} />}
@@ -979,20 +984,23 @@ const AssetTranslationContent = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <VersionPreview
+                    <BinaryAssetPreview
                       projectId={project.id}
                       assetId={asset.id}
                       languageId={languageId}
                       versionId={version.id}
                       contentType={version.contentType}
                       filename={version.originalFilename}
+                      compact
                     />
                   </TableCell>
-                  <TableCell>
-                    <Typography variant="caption" color="text.secondary">
-                      —
-                    </Typography>
-                  </TableCell>
+                  {showTranscript && (
+                    <TableCell>
+                      <Typography variant="caption" color="text.secondary">
+                        —
+                      </Typography>
+                    </TableCell>
+                  )}
                   <TableCell align="right">
                     <Box display="flex" gap={1} justifyContent="flex-end">
                       <IconAction
@@ -1025,10 +1033,15 @@ const AssetTranslationContent = () => {
           sx={{ mt: 1 }}
           data-cy="asset-translation-no-versions"
         >
-          {t(
-            'asset_translation_no_versions',
-            'No versions yet. Run a tool to create one.'
-          )}
+          {showPipeline
+            ? t(
+                'asset_translation_no_versions',
+                'No versions yet. Run a tool to create one.'
+              )
+            : t(
+                'asset_translation_no_versions_upload',
+                'No versions yet. Upload a file to add one.'
+              )}
         </Typography>
       )}
 
@@ -1077,98 +1090,6 @@ const AssetTranslationContent = () => {
         }}
       />
     </BaseProjectView>
-  );
-};
-
-const VersionPreview = ({
-  projectId,
-  assetId,
-  languageId,
-  versionId,
-  contentType,
-  filename,
-}: {
-  projectId: number;
-  assetId: number;
-  languageId: number;
-  versionId: number;
-  contentType: string;
-  filename: string;
-}) => {
-  const { t } = useTranslate();
-  const [src, setSrc] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    binaryAssetApi
-      .versionTicket(projectId, assetId, languageId, versionId)
-      .then((ticket) => {
-        if (!cancelled) {
-          const u = ticket.url.includes('?')
-            ? `${ticket.url}&inline=true`
-            : `${ticket.url}?inline=true`;
-          setSrc(u);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, assetId, languageId, versionId]);
-
-  if (!src) return null;
-
-  const kind = contentType.startsWith('audio/')
-    ? 'audio'
-    : contentType.startsWith('video/')
-    ? 'video'
-    : contentType.startsWith('image/')
-    ? 'image'
-    : 'unknown';
-
-  if (kind === 'audio') {
-    return (
-      <Box
-        component="audio"
-        controls
-        preload="metadata"
-        src={src}
-        sx={{ width: '100%', maxWidth: 480, height: 36 }}
-        data-cy="asset-version-preview-audio"
-      />
-    );
-  }
-  if (kind === 'video') {
-    return (
-      <Box
-        component="video"
-        controls
-        preload="metadata"
-        src={src}
-        sx={{ width: '100%', maxWidth: 480, maxHeight: 320, borderRadius: 1 }}
-        data-cy="asset-version-preview-video"
-      />
-    );
-  }
-  if (kind === 'image') {
-    return (
-      <Box
-        component="img"
-        src={src}
-        alt={filename}
-        sx={{
-          maxWidth: 360,
-          maxHeight: 280,
-          objectFit: 'contain',
-          borderRadius: 1,
-        }}
-        data-cy="asset-version-preview-image"
-      />
-    );
-  }
-  return (
-    <Typography variant="caption" color="text.secondary">
-      {t('asset_translation_preview_unsupported', 'No inline preview')}
-    </Typography>
   );
 };
 

@@ -6083,5 +6083,35 @@
         <dropNotNullConstraint tableName="binary_asset" columnName="content_type" columnDataType="VARCHAR(255)"/>
         <dropNotNullConstraint tableName="binary_asset" columnName="sha256" columnDataType="VARCHAR(64)"/>
     </changeSet>
+    <changeSet author="blubblub" id="1787400000000-1">
+        <!-- "This asset is used on this screen." Screenshots are shared with keys: one upload per
+             screen, referenced by every key and asset shown on it, deleted once nothing references it. -->
+        <createTable tableName="binary_asset_screenshot_reference">
+            <column name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="binary_asset_screenshot_referencePK"/>
+            </column>
+            <column name="asset_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="screenshot_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITHOUT TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint columnNames="asset_id, screenshot_id" constraintName="binary_asset_screenshot_reference_unique" tableName="binary_asset_screenshot_reference"/>
+        <createIndex indexName="binary_asset_screenshot_reference_asset_id_idx" tableName="binary_asset_screenshot_reference">
+            <column name="asset_id"/>
+        </createIndex>
+        <createIndex indexName="binary_asset_screenshot_reference_screenshot_id_idx" tableName="binary_asset_screenshot_reference">
+            <column name="screenshot_id"/>
+        </createIndex>
+        <addForeignKeyConstraint baseColumnNames="asset_id" baseTableName="binary_asset_screenshot_reference" constraintName="FK_binary_asset_screenshot_reference_asset" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="binary_asset" validate="true"/>
+        <addForeignKeyConstraint baseColumnNames="screenshot_id" baseTableName="binary_asset_screenshot_reference" constraintName="FK_binary_asset_screenshot_reference_screenshot" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="screenshot" validate="true"/>
+    </changeSet>
 
 </databaseChangeLog>

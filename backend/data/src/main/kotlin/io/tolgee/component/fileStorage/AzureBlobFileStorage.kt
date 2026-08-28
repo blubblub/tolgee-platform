@@ -6,6 +6,7 @@ package io.tolgee.component.fileStorage
 
 import com.azure.core.util.BinaryData
 import com.azure.storage.blob.BlobContainerClient
+import com.azure.storage.blob.models.BlobRange
 import com.azure.storage.blob.models.ListBlobsOptions
 import io.tolgee.exceptions.FileStoreException
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException
@@ -30,6 +31,21 @@ open class AzureBlobFileStorage(
   override fun openFileStream(storageFilePath: String): InputStream {
     try {
       return client.getBlobClient(storageFilePath).openInputStream()
+    } catch (e: Exception) {
+      throw FileStoreException("Can not obtain file", storageFilePath, e)
+    }
+  }
+
+  override fun openFileStreamRange(
+    storageFilePath: String,
+    start: Long,
+    endInclusive: Long,
+  ): InputStream {
+    require(start >= 0 && endInclusive >= start) { "Invalid byte range $start-$endInclusive" }
+    try {
+      return client
+        .getBlobClient(storageFilePath)
+        .openInputStream(BlobRange(start, endInclusive - start + 1), null)
     } catch (e: Exception) {
       throw FileStoreException("Can not obtain file", storageFilePath, e)
     }
