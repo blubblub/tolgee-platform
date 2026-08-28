@@ -194,36 +194,48 @@ interface BinaryAssetRepository : JpaRepository<BinaryAsset, Long> {
 }
 
 // The extension lists mirror BinaryAssetMediaType.infer — JPQL cannot share Kotlin constants.
+// Precedence too: a content type that names a major type wins outright, the extension is consulted
+// only when it does not (`video/webm` + `.webm` is a video, not also an audio).
 // A source-less asset has null type and filename; coalesce keeps `not (...)` a real boolean.
 private const val SRC_TYPE = "lower(coalesce(a.contentType, ''))"
 private const val SRC_NAME = "lower(coalesce(a.originalFilename, ''))"
 private const val SOURCE_AUDIO =
-  "($SRC_TYPE like 'audio/%' or $SRC_NAME like '%.mp3' or $SRC_NAME like '%.wav' or " +
-    "$SRC_NAME like '%.ogg' or $SRC_NAME like '%.m4a' or $SRC_NAME like '%.aac' or " +
-    "$SRC_NAME like '%.flac' or $SRC_NAME like '%.webm' or $SRC_NAME like '%.opus')"
+  "($SRC_TYPE like 'audio/%' or ($SRC_TYPE not like 'audio/%' and $SRC_TYPE not like 'video/%' and " +
+    "$SRC_TYPE not like 'image/%' and (" +
+    "$SRC_NAME like '%.mp3' or $SRC_NAME like '%.wav' or $SRC_NAME like '%.ogg' or " +
+    "$SRC_NAME like '%.m4a' or $SRC_NAME like '%.aac' or $SRC_NAME like '%.flac' or " +
+    "$SRC_NAME like '%.webm' or $SRC_NAME like '%.opus')))"
 private const val SOURCE_VIDEO =
-  "($SRC_TYPE like 'video/%' or $SRC_NAME like '%.mp4' or $SRC_NAME like '%.mov' or " +
-    "$SRC_NAME like '%.m4v' or $SRC_NAME like '%.mkv' or $SRC_NAME like '%.avi')"
+  "($SRC_TYPE like 'video/%' or ($SRC_TYPE not like 'audio/%' and $SRC_TYPE not like 'video/%' and " +
+    "$SRC_TYPE not like 'image/%' and (" +
+    "$SRC_NAME like '%.mp4' or $SRC_NAME like '%.mov' or $SRC_NAME like '%.m4v' or " +
+    "$SRC_NAME like '%.mkv' or $SRC_NAME like '%.avi')))"
 private const val SOURCE_IMAGE =
-  "($SRC_TYPE like 'image/%' or $SRC_NAME like '%.png' or $SRC_NAME like '%.jpg' or " +
-    "$SRC_NAME like '%.jpeg' or $SRC_NAME like '%.gif' or $SRC_NAME like '%.webp' or " +
-    "$SRC_NAME like '%.svg' or $SRC_NAME like '%.bmp')"
+  "($SRC_TYPE like 'image/%' or ($SRC_TYPE not like 'audio/%' and $SRC_TYPE not like 'video/%' and " +
+    "$SRC_TYPE not like 'image/%' and (" +
+    "$SRC_NAME like '%.png' or $SRC_NAME like '%.jpg' or $SRC_NAME like '%.jpeg' or " +
+    "$SRC_NAME like '%.gif' or $SRC_NAME like '%.webp' or $SRC_NAME like '%.svg' or " +
+    "$SRC_NAME like '%.bmp')))"
 
+private const val LANE_TYPE = "lower(t.contentType)"
+private const val LANE_NAME = "lower(t.originalFilename)"
 private const val LANE_AUDIO =
-  "(lower(t.contentType) like 'audio/%' or lower(t.originalFilename) like '%.mp3' or " +
-    "lower(t.originalFilename) like '%.wav' or lower(t.originalFilename) like '%.ogg' or " +
-    "lower(t.originalFilename) like '%.m4a' or lower(t.originalFilename) like '%.aac' or " +
-    "lower(t.originalFilename) like '%.flac' or lower(t.originalFilename) like '%.webm' or " +
-    "lower(t.originalFilename) like '%.opus')"
+  "($LANE_TYPE like 'audio/%' or ($LANE_TYPE not like 'audio/%' and $LANE_TYPE not like 'video/%' and " +
+    "$LANE_TYPE not like 'image/%' and (" +
+    "$LANE_NAME like '%.mp3' or $LANE_NAME like '%.wav' or $LANE_NAME like '%.ogg' or " +
+    "$LANE_NAME like '%.m4a' or $LANE_NAME like '%.aac' or $LANE_NAME like '%.flac' or " +
+    "$LANE_NAME like '%.webm' or $LANE_NAME like '%.opus')))"
 private const val LANE_VIDEO =
-  "(lower(t.contentType) like 'video/%' or lower(t.originalFilename) like '%.mp4' or " +
-    "lower(t.originalFilename) like '%.mov' or lower(t.originalFilename) like '%.m4v' or " +
-    "lower(t.originalFilename) like '%.mkv' or lower(t.originalFilename) like '%.avi')"
+  "($LANE_TYPE like 'video/%' or ($LANE_TYPE not like 'audio/%' and $LANE_TYPE not like 'video/%' and " +
+    "$LANE_TYPE not like 'image/%' and (" +
+    "$LANE_NAME like '%.mp4' or $LANE_NAME like '%.mov' or $LANE_NAME like '%.m4v' or " +
+    "$LANE_NAME like '%.mkv' or $LANE_NAME like '%.avi')))"
 private const val LANE_IMAGE =
-  "(lower(t.contentType) like 'image/%' or lower(t.originalFilename) like '%.png' or " +
-    "lower(t.originalFilename) like '%.jpg' or lower(t.originalFilename) like '%.jpeg' or " +
-    "lower(t.originalFilename) like '%.gif' or lower(t.originalFilename) like '%.webp' or " +
-    "lower(t.originalFilename) like '%.svg' or lower(t.originalFilename) like '%.bmp')"
+  "($LANE_TYPE like 'image/%' or ($LANE_TYPE not like 'audio/%' and $LANE_TYPE not like 'video/%' and " +
+    "$LANE_TYPE not like 'image/%' and (" +
+    "$LANE_NAME like '%.png' or $LANE_NAME like '%.jpg' or $LANE_NAME like '%.jpeg' or " +
+    "$LANE_NAME like '%.gif' or $LANE_NAME like '%.webp' or $LANE_NAME like '%.svg' or " +
+    "$LANE_NAME like '%.bmp')))"
 
 /** Any older lane (`x`) of the same asset that already has a recognised type — it decides, not `t`. */
 private const val OLDER_TYPED_LANE =

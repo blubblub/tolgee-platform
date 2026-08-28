@@ -118,9 +118,6 @@ declare namespace DataCy {
         "asset-version-download": true;
         "asset-version-final-badge": true;
         "asset-version-model-id": true;
-        "asset-version-preview-audio": true;
-        "asset-version-preview-image": true;
-        "asset-version-preview-video": true;
         "asset-version-remove-background-noise": true;
         "asset-version-row": true;
         "asset-version-run-dialog": true;

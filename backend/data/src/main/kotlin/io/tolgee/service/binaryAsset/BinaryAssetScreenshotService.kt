@@ -2,6 +2,7 @@ package io.tolgee.service.binaryAsset
 
 import io.tolgee.constants.Message
 import io.tolgee.exceptions.NotFoundException
+import io.tolgee.exceptions.PermissionException
 import io.tolgee.model.Screenshot
 import io.tolgee.model.binaryAsset.BinaryAsset
 import io.tolgee.repository.binaryAsset.BinaryAssetRepository
@@ -50,6 +51,11 @@ class BinaryAssetScreenshotService(
     val asset = asset(projectId, assetId)
     val screenshot = screenshotService.get(screenshotId)
     screenshotService.checkInProject(screenshot, projectId)
+    // "not somewhere else" is not "here": a reference-less row must not be claimable from any project
+    val referencedHere =
+      screenshot.keyScreenshotReferences.any { it.key.project.id == projectId } ||
+        screenshot.binaryAssetScreenshotReferences.any { it.asset.project.id == projectId }
+    if (!referencedHere) throw PermissionException(Message.SCREENSHOT_NOT_FROM_PROJECT)
     screenshotService.addAssetReference(asset, screenshot)
     return screenshot.also { screenshotService.initializeReferences(listOf(it)) }
   }

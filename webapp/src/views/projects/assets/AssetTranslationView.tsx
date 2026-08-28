@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Alert,
   AlertTitle,
@@ -984,13 +984,14 @@ const AssetTranslationContent = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <VersionPreview
+                    <BinaryAssetPreview
                       projectId={project.id}
                       assetId={asset.id}
                       languageId={languageId}
                       versionId={version.id}
                       contentType={version.contentType}
                       filename={version.originalFilename}
+                      compact
                     />
                   </TableCell>
                   {showTranscript && (
@@ -1089,98 +1090,6 @@ const AssetTranslationContent = () => {
         }}
       />
     </BaseProjectView>
-  );
-};
-
-const VersionPreview = ({
-  projectId,
-  assetId,
-  languageId,
-  versionId,
-  contentType,
-  filename,
-}: {
-  projectId: number;
-  assetId: number;
-  languageId: number;
-  versionId: number;
-  contentType: string;
-  filename: string;
-}) => {
-  const { t } = useTranslate();
-  const [src, setSrc] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    binaryAssetApi
-      .versionTicket(projectId, assetId, languageId, versionId)
-      .then((ticket) => {
-        if (!cancelled) {
-          const u = ticket.url.includes('?')
-            ? `${ticket.url}&inline=true`
-            : `${ticket.url}?inline=true`;
-          setSrc(u);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, assetId, languageId, versionId]);
-
-  if (!src) return null;
-
-  const kind = contentType.startsWith('audio/')
-    ? 'audio'
-    : contentType.startsWith('video/')
-    ? 'video'
-    : contentType.startsWith('image/')
-    ? 'image'
-    : 'unknown';
-
-  if (kind === 'audio') {
-    return (
-      <Box
-        component="audio"
-        controls
-        preload="metadata"
-        src={src}
-        sx={{ width: '100%', maxWidth: 480, height: 36 }}
-        data-cy="asset-version-preview-audio"
-      />
-    );
-  }
-  if (kind === 'video') {
-    return (
-      <Box
-        component="video"
-        controls
-        preload="metadata"
-        src={src}
-        sx={{ width: '100%', maxWidth: 480, maxHeight: 320, borderRadius: 1 }}
-        data-cy="asset-version-preview-video"
-      />
-    );
-  }
-  if (kind === 'image') {
-    return (
-      <Box
-        component="img"
-        src={src}
-        alt={filename}
-        sx={{
-          maxWidth: 360,
-          maxHeight: 280,
-          objectFit: 'contain',
-          borderRadius: 1,
-        }}
-        data-cy="asset-version-preview-image"
-      />
-    );
-  }
-  return (
-    <Typography variant="caption" color="text.secondary">
-      {t('asset_translation_preview_unsupported', 'No inline preview')}
-    </Typography>
   );
 };
 

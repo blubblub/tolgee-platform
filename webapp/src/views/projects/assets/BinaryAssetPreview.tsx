@@ -28,12 +28,20 @@ const MAX_CONCURRENT_TICKETS = 4;
 let activeTickets = 0;
 const ticketQueue: Array<() => void> = [];
 
-async function withTicketSlot<T>(fn: () => Promise<T>): Promise<T> {
+/**
+ * Runs `fn` once a slot is free. A caller that was cancelled while queued (row scrolled away,
+ * filter changed) gives its slot straight back instead of spending a request on a dead row.
+ */
+async function withTicketSlot<T>(
+  fn: () => Promise<T>,
+  isCancelled: () => boolean
+): Promise<T | undefined> {
   if (activeTickets >= MAX_CONCURRENT_TICKETS) {
     await new Promise<void>((resolve) => ticketQueue.push(resolve));
   }
   activeTickets++;
   try {
+    if (isCancelled()) return undefined;
     return await fn();
   } finally {
     activeTickets--;
@@ -48,15 +56,20 @@ const TICKET_RETRIES = 3;
 // video and resume later and the next request 404s, which surfaces as a media
 // error. Re-mint a fresh ticket a bounded number of times before giving up.
 export const MAX_AUTO_RETICKETS = 2;
+// Playback has to get this far past the point of failure before the retry budget is earned
+// back — a file that always dies at the same offset must not re-ticket forever.
+export const PROGRESS_TO_RESET_SECONDS = 2;
+// HTMLMediaElement.error.code: the file itself cannot be decoded, a fresh URL will not help
+const MEDIA_ERR_DECODE = 3;
 
-function retryDelayMs(e: unknown, attempt: number): number {
-  // 429 bodies carry the bucket refill time; 444 arrives with no body at all
-  const err = e as { code?: string; params?: unknown[] };
-  if (err?.code === 'rate_limited') {
-    const retryAfter = Number(err.params?.[0]);
-    if (Number.isFinite(retryAfter) && retryAfter > 0) {
-      return Math.min(retryAfter, 30_000);
-    }
+export function retryDelayMs(e: unknown, attempt: number): number {
+  // a 429 body is { message, retryAfter, global } with retryAfter in ms — wait exactly that long
+  // rather than knocking again early and collecting a strike; 444 arrives with no body at all
+  const retryAfter = Number(
+    (e as { data?: { retryAfter?: unknown } })?.data?.retryAfter
+  );
+  if (Number.isFinite(retryAfter) && retryAfter > 0) {
+    return Math.min(retryAfter, 30_000);
   }
   return 1000 * 2 ** attempt + Math.random() * 500;
 }
@@ -112,14 +125,20 @@ export const BinaryAssetPreview = ({
   const [retryNonce, setRetryNonce] = useState(0);
   const autoReticketsRef = useRef(0);
   const resumeAtRef = useRef(0);
+  const failedAtRef = useRef(0);
 
   const handleMediaError = (e: SyntheticEvent<HTMLMediaElement>) => {
-    if (autoReticketsRef.current >= MAX_AUTO_RETICKETS) {
+    const el = e.currentTarget;
+    if (
+      el.error?.code === MEDIA_ERR_DECODE ||
+      autoReticketsRef.current >= MAX_AUTO_RETICKETS
+    ) {
       setError('Playback failed');
       return;
     }
     autoReticketsRef.current += 1;
-    resumeAtRef.current = e.currentTarget.currentTime || 0;
+    failedAtRef.current = el.currentTime || 0;
+    resumeAtRef.current = failedAtRef.current;
     setRetryNonce((n) => n + 1);
   };
 
@@ -130,9 +149,14 @@ export const BinaryAssetPreview = ({
     }
   };
 
-  // Once the fresh source actually plays, a later expiry gets its own retries.
-  const handleCanPlay = () => {
-    autoReticketsRef.current = 0;
+  // Real progress past the failure point means the file plays; a later expiry gets its own retries.
+  const handleTimeUpdate = (e: SyntheticEvent<HTMLMediaElement>) => {
+    if (
+      e.currentTarget.currentTime >
+      failedAtRef.current + PROGRESS_TO_RESET_SECONDS
+    ) {
+      autoReticketsRef.current = 0;
+    }
   };
 
   // Each preview waits for its own visibility, so a tall page only tickets
@@ -171,8 +195,8 @@ export const BinaryAssetPreview = ({
       try {
         for (let attempt = 0; ; attempt++) {
           try {
-            const ticket = await withTicketSlot(fetchTicket);
-            if (!cancelled) {
+            const ticket = await withTicketSlot(fetchTicket, () => cancelled);
+            if (ticket && !cancelled) {
               setSrc(withInline(ticket.url));
             }
             return;
@@ -276,7 +300,7 @@ export const BinaryAssetPreview = ({
         onClick={(e) => e.stopPropagation()}
         onError={handleMediaError}
         onLoadedMetadata={handleLoadedMetadata}
-        onCanPlay={handleCanPlay}
+        onTimeUpdate={handleTimeUpdate}
         data-cy="binary-asset-preview-audio"
       />
     );
@@ -299,7 +323,7 @@ export const BinaryAssetPreview = ({
         onClick={(e) => e.stopPropagation()}
         onError={handleMediaError}
         onLoadedMetadata={handleLoadedMetadata}
-        onCanPlay={handleCanPlay}
+        onTimeUpdate={handleTimeUpdate}
         data-cy="binary-asset-preview-video"
       />
     );

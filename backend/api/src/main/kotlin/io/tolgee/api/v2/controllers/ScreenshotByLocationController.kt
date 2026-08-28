@@ -50,7 +50,8 @@ class ScreenshotByLocationController(
         "are never created or deleted; unknown names are reported back. Idempotent, safe to rerun.",
   )
   @RequestBody(content = [Content(encoding = [Encoding(name = "info", contentType = "application/json")])])
-  @RequiresProjectPermissions([Scope.SCREENSHOTS_UPLOAD])
+  // replaces images, unlinks keys and deletes folded-in screenshots — upload alone is not enough
+  @RequiresProjectPermissions([Scope.SCREENSHOTS_UPLOAD, Scope.SCREENSHOTS_DELETE])
   @AllowApiAccess
   @RequestActivity(ActivityType.SCREENSHOT_UPSERT_BY_LOCATION)
   fun upsertByLocation(

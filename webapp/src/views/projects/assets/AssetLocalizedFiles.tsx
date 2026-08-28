@@ -144,6 +144,11 @@ export const AssetLocalizedFiles = ({
   const capabilities = getCapabilities(asset);
   const showTranscript = capabilities.transcript || !!asset.transcriptKeyName;
   const showPipeline = capabilities.pipeline;
+  // a chosen version can exist without the pipeline (uploaded by hand), and must stay visible
+  const showFinal =
+    showPipeline ||
+    asset.chosenVersionId != null ||
+    (asset.translations ?? []).some((row) => row.chosenVersionId != null);
   const recordable = canRecordAudio() && capabilities.record;
 
   const rows = useMemo(
@@ -444,7 +449,7 @@ export const AssetLocalizedFiles = ({
                     {t('binary_assets_transcript', 'Transcript')}
                   </TableCell>
                 )}
-                {showPipeline && (
+                {showFinal && (
                   <TableCell>{t('binary_assets_final', 'Final')}</TableCell>
                 )}
                 <TableCell align="right">Actions</TableCell>
@@ -551,7 +556,7 @@ export const AssetLocalizedFiles = ({
                       />
                     </TableCell>
                   )}
-                  {showPipeline && (
+                  {showFinal && (
                     <TableCell data-cy="binary-asset-final-cell">
                       {sourceBusy ? (
                         <Box
@@ -821,7 +826,7 @@ export const AssetLocalizedFiles = ({
                       </Box>
                     </TableCell>
                   )}
-                  {showPipeline && (
+                  {showFinal && (
                     <TableCell data-cy="binary-asset-final-cell">
                       {recordingFinalLanguageId === row.languageId ||
                       regeneratingLanguageIds.includes(row.languageId) ? (

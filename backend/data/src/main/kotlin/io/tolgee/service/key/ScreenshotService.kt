@@ -33,6 +33,8 @@ import jakarta.persistence.EntityManager
 import org.springframework.core.io.InputStreamSource
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.awt.Dimension
 import kotlin.math.roundToInt
 
@@ -125,7 +127,7 @@ class ScreenshotService(
     val middleSized = converter.getThumbnail(MIDDLE_SIZED_MAX_DIMENSION)
     val thumbnail = converter.getThumbnail(THUMBNAIL_MAX_DIMENSION)
 
-    deleteFile(screenshot)
+    val previousFiles = filePaths(screenshot)
     screenshot.extension = "png"
     screenshot.hasThumbnail = true
     screenshot.hasMiddleSized = true
@@ -133,6 +135,8 @@ class ScreenshotService(
     screenshot.height = converter.targetDimension.height
     screenshotRepository.save(screenshot)
     storeFiles(screenshot, image.toByteArray(), middleSized.toByteArray(), thumbnail.toByteArray())
+    // files the new image did not overwrite (a legacy .jpg, say) go once the row change is safe
+    deleteFilesAfterCommit(previousFiles - filePaths(screenshot).toSet())
     return CreateScreenshotResult(
       screenshot = screenshot,
       originalDimension = converter.originalDimension,
@@ -524,13 +528,33 @@ class ScreenshotService(
   }
 
   /** Removes every stored size. A missing derived file is not an error — legacy rows never had them. */
-  private fun deleteFile(screenshot: Screenshot) {
-    val paths =
-      listOfNotNull(
-        screenshot.getFilePath(),
-        screenshot.getMiddleSizedPath(),
-        screenshot.getThumbnailPath().takeIf { it != screenshot.getFilePath() },
-      )
+  private fun deleteFile(screenshot: Screenshot) = deleteFilesAfterCommit(filePaths(screenshot))
+
+  private fun filePaths(screenshot: Screenshot): List<String> =
+    listOfNotNull(
+      screenshot.getFilePath(),
+      screenshot.getMiddleSizedPath(),
+      screenshot.getThumbnailPath().takeIf { it != screenshot.getFilePath() },
+    )
+
+  /**
+   * Rows roll back with the transaction; blobs do not. Deleting them before commit would leave
+   * surviving rows whose images 404 when anything later in the request fails.
+   */
+  private fun deleteFilesAfterCommit(paths: Collection<String>) {
+    if (paths.isEmpty()) return
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      deleteFilesNow(paths)
+      return
+    }
+    TransactionSynchronizationManager.registerSynchronization(
+      object : TransactionSynchronization {
+        override fun afterCommit() = deleteFilesNow(paths)
+      },
+    )
+  }
+
+  private fun deleteFilesNow(paths: Collection<String>) {
     paths.forEach { path ->
       try {
         fileStorage.deleteFile(path)

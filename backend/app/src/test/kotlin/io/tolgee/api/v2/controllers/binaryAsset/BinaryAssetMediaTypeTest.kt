@@ -168,6 +168,25 @@ class BinaryAssetMediaTypeTest : ProjectAuthControllerTest("/v2/projects/") {
 
   @Test
   @ProjectJWTAuthTestMethod
+  fun `the content type wins over an extension from another list, in the model and in the filter`() {
+    // .webm is on the audio extension list; video/webm says otherwise and must decide alone
+    val clipId = createAsset("webm-clip", "rec.webm", "video/webm")
+    performProjectAuthGet("binary-assets/$clipId").andIsOk.andAssertThatJson {
+      node("mediaType").isEqualTo("VIDEO")
+    }
+    assertThat(filtersListing("webm-clip")).containsExactly("VIDEO")
+
+    // the same rule for a lane file deciding a source-less asset
+    val voiceId = createAsset("sourceless-odd-ext", null)
+    uploadLane(voiceId, languageId("de"), "voice_de.mp4", "audio/mpeg")
+    performProjectAuthGet("binary-assets/$voiceId").andIsOk.andAssertThatJson {
+      node("mediaType").isEqualTo("AUDIO")
+    }
+    assertThat(filtersListing("sourceless-odd-ext")).containsExactly("AUDIO")
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
   fun `an asset with no original and no lanes has no type and matches no filter`() {
     createAsset("sourceless-empty", null)
 

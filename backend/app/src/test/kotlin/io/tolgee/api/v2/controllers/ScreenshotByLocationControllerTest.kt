@@ -1,16 +1,21 @@
 package io.tolgee.api.v2.controllers
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import io.tolgee.API_KEY_HEADER_NAME
 import io.tolgee.ProjectAuthControllerTest
 import io.tolgee.dtos.request.ScreenshotInfoDto
 import io.tolgee.dtos.request.key.CreateKeyDto
 import io.tolgee.fixtures.AuthorizedRequestFactory
+import io.tolgee.fixtures.ProjectApiKeyAuthRequestPerformer
 import io.tolgee.fixtures.andAssertThatJson
 import io.tolgee.fixtures.andIsBadRequest
 import io.tolgee.fixtures.andIsCreated
+import io.tolgee.fixtures.andIsForbidden
 import io.tolgee.fixtures.andIsOk
 import io.tolgee.fixtures.generateImage
+import io.tolgee.model.enums.Scope
 import io.tolgee.repository.ScreenshotRepository
+import io.tolgee.testing.annotations.ProjectApiKeyAuthTestMethod
 import io.tolgee.testing.annotations.ProjectJWTAuthTestMethod
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -75,7 +80,15 @@ class ScreenshotByLocationControllerTest : ProjectAuthControllerTest("/v2/projec
         req
       },
     )
-    return mvc.perform(AuthorizedRequestFactory.addToken(builder))
+    // a raw builder gets no auth from the performer, so attach whatever the test method chose
+    val performer = projectAuthRequestPerformer
+    val authorized =
+      if (performer is ProjectApiKeyAuthRequestPerformer) {
+        builder.header(API_KEY_HEADER_NAME, performer.apiKey.key)
+      } else {
+        AuthorizedRequestFactory.addToken(builder)
+      }
+    return mvc.perform(authorized)
   }
 
   private fun screenshotId(result: ResultActions): Long =
@@ -205,6 +218,48 @@ class ScreenshotByLocationControllerTest : ProjectAuthControllerTest("/v2/projec
     }
 
     assertThat(screenshotRepository.count()).isEqualTo(1)
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `a key listed twice on one screen gets one reference with the positions merged`() {
+    keyService.create(project, CreateKeyDto("cta"))
+
+    upsert(
+      mapOf(
+        "location" to "home",
+        "keys" to
+          listOf(
+            mapOf("name" to "cta", "positions" to listOf(mapOf("x" to 0, "y" to 0, "width" to 10, "height" to 10))),
+            mapOf("name" to "cta", "positions" to listOf(mapOf("x" to 50, "y" to 50, "width" to 10, "height" to 10))),
+          ),
+      ),
+    ).andIsOk.andAssertThatJson {
+      node("linkedKeys").isArray.containsExactly("cta")
+      // the model flattens one entry per position; both belong to the single reference below
+      node("screenshot.keyReferences").isArray.hasSize(2)
+      node("screenshot.keyReferences[0].keyName").isEqualTo("cta")
+      node("screenshot.keyReferences[1].keyName").isEqualTo("cta")
+    }
+    val reference =
+      executeInNewTransaction {
+        screenshotService.getAllKeyScreenshotReferences(keyService.get(project.id, "cta", null)).single()
+      }
+    assertThat(reference.positions).hasSize(2)
+  }
+
+  @Test
+  @ProjectApiKeyAuthTestMethod(scopes = [Scope.SCREENSHOTS_UPLOAD])
+  fun `an upload-only key cannot upsert by location because it replaces and deletes`() {
+    keyService.create(project, CreateKeyDto("cta"))
+    upsert(mapOf("location" to "home", "keys" to listOf(mapOf("name" to "cta")))).andIsForbidden
+  }
+
+  @Test
+  @ProjectApiKeyAuthTestMethod(scopes = [Scope.SCREENSHOTS_UPLOAD, Scope.SCREENSHOTS_DELETE])
+  fun `a key with upload and delete rights can upsert by location`() {
+    keyService.create(project, CreateKeyDto("cta"))
+    upsert(mapOf("location" to "home", "keys" to listOf(mapOf("name" to "cta")))).andIsOk
   }
 
   @Test

@@ -96,16 +96,25 @@ class ScreenshotByLocationService(
     keyScreenshotReferenceRepository.flush()
     stale.forEach { screenshotService.delete(it) }
 
-    request.keys.forEach { ref ->
-      val key = keys.found[ref.name to ref.namespace?.nullIfEmpty] ?: return@forEach
-      screenshotService.addReference(
-        key = key,
-        screenshot = screenshot,
-        info = ScreenshotInfoDto(text = ref.text, positions = ref.positions, location = location),
-        originalDimension = result.originalDimension,
-        targetDimension = result.targetDimension,
-      )
-    }
+    // One reference per key: a button rendered twice arrives as two entries for the same key, and
+    // a second (key, screenshot) reference would collide on its composite id. Positions merge.
+    request.keys
+      .groupBy { it.name to it.namespace?.nullIfEmpty }
+      .forEach { (id, refs) ->
+        val key = keys.found[id] ?: return@forEach
+        screenshotService.addReference(
+          key = key,
+          screenshot = screenshot,
+          info =
+            ScreenshotInfoDto(
+              text = refs.firstNotNullOfOrNull { it.text },
+              positions = refs.flatMap { it.positions.orEmpty() }.ifEmpty { null },
+              location = location,
+            ),
+          originalDimension = result.originalDimension,
+          targetDimension = result.targetDimension,
+        )
+      }
     assets.found.values.forEach { asset -> screenshotService.addAssetReference(asset, screenshot) }
     screenshotService.initializeReferences(listOf(screenshot))
 

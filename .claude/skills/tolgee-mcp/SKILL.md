@@ -18,7 +18,7 @@ Auth: `X-API-Key` header on **every** request.
 
 ## Which interface — MCP, REST, or the CLI
 
-- **MCP** — everything here. All 42 tools, including the complete binary-asset
+- **MCP** — everything here. All 47 tools, including the complete binary-asset
   surface (every asset REST endpoint has a tool).
 - **REST** — needed only for **very large uploads**. MCP arguments are JSON, so
   uploads are base64 with a 200 MiB cap; above that use the REST multipart
@@ -27,7 +27,7 @@ Auth: `X-API-Key` header on **every** request.
   works without authentication, so a plain HTTP GET fetches the bytes (HTTP
   byte ranges are honoured, so `curl -C -` resumes and players can seek). REST is
   also the only way to reach non-asset endpoints that have no tools (export,
-  import, screenshots).
+  import).
 - **`@tolgee/cli`** (`tolgee pull/push/sync/extract/tag`) — **not for assets.**
   It syncs translation strings between source code and a project and has no
   asset, transcript, TTS, or version commands. Reach for it when wiring string
@@ -157,9 +157,14 @@ shown on it. The atlas screenshot bot drives this; humans rarely need to.
   place** and sets the linked `keys` (name, optional namespace/text/positions)
   and `assets` (names) to exactly what was sent. Keys and assets are never
   created or deleted; unknown names come back in `unknownKeys` /
-  `unknownAssets`. Idempotent — rerun freely. REST: `PUT
+  `unknownAssets`. Idempotent — rerun freely. Needs both `SCREENSHOTS_UPLOAD`
+  and `SCREENSHOTS_DELETE` (it replaces images and drops links). REST: `PUT
   /v2/projects/{projectId}/screenshots/by-location` (multipart `image` +
-  JSON `info`).
+  JSON `info`). Shapes differ: the MCP tool takes `assets` as plain strings
+  (`["vox-intro"]`); REST `info.assets` is `[{"name": "vox-intro"}]` and
+  `info.keys` is `[{"name", "namespace"?, "text"?, "positions"?}]`. Likewise
+  `list_asset_screenshots` returns a bare array where REST wraps it in
+  `_embedded.screenshots`.
 - Per asset: `list_asset_screenshots`, `upload_asset_screenshot`,
   `link_asset_screenshot` (attach a screenshot a key already has),
   `unlink_asset_screenshot` (the screenshot is deleted only when nothing else
@@ -193,7 +198,7 @@ shown on it. The atlas screenshot bot drives this; humans rarely need to.
   `PUT …/translations/{languageId}`, `POST …/versions`.
 - AI calls are synchronous; give MCP client requests a generous timeout
   (≥ 5 min) for long audio.
-- Transcription needs audio/video assets; images/documents are rejected.
+- Transcription needs audio assets; video, images and documents are rejected.
 - `delete_*` tools are destructive (versions and files are unrecoverable) —
   always confirm with the user first.
 - MCP responses carry the same JSON models as the REST API
