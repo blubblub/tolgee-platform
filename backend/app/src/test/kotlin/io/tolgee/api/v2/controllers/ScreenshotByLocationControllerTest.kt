@@ -2,6 +2,7 @@ package io.tolgee.api.v2.controllers
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.tolgee.ProjectAuthControllerTest
+import io.tolgee.dtos.request.ScreenshotInfoDto
 import io.tolgee.dtos.request.key.CreateKeyDto
 import io.tolgee.fixtures.AuthorizedRequestFactory
 import io.tolgee.fixtures.andAssertThatJson
@@ -187,8 +188,8 @@ class ScreenshotByLocationControllerTest : ProjectAuthControllerTest("/v2/projec
     executeInNewTransaction {
       val a = keyService.create(project, CreateKeyDto("legacy_a"))
       val b = keyService.create(project, CreateKeyDto("legacy_b"))
-      screenshotService.store(generateImage(50, 50), a, io.tolgee.dtos.request.ScreenshotInfoDto(location = "settings"))
-      screenshotService.store(generateImage(50, 50), b, io.tolgee.dtos.request.ScreenshotInfoDto(location = "settings"))
+      screenshotService.store(generateImage(50, 50), a, ScreenshotInfoDto(location = "settings"))
+      screenshotService.store(generateImage(50, 50), b, ScreenshotInfoDto(location = "settings"))
     }
     assertThat(screenshotRepository.count()).isEqualTo(2)
 
