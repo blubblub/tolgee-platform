@@ -111,11 +111,82 @@ class BinaryAssetMediaTypeTest : ProjectAuthControllerTest("/v2/projects/") {
   @ProjectJWTAuthTestMethod
   fun `an asset with no original takes its type from its localized files`() {
     val assetId = createAsset("sourceless-voice", null)
-    val langId = languageId("de")
+    uploadLane(assetId, languageId("de"), "voice_de.m4a", "application/octet-stream")
+
+    performProjectAuthGet("binary-assets/$assetId").andIsOk.andAssertThatJson {
+      node("mediaType").isEqualTo("AUDIO")
+      // the source stays "not uploaded" — the sync scripts read these as "no source"
+      node("contentType").isNull()
+      node("originalFilename").isNull()
+      node("byteSize").isEqualTo(0)
+      node("capabilities.transcript").isEqualTo(true)
+    }
+    // the list filter agrees with the model: found under AUDIO and nowhere else
+    assertThat(filtersListing("sourceless-voice")).containsExactly("AUDIO")
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `an asset with no original and an image lane is an image, and only an image`() {
+    val assetId = createAsset("sourceless-shot", null)
+    uploadLane(assetId, languageId("de"), "shot_de.jpg", "image/jpeg")
+
+    performProjectAuthGet("binary-assets/$assetId").andIsOk.andAssertThatJson {
+      node("mediaType").isEqualTo("IMAGE")
+      node("contentType").isNull()
+      node("capabilities.transcript").isEqualTo(false)
+      node("capabilities.pipeline").isEqualTo(false)
+    }
+    assertThat(filtersListing("sourceless-shot")).containsExactly("IMAGE")
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `the original decides the type even when a lane disagrees`() {
+    val assetId = createAsset("voice-with-odd-lane", "voice.mp3", "audio/mpeg")
+    uploadLane(assetId, languageId("de"), "voice_de.png", "image/png")
+
+    performProjectAuthGet("binary-assets/$assetId").andIsOk.andAssertThatJson {
+      node("mediaType").isEqualTo("AUDIO")
+    }
+    assertThat(filtersListing("voice-with-odd-lane")).containsExactly("AUDIO")
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `lanes of mixed types resolve to the oldest typed lane, in the model and in the filter`() {
+    val assetId = createAsset("sourceless-mixed", null)
+    val frId = createLanguage("fr")
+    uploadLane(assetId, languageId("de"), "first_de.png", "image/png")
+    uploadLane(assetId, frId, "later_fr.wav", "audio/wav")
+
+    performProjectAuthGet("binary-assets/$assetId").andIsOk.andAssertThatJson {
+      node("mediaType").isEqualTo("IMAGE")
+    }
+    assertThat(filtersListing("sourceless-mixed")).containsExactly("IMAGE")
+  }
+
+  @Test
+  @ProjectJWTAuthTestMethod
+  fun `an asset with no original and no lanes has no type and matches no filter`() {
+    createAsset("sourceless-empty", null)
+
+    assertThat(filtersListing("sourceless-empty")).isEmpty()
+    // still there when nothing is filtered
+    assertThat(listedNames(null)).contains("sourceless-empty")
+    assertThat(listedNames("AUDIO,VIDEO,IMAGE")).doesNotContain("sourceless-empty")
+  }
+
+  private fun uploadLane(
+    assetId: Long,
+    langId: Long,
+    filename: String,
+    contentType: String,
+  ) {
     val builder =
       MockMvcRequestBuilders
         .multipart("${projectUrlPrefix}${project.id}/binary-assets/$assetId/translations/$langId")
-        .file(MockMultipartFile("file", "voice_de.m4a", "application/octet-stream", byteArrayOf(1, 2, 3, 4)))
+        .file(MockMultipartFile("file", filename, contentType, byteArrayOf(1, 2, 3, 4)))
         .file(MockMultipartFile("translatedAgainstSourceRevision", null, MediaType.TEXT_PLAIN_VALUE, "1".toByteArray()))
     builder.with(
       RequestPostProcessor { req ->
@@ -124,19 +195,25 @@ class BinaryAssetMediaTypeTest : ProjectAuthControllerTest("/v2/projects/") {
       },
     )
     mvc.perform(AuthorizedRequestFactory.addToken(builder)).andExpect(MockMvcResultMatchers.status().isOk)
-
-    performProjectAuthGet("binary-assets/$assetId").andIsOk.andAssertThatJson {
-      node("mediaType").isEqualTo("AUDIO")
-      node("capabilities.transcript").isEqualTo(true)
-    }
-    // the list filter agrees with the model: found under AUDIO, absent under IMAGE
-    assertThat(listedNames("AUDIO")).contains("sourceless-voice")
-    assertThat(listedNames("IMAGE")).doesNotContain("sourceless-voice")
   }
 
-  private fun listedNames(mediaType: String): List<String> {
+  private fun createLanguage(tag: String): Long {
+    val result =
+      performProjectAuthPost(
+        "languages",
+        mapOf("name" to tag.uppercase(), "originalName" to tag, "tag" to tag),
+      ).andIsOk.andReturn()
+    return jacksonObjectMapper().readTree(result.response.contentAsString).get("id").asLong()
+  }
+
+  /** Which of the three media-type filters list the asset — the model and the filter must agree. */
+  private fun filtersListing(name: String): List<String> =
+    listOf("AUDIO", "VIDEO", "IMAGE").filter { name in listedNames(it) }
+
+  private fun listedNames(mediaType: String?): List<String> {
+    val filter = mediaType?.let { "filterMediaType=$it&" } ?: ""
     val body =
-      performProjectAuthGet("binary-assets?filterMediaType=$mediaType&size=50")
+      performProjectAuthGet("binary-assets?${filter}size=50")
         .andIsOk
         .andReturn()
         .response.contentAsString
@@ -208,7 +285,7 @@ class BinaryAssetMediaTypeTest : ProjectAuthControllerTest("/v2/projects/") {
 
   @Test
   @ProjectJWTAuthTestMethod
-  fun `an asset with no original keeps every affordance`() {
+  fun `an asset with no file yet keeps every affordance`() {
     // recording or TTS may be how it gets its first file, and its transcript may be all it has
     val assetId = createAsset("sourceless", null)
 

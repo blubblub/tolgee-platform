@@ -168,8 +168,12 @@ shown on it. The atlas screenshot bot drives this; humans rarely need to.
   `screenshotCount`; screenshot models carry `keyReferences` and
   `assetReferences`.
 - Media types: `mediaType` (AUDIO/VIDEO/IMAGE, inferred from the original or,
-  without one, from any localized file) and `capabilities` (`transcript`,
-  `pipeline`, `record`) say what applies to an asset. Only AUDIO has a
+  without one, from the oldest localized file that has a type) and
+  `capabilities` (`transcript`, `pipeline`, `record`) say what applies to an
+  asset. `contentType`/`byteSize`/`sha256` stay null/0 for a source-less asset
+  — they describe the original only. `list_assets` `filterMediaType` uses the
+  same resolution, so a source-less voiceover is listed under `audio` alone;
+  an asset with no file at all has no type and matches no filter. Only AUDIO has a
   transcript and the audio tools; an image or video is localized by a
   replacement file only — transcript and tool calls on it are refused
   (`binary_asset_transcript_not_supported`, `binary_asset_tool_not_supported`).
