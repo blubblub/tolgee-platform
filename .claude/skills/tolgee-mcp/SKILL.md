@@ -24,7 +24,8 @@ Auth: `X-API-Key` header on **every** request.
   uploads are base64 with a 200 MiB cap; above that use the REST multipart
   endpoints, which stream and accept 512 MiB on `localize.blubtools.com`.
   Downloads never need REST: `get_asset_download_url` returns a ticket URL that
-  works without authentication, so a plain HTTP GET fetches the bytes. REST is
+  works without authentication, so a plain HTTP GET fetches the bytes (HTTP
+  byte ranges are honoured, so `curl -C -` resumes and players can seek). REST is
   also the only way to reach non-asset endpoints that have no tools (export,
   import, screenshots).
 - **`@tolgee/cli`** (`tolgee pull/push/sync/extract/tag`) — **not for assets.**

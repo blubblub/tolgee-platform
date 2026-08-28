@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { SyntheticEvent, useEffect, useRef, useState } from 'react';
 import { Box, CircularProgress, Link, Typography } from '@mui/material';
 import { useInView } from 'react-intersection-observer';
 import { binaryAssetApi } from './binaryAssetApi';
@@ -42,6 +42,12 @@ async function withTicketSlot<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 const TICKET_RETRIES = 3;
+
+// A download ticket lives 5 minutes, but the browser keeps issuing Range
+// requests against the same URL for as long as the media plays — pause a long
+// video and resume later and the next request 404s, which surfaces as a media
+// error. Re-mint a fresh ticket a bounded number of times before giving up.
+export const MAX_AUTO_RETICKETS = 2;
 
 function retryDelayMs(e: unknown, attempt: number): number {
   // 429 bodies carry the bucket refill time; 444 arrives with no body at all
@@ -104,6 +110,30 @@ export const BinaryAssetPreview = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
+  const autoReticketsRef = useRef(0);
+  const resumeAtRef = useRef(0);
+
+  const handleMediaError = (e: SyntheticEvent<HTMLMediaElement>) => {
+    if (autoReticketsRef.current >= MAX_AUTO_RETICKETS) {
+      setError('Playback failed');
+      return;
+    }
+    autoReticketsRef.current += 1;
+    resumeAtRef.current = e.currentTarget.currentTime || 0;
+    setRetryNonce((n) => n + 1);
+  };
+
+  const handleLoadedMetadata = (e: SyntheticEvent<HTMLMediaElement>) => {
+    if (resumeAtRef.current > 0) {
+      e.currentTarget.currentTime = resumeAtRef.current;
+      resumeAtRef.current = 0;
+    }
+  };
+
+  // Once the fresh source actually plays, a later expiry gets its own retries.
+  const handleCanPlay = () => {
+    autoReticketsRef.current = 0;
+  };
 
   // Each preview waits for its own visibility, so a tall page only tickets
   // the rows actually on screen (parents may gate coarser via `enabled`).
@@ -216,6 +246,7 @@ export const BinaryAssetPreview = ({
           variant="caption"
           onClick={(e) => {
             e.stopPropagation();
+            autoReticketsRef.current = 0;
             setRetryNonce((n) => n + 1);
           }}
           data-cy="binary-asset-preview-retry"
@@ -243,6 +274,9 @@ export const BinaryAssetPreview = ({
         // renders the overflow menu — that menu is the only download affordance
         sx={{ width: compact ? 200 : '100%', maxWidth: 480, height: 36 }}
         onClick={(e) => e.stopPropagation()}
+        onError={handleMediaError}
+        onLoadedMetadata={handleLoadedMetadata}
+        onCanPlay={handleCanPlay}
         data-cy="binary-asset-preview-audio"
       />
     );
@@ -263,6 +297,9 @@ export const BinaryAssetPreview = ({
           bgcolor: 'common.black',
         }}
         onClick={(e) => e.stopPropagation()}
+        onError={handleMediaError}
+        onLoadedMetadata={handleLoadedMetadata}
+        onCanPlay={handleCanPlay}
         data-cy="binary-asset-preview-video"
       />
     );

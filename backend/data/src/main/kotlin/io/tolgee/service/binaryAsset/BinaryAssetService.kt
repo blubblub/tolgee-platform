@@ -340,18 +340,29 @@ class BinaryAssetService(
     )
   }
 
+  /**
+   * @param range inclusive byte range to serve (HTTP Range); null streams the whole file.
+   *   [FileStream.byteSize] stays the full size so callers can build `Content-Range`.
+   */
   fun openByStorageKey(
     storageKey: String,
     contentType: String,
     filename: String,
     byteSize: Long,
+    range: LongRange? = null,
   ): FileStream {
     requireStreamingStorage()
     if (!fileStorage.fileExists(storageKey)) {
       throw NotFoundException(Message.BINARY_ASSET_NOT_FOUND)
     }
+    val inputStream =
+      if (range == null) {
+        fileStorage.openFileStream(storageKey)
+      } else {
+        fileStorage.openFileStreamRange(storageKey, range.first, range.last)
+      }
     return FileStream(
-      inputStream = fileStorage.openFileStream(storageKey),
+      inputStream = inputStream,
       contentType = contentType,
       filename = filename,
       byteSize = byteSize,

@@ -37,6 +37,26 @@ class LocalFileStorage(
     }
   }
 
+  override fun openFileStreamRange(
+    storageFilePath: String,
+    start: Long,
+    endInclusive: Long,
+  ): InputStream {
+    require(start >= 0 && endInclusive >= start) { "Invalid byte range $start-$endInclusive" }
+    try {
+      val stream = getLocalFile(storageFilePath).inputStream()
+      try {
+        stream.channel.position(start)
+      } catch (e: Exception) {
+        stream.close()
+        throw e
+      }
+      return BoundedInputStream(stream.buffered(), endInclusive - start + 1)
+    } catch (e: Exception) {
+      throw FileStoreException("Can not obtain file", storageFilePath, e)
+    }
+  }
+
   override fun deleteFile(storageFilePath: String) {
     try {
       getLocalFile(storageFilePath).delete()
