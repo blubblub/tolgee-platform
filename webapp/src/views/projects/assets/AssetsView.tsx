@@ -10,6 +10,7 @@ import {
 import { Plus } from '@untitled-ui/icons-react';
 import { useTranslate } from '@tolgee/react';
 import { useMutation, useQueryClient } from 'react-query';
+import { useDebounce } from 'use-debounce';
 
 import { BaseProjectView } from 'tg.views/projects/BaseProjectView';
 import { useProject } from 'tg.hooks/useProject';
@@ -20,6 +21,7 @@ import { useUrlSearchState } from 'tg.hooks/useUrlSearchState';
 import { LanguagesSelect } from 'tg.component/common/form/LanguagesSelect/LanguagesSelect';
 import { LINKS, PARAMS } from 'tg.constants/links';
 import { BoxLoading } from 'tg.component/common/BoxLoading';
+import { SmoothProgress } from 'tg.component/SmoothProgress';
 import {
   invalidateUrlPrefix,
   useApiInfiniteQuery,
@@ -31,6 +33,8 @@ import { AssetCard } from './AssetCard';
 type MediaFilter = 'AUDIO' | 'VIDEO' | 'IMAGE';
 
 const PAGE_SIZE = 30;
+/** Typing shows instantly; the request waits for a pause instead of firing per keystroke. */
+const SEARCH_DEBOUNCE_MS = 300;
 
 /** Stable identity — useUrlSearchState memoizes on the default value. */
 const ALL_LANGUAGES: string[] = [];
@@ -52,6 +56,7 @@ const AssetsViewContent = () => {
     [projectLanguages]
   );
   const [search, setSearch] = useState('');
+  const [debouncedSearch] = useDebounce(search.trim(), SEARCH_DEBOUNCE_MS);
   const [mediaFilters, setMediaFilters] = useState<MediaFilter[]>([]);
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -61,6 +66,12 @@ const AssetsViewContent = () => {
     'languages',
     { array: true, defaultVal: ALL_LANGUAGES }
   );
+  // useUrlSearchState re-parses the URL into a fresh array on every render; the memoized cards
+  // need one reference per distinct selection or they re-render on every keystroke anyway
+  const languageTags = useMemo(
+    () => selectedLanguages,
+    [selectedLanguages.join(',')]
+  );
 
   const canCreate = satisfiesPermission('keys.create');
 
@@ -69,7 +80,7 @@ const AssetsViewContent = () => {
   const listPath = { projectId: project.id };
   const listQueryParams = {
     size: PAGE_SIZE,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     filterMediaType: mediaFilters.length ? mediaFilters : undefined,
   };
 
@@ -132,6 +143,11 @@ const AssetsViewContent = () => {
     [listQuery.data]
   );
   const total = listQuery.data?.pages?.[0]?.page?.totalElements ?? 0;
+  // a filter or search change keeps the previous page on screen (keepPreviousData) — say so,
+  // rather than letting a stale list pass for the new result until the request lands. Only a
+  // key change dims the rows; a background refetch after an upload must not grey out the page.
+  const isRefiltering = listQuery.isFetching && !listQuery.isFetchingNextPage;
+  const showingStaleData = listQuery.isPreviousData;
 
   const filterLabel = useMemo(() => {
     if (!mediaFilters.length) return null;
@@ -298,6 +314,8 @@ const AssetsViewContent = () => {
         </Typography>
       )}
 
+      <SmoothProgress loading={isRefiltering} sx={{ mb: 1 }} />
+
       {listQuery.isLoading ? (
         <BoxLoading />
       ) : assets.length === 0 ? (
@@ -309,6 +327,14 @@ const AssetsViewContent = () => {
           display="flex"
           flexDirection="column"
           gap={2}
+          sx={{
+            // the old rows fade while the new filter loads; interacting with them would act on
+            // assets that may be about to disappear
+            opacity: showingStaleData ? 0.5 : 1,
+            pointerEvents: showingStaleData ? 'none' : 'auto',
+            transition: 'opacity 150ms',
+          }}
+          aria-busy={showingStaleData}
           data-cy="binary-assets-list"
         >
           {assets.map((asset) => (
@@ -316,7 +342,7 @@ const AssetsViewContent = () => {
               key={asset.id}
               projectId={project.id}
               asset={asset}
-              languageTags={selectedLanguages}
+              languageTags={languageTags}
               sourceLanguageName={
                 projectLanguages.find((l) => l.tag === asset.sourceLanguageTag)
                   ?.name ?? asset.sourceLanguageTag

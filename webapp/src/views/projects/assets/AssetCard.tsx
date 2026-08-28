@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { memo, ReactNode } from 'react';
 import { Box, Chip, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 
@@ -24,15 +24,19 @@ type Props = {
 /**
  * One asset card: header with counts plus the per-language files table. The assets list renders
  * one per asset and the detail page renders the same card, just filtered to a single asset.
+ *
+ * Memoized: the list re-renders on every search keystroke and filter toggle, and a page of these
+ * (each a table of media players per language) is far too heavy to rebuild before the input can
+ * even show the typed character. Callers must pass referentially stable `languageTags`.
  */
-export const AssetCard = ({
+export const AssetCard = memo(function AssetCard({
   projectId,
   asset,
   languageTags,
   sourceLanguageName,
   linkToDetail,
   actions,
-}: Props) => {
+}: Props) {
   // counts follow the language selection, so they match the rows below
   const rows = visibleTranslations(asset, languageTags);
   const currentCount = rows.filter((r) => r.status === 'CURRENT').length;
@@ -127,4 +131,4 @@ export const AssetCard = ({
       </Box>
     </Box>
   );
-};
+});
