@@ -1,5 +1,6 @@
 package io.tolgee.security.thirdParty
 
+import io.tolgee.configuration.tolgee.TolgeeProperties
 import io.tolgee.constants.Message
 import io.tolgee.dtos.request.auth.AuthProviderChangeData
 import io.tolgee.exceptions.AuthenticationException
@@ -25,6 +26,7 @@ class ThirdPartyUserHandler(
   private val userAccountService: UserAccountService,
   private val authProviderChangeService: AuthProviderChangeService,
   private val tenantService: TenantService,
+  private val tolgeeProperties: TolgeeProperties,
 ) {
   fun findOrCreateUser(data: ThirdPartyUserDetails): UserAccount {
     val userAccount = getUserAccount(data)
@@ -48,7 +50,44 @@ class ThirdPartyUserHandler(
       return userAccount
     }
 
-    return createUser(data)
+    return linkExistingAccount(data) ?: createUser(data)
+  }
+
+  /**
+   * Fork addition: a first Google login for an e-mail that already has a native account attaches Google to
+   * that account rather than failing with USERNAME_ALREADY_EXISTS. The password is kept, so both methods
+   * work afterwards.
+   *
+   * Google only — its delegate refuses unverified e-mails, which is what makes matching by e-mail safe.
+   * Returning null falls through to [createUser], which reports the conflict as before.
+   */
+  private fun linkExistingAccount(data: ThirdPartyUserDetails): UserAccount? {
+    if (data.thirdPartyAuthType != ThirdPartyAuthType.GOOGLE ||
+      !tolgeeProperties.authentication.google.linkExistingAccounts
+    ) {
+      return null
+    }
+
+    val existing = userAccountService.findActive(data.username) ?: return null
+
+    val linkable =
+      existing.thirdPartyAuthType == null &&
+        existing.accountType != AccountType.MANAGED &&
+        // Google alone must not become a way around the second factor
+        existing.totpKey == null &&
+        // whoever registered an unconfirmed address may not be its owner
+        existing.emailVerification == null
+    if (!linkable) {
+      return null
+    }
+
+    checkNotManagedByOrganization(existing.domain)
+
+    authProviderChangeService.apply(
+      existing,
+      AuthProviderChangeData(data.thirdPartyAuthType, data.authId),
+    )
+    return existing
   }
 
   private fun getManagingOrganization(data: ThirdPartyUserDetails): Organization? {

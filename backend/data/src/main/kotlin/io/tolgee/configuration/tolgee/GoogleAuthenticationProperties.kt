@@ -25,6 +25,16 @@ class GoogleAuthenticationProperties {
   )
   var workspaceDomain: String? = null
 
+  @DocProperty(
+    description =
+      "When `true`, a Google login whose verified e-mail matches an existing Tolgee account that has " +
+        "no third-party provider yet is linked to that account instead of being refused with " +
+        "`username_already_exists`. The account keeps its password, so both login methods work afterwards. " +
+        "Accounts with two-factor authentication, an unverified e-mail, or SSO management are never " +
+        "linked automatically.",
+  )
+  var linkExistingAccounts: Boolean = false
+
   @DocProperty(description = "URL to Google `/token` API endpoint. This usually does not need to be changed.")
   var authorizationUrl: String = "https://oauth2.googleapis.com/token"
 

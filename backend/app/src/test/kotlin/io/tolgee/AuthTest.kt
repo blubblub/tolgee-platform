@@ -9,6 +9,7 @@ import io.tolgee.fixtures.andIsForbidden
 import io.tolgee.fixtures.andIsUnauthorized
 import io.tolgee.fixtures.mapResponseTo
 import io.tolgee.model.Project
+import io.tolgee.model.enums.ThirdPartyAuthType
 import io.tolgee.security.authentication.JwtService
 import io.tolgee.security.thirdParty.GithubOAuthDelegate.GithubEmailResponse
 import io.tolgee.testing.AbstractControllerTest
@@ -252,6 +253,64 @@ class AuthTest : AbstractControllerTest() {
     gitHubAuthUtil.authorizeGithubUser(emailResponse = ResponseEntity(arrayOf(emailResponse), HttpStatus.OK))
     assertThat(userAccountService.findActive("fake.mixed@email.com")!!.username)
       .isEqualTo("fake.mixed@email.com")
+  }
+
+  @Test
+  fun `google login is refused for an existing native account by default`() {
+    val user = dbPopulator.createUserIfNotExists("link.me@domain.com", "native-password")
+
+    val response = googleAuthUtil.authorizeGoogleUser(user).response
+
+    assertThat(response.status).isEqualTo(401)
+    assertThat(response.contentAsString).contains(Message.USERNAME_ALREADY_EXISTS.code)
+  }
+
+  @Test
+  fun `google login links an existing native account and keeps its password`() {
+    withGoogleAccountLinking {
+      val user = dbPopulator.createUserIfNotExists("link.me@domain.com", "native-password")
+
+      val result = googleAuthUtil.authorizeGoogleUser(user).mapResponseTo<Map<String, Any>>()
+
+      assertThat(result["accessToken"]).isNotNull
+      val linked = userAccountService.findActive("link.me@domain.com")!!
+      assertThat(linked.id).isEqualTo(user.id)
+      assertThat(linked.thirdPartyAuthType).isEqualTo(ThirdPartyAuthType.GOOGLE)
+      assertThat(linked.thirdPartyAuthId).isEqualTo("fakeId")
+
+      // the second Google login finds the account by its Google id
+      assertThat(googleAuthUtil.authorizeGoogleUser(user).response.status).isEqualTo(200)
+      // and the password still works
+      val native: HashMap<String, Any> =
+        doAuthentication("link.me@domain.com", "native-password").andReturn().mapResponseTo()
+      assertThat(native["accessToken"]).isNotNull
+    }
+  }
+
+  @Test
+  fun `google login does not link an account protected by two-factor authentication`() {
+    withGoogleAccountLinking {
+      val user = dbPopulator.createUserIfNotExists("link.me@domain.com", "native-password")
+      user.totpKey = byteArrayOf(1, 2, 3)
+      userAccountService.save(user)
+
+      val response = googleAuthUtil.authorizeGoogleUser(user).response
+
+      assertThat(response.status).isEqualTo(401)
+      assertThat(response.contentAsString).contains(Message.USERNAME_ALREADY_EXISTS.code)
+      assertThat(userAccountService.findActive("link.me@domain.com")!!.thirdPartyAuthType).isNull()
+    }
+  }
+
+  private fun withGoogleAccountLinking(block: () -> Unit) {
+    val google = tolgeeProperties.authentication.google
+    val old = google.linkExistingAccounts
+    google.linkExistingAccounts = true
+    try {
+      block()
+    } finally {
+      google.linkExistingAccounts = old
+    }
   }
 
   @Test

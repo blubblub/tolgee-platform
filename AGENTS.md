@@ -468,6 +468,34 @@ language belongs to the project. Its FKs to `project` and `language` mean
 cleanup must stay wired into `ProjectHardDeletingService`, `ProjectContentClearer`,
 and `LanguageHardDeleter`.
 
+## Google login
+
+Upstream's Google OAuth, switched on by env — there is no fork login UI. Password
+login stays enabled alongside it. Configure on the droplet:
+
+```bash
+TOLGEE_AUTHENTICATION_GOOGLE_CLIENT_ID=...
+TOLGEE_AUTHENTICATION_GOOGLE_CLIENT_SECRET=...
+TOLGEE_AUTHENTICATION_GOOGLE_LINK_EXISTING_ACCOUNTS=true   # fork-only, default false
+```
+
+The redirect URI registered in Google Cloud must be
+`https://localize.blubtools.com/login/auth_callback/google`.
+
+Registrations stay off, so the invite gate is unchanged: a Google account with no
+Tolgee user and no invitation code is refused (`registrations_not_allowed`), and
+an invitation created for a specific e-mail only accepts that e-mail.
+
+`link-existing-accounts` is the fork addition, in
+`ThirdPartyUserHandler.linkExistingAccount`. Upstream refuses a Google login
+whose e-mail already has a native account (`username_already_exists`) until the
+user switches provider in account settings; with the flag on, the first Google
+login attaches Google to that account and keeps its password. It deliberately
+skips accounts with two-factor authentication, an unconfirmed e-mail, another
+provider already attached, or SSO management — those still get the upstream
+refusal. Google only: its delegate rejects unverified e-mails, and the GitHub and
+generic OAuth2 delegates have not been audited for the same guarantee.
+
 ## MCP server covers assets
 
 To *drive* a Tolgee instance (rather than change the platform), use the
