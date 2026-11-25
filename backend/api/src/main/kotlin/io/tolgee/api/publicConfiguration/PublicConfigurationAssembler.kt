@@ -1,6 +1,7 @@
 package io.tolgee.api.publicConfiguration
 
 import io.tolgee.api.publicConfiguration.PublicConfigurationDTO.AuthMethodsDTO
+import io.tolgee.api.publicConfiguration.PublicConfigurationDTO.CloudflareAccessPublicConfigDTO
 import io.tolgee.api.publicConfiguration.PublicConfigurationDTO.OAuthPublicConfigDTO
 import io.tolgee.api.publicConfiguration.PublicConfigurationDTO.OAuthPublicExtendsConfigDTO
 import io.tolgee.api.publicConfiguration.PublicConfigurationDTO.SsoGlobalPublicConfigDTO
@@ -101,6 +102,9 @@ class PublicConfigurationAssembler(
       ),
       SsoOrganizationsPublicConfigDTO(
         ssoOrganizations.enabled,
+      ),
+      CloudflareAccessPublicConfigDTO(
+        cloudflareAccess.enabled,
       ),
     )
   }

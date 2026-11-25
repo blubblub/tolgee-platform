@@ -28,6 +28,18 @@ const LOCAL_STORAGE_OAUTH_STATE_KEY = 'oauth2State';
 const LOCAL_STORAGE_SSO_STATE_KEY = 'ssoState';
 const LOCAL_STORAGE_DOMAIN_KEY = 'ssoDomain';
 
+// Set by an explicit logout. Without it the login page would sign the user
+// straight back in from their Cloudflare Access session. Session storage, so
+// it only holds for the tab the user logged out in.
+const SESSION_STORAGE_CLOUDFLARE_ACCESS_LOGGED_OUT_KEY =
+  'cloudflareAccessLoggedOut';
+
+export function isCloudflareAccessAutoLoginSuppressed() {
+  return Boolean(
+    sessionStorage.getItem(SESSION_STORAGE_CLOUDFLARE_ACCESS_LOGGED_OUT_KEY)
+  );
+}
+
 export function getRedirectUrl(userId?: number) {
   const link = securityService.getAfterLoginLink();
   if (link?.url && (link.userId === undefined || link.userId === userId)) {
@@ -55,6 +67,17 @@ export const useAuthService = (
   const authorizeOAuthLoadable = useApiMutation({
     url: '/api/public/authorize_oauth/{serviceType}',
     method: 'get',
+    fetchOptions: {
+      disableAuthRedirect: true,
+      disableErrorNotification: true,
+      disable404Redirect: true,
+      disableAutoErrorHandle: true,
+    },
+  });
+
+  const cloudflareAccessLoadable = useApiMutation({
+    url: '/api/public/authorize_cloudflare_access',
+    method: 'post',
     fetchOptions: {
       disableAuthRedirect: true,
       disableErrorNotification: true,
@@ -234,6 +257,7 @@ export const useAuthService = (
     signupLoadable,
     authorizeOAuthLoadable,
     redirectSsoUrlLoadable,
+    cloudflareAccessLoadable,
     allowRegistration,
     invitationCode,
     invitationEmail,
@@ -298,6 +322,17 @@ export const useAuthService = (
       setInvitationCode(undefined);
       await handleAfterLogin(response!);
     },
+    /**
+     * Logs in with the identity Cloudflare Access has already verified.
+     * Rejects when there is no matching account; callers fall back to the form.
+     */
+    async loginWithCloudflareAccess() {
+      const response = await cloudflareAccessLoadable.mutateAsync({});
+      sessionStorage.removeItem(
+        SESSION_STORAGE_CLOUDFLARE_ACCESS_LOGGED_OUT_KEY
+      );
+      await handleAfterLogin(response!);
+    },
     loginRedirectSso,
     getSsoAuthLinkByDomain,
     useSsoAuthLinkByDomain,
@@ -344,6 +379,12 @@ export const useAuthService = (
       securityService.saveAfterLoginLink({ url, userId });
     },
     logout() {
+      // only an explicit logout sets this: an expired session goes through
+      // exitDebugCustomerAccountOrLogout and should recover silently
+      sessionStorage.setItem(
+        SESSION_STORAGE_CLOUDFLARE_ACCESS_LOGGED_OUT_KEY,
+        '1'
+      );
       return setJwtToken(undefined);
     },
     waitForSuperToken(afterAction: SuperTokenAction) {

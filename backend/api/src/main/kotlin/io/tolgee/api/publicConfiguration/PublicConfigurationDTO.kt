@@ -45,6 +45,7 @@ class PublicConfigurationDTO(
     val oauth2: OAuthPublicExtendsConfigDTO,
     val ssoGlobal: SsoGlobalPublicConfigDTO,
     val ssoOrganizations: SsoOrganizationsPublicConfigDTO,
+    val cloudflareAccess: CloudflareAccessPublicConfigDTO,
   )
 
   data class OAuthPublicConfigDTO(
@@ -70,6 +71,10 @@ class PublicConfigurationDTO(
   )
 
   data class SsoOrganizationsPublicConfigDTO(
+    val enabled: Boolean,
+  )
+
+  data class CloudflareAccessPublicConfigDTO(
     val enabled: Boolean,
   )
 

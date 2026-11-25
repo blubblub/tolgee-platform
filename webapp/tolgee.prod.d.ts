@@ -196,7 +196,9 @@ declare module '@tolgee/web' {
     | 'project_dashboard_asset_translations_assets'
     | 'project_dashboard_asset_translations_count'
     | 'project_dashboard_asset_translations_heading'
-    | 'project_menu_assets';
+    | 'project_menu_assets'
+    | 'login_cloudflare_access'
+    | 'login_cloudflare_access_failed';
 
   export type TranslationKey =
     | DotNotationEntries<TranslationsType>

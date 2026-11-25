@@ -8,6 +8,10 @@ export interface paths {
     /** Exports data as ZIP of jsons */
     get: operations["doExportJsonZip"];
   };
+  "/api/public/authorize_cloudflare_access": {
+    /** Logs in the existing account whose e-mail matches the identity verified by Cloudflare Access. Never creates an account. */
+    post: operations["authenticateWithCloudflareAccess"];
+  };
   "/api/public/authorize_oauth/sso/authentication-url": {
     /** Returns URL which can be used to authenticate user using third party SSO service */
     post: operations["getAuthenticationUrl"];
@@ -132,7 +136,7 @@ export interface paths {
     delete: operations["rejectChangeAuthProvider"];
   };
   "/v2/binary-assets/download": {
-    /** Pass inline=true (or omit when content type is audio/image/video) to stream with Content-Disposition: inline so browsers can play/preview in-page. */
+    /** Pass inline=true (or omit when content type is audio/image/video) to stream with Content-Disposition: inline so browsers can play/preview in-page. Supports HTTP byte ranges (a single `Range: bytes=…` → 206 Partial Content). */
     get: operations["download"];
   };
   "/v2/ee-current-subscription-usage": {
@@ -1631,6 +1635,7 @@ export interface components {
       isReadOnly: boolean;
     };
     AuthMethodsDTO: {
+      cloudflareAccess: components["schemas"]["CloudflareAccessPublicConfigDTO"];
       github: components["schemas"]["OAuthPublicConfigDTO"];
       google: components["schemas"]["OAuthPublicConfigDTO"];
       oauth2: components["schemas"]["OAuthPublicExtendsConfigDTO"];
@@ -2098,6 +2103,9 @@ export interface components {
     ClearTranslationsRequest: {
       keyIds: number[];
       languageIds: number[];
+    };
+    CloudflareAccessPublicConfigDTO: {
+      enabled: boolean;
     };
     CollectionModelAiPlaygroundResultModel: {
       _embedded?: {
@@ -8260,6 +8268,41 @@ export interface operations {
       };
     };
   };
+  /** Logs in the existing account whose e-mail matches the identity verified by Cloudflare Access. Never creates an account. */
+  authenticateWithCloudflareAccess: {
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["JwtAuthenticationResponse"];
+        };
+      };
+      /** Bad Request */
+      400: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Unauthorized */
+      401: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Forbidden */
+      403: {
+        content: {
+          "application/json": string;
+        };
+      };
+      /** Not Found */
+      404: {
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
   /** Returns URL which can be used to authenticate user using third party SSO service */
   getAuthenticationUrl: {
     responses: {
@@ -9703,7 +9746,7 @@ export interface operations {
       };
     };
   };
-  /** Pass inline=true (or omit when content type is audio/image/video) to stream with Content-Disposition: inline so browsers can play/preview in-page. */
+  /** Pass inline=true (or omit when content type is audio/image/video) to stream with Content-Disposition: inline so browsers can play/preview in-page. Supports HTTP byte ranges (a single `Range: bytes=…` → 206 Partial Content). */
   download: {
     parameters: {
       query: {

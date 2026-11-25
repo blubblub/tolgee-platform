@@ -22,6 +22,7 @@ import {
   useGlobalContext,
 } from 'tg.globalContext/GlobalContext';
 import { ApiError } from 'tg.service/http/ApiError';
+import { messageService } from 'tg.service/MessageService';
 
 const StyledInputFields = styled('div')`
   display: grid;
@@ -38,10 +39,14 @@ type LoginViewCredentialsProps = {
 
 export function LoginCredentialsForm(props: LoginViewCredentialsProps) {
   const remoteConfig = useConfig();
-  const { login, loginRedirectSso } = useGlobalActions();
+  const { login, loginRedirectSso, loginWithCloudflareAccess } =
+    useGlobalActions();
   const isLoading = useGlobalContext(
     (c) =>
       c.auth.loginLoadable.isLoading || c.auth.redirectSsoUrlLoadable.isLoading
+  );
+  const cloudflareAccessLoading = useGlobalContext(
+    (c) => c.auth.cloudflareAccessLoadable.isLoading
   );
 
   const oAuthServices = useOAuthServices();
@@ -50,8 +55,13 @@ export function LoginCredentialsForm(props: LoginViewCredentialsProps) {
   const organizationsSsoEnabled =
     remoteConfig.authMethods?.ssoOrganizations.enabled ?? false;
   const globalSsoEnabled = remoteConfig.authMethods?.ssoGlobal.enabled ?? false;
+  const cloudflareAccessEnabled =
+    remoteConfig.authMethods?.cloudflareAccess?.enabled ?? false;
   const hasNonNativeAuthMethods =
-    oAuthServices.length > 0 || organizationsSsoEnabled || globalSsoEnabled;
+    oAuthServices.length > 0 ||
+    organizationsSsoEnabled ||
+    globalSsoEnabled ||
+    cloudflareAccessEnabled;
   const noLoginMethods = !nativeEnabled && !hasNonNativeAuthMethods;
 
   const customLogoUrl = remoteConfig.authMethods?.ssoGlobal.customLogoUrl;
@@ -61,6 +71,17 @@ export function LoginCredentialsForm(props: LoginViewCredentialsProps) {
   ) : (
     <T keyName="login_sso" />
   );
+
+  function cloudflareAccessLogin() {
+    loginWithCloudflareAccess().catch(() => {
+      messageService.error(
+        <T
+          keyName="login_cloudflare_access_failed"
+          defaultValue="Your company login has no matching account here. Log in another way, or ask an administrator for an invitation."
+        />
+      );
+    });
+  }
 
   function globalSsoLogin() {
     loginRedirectSso(remoteConfig.authMethods?.ssoGlobal.domain as string);
@@ -158,6 +179,25 @@ export function LoginCredentialsForm(props: LoginViewCredentialsProps) {
                   </LoadingButton>
                 )}
               </React.Fragment>
+            )}
+
+            {cloudflareAccessEnabled && (
+              <LoadingButton
+                loading={cloudflareAccessLoading}
+                size="medium"
+                endIcon={<Key02 />}
+                variant="outlined"
+                style={{ marginBottom: '0.5rem' }}
+                color="inherit"
+                onClick={cloudflareAccessLogin}
+                data-cy="login-provider"
+                data-cy-provider="cloudflare-access"
+              >
+                <T
+                  keyName="login_cloudflare_access"
+                  defaultValue="Continue with company login"
+                />
+              </LoadingButton>
             )}
 
             {oAuthServices.map((provider) => (

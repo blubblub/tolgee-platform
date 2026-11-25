@@ -72,7 +72,9 @@ Trust live state over version values copied into documentation. Reconcile stale 
    - The app container uses the newly loaded image ID.
    - Docker health is `healthy`.
    - `https://localize.blubtools.com/actuator/health` returns `{"status":"UP"}`.
-   - `/` and `/api/public/configuration` return HTTP 200.
+   - `/` and `/api/public/configuration` return HTTP 200 **when requested from the Droplet** with
+     `curl -sk --resolve localize.blubtools.com:443:127.0.0.1 …`. The site is behind Cloudflare Access, so
+     from outside both answer 302 to the Access login; that is not a failed release.
 9. If health does not recover, collect bounded app logs, restore the exact snapshot created in step 7, run `docker compose up -d --no-deps app`, verify the old release, and report the failed release as not deployed.
 10. After success, delete the local and uploaded release archives. Keep the rollback Compose snapshot and all loaded Docker images; never prune them.
 11. Update `../company/docs/tolgee.md` with the deployed tag, full image ID, source commit, verification date, and any procedure correction. Never add secrets. Respect that repository's own commit/push rules.

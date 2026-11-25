@@ -496,6 +496,51 @@ provider already attached, or SSO management — those still get the upstream
 refusal. Google only: its delegate rejects unverified e-mails, and the GitHub and
 generic OAuth2 delegates have not been audited for the same guarantee.
 
+## Single login behind Cloudflare Access
+
+`localize.blubtools.com` sits behind Cloudflare Access (the blubtools SSO), so
+the browser has already authenticated before Tolgee sees a request. Rather than
+asking for a second login, the fork turns that identity into a Tolgee session.
+Configure on the droplet (unset = feature off, endpoint refuses):
+
+```bash
+TOLGEE_AUTHENTICATION_CLOUDFLARE_ACCESS_TEAM_DOMAIN=https://blub-blub.cloudflareaccess.com
+TOLGEE_AUTHENTICATION_CLOUDFLARE_ACCESS_AUDIENCE=<AUD tag of the Access application>
+```
+
+- `POST /api/public/authorize_cloudflare_access`
+  (`CloudflareAccessAuthController`) reads `Cf-Access-Jwt-Assertion`, and
+  `CloudflareAccessTokenVerifier` checks RS256 against
+  `<team-domain>/cdn-cgi/access/certs`, plus issuer, audience and expiry. The
+  origin only accepts Cloudflare, but the signature is verified regardless.
+- It logs in the **existing active account with the same e-mail and never
+  creates one**, so invitations stay the only way in. It writes nothing to the
+  account: no provider slot, no schema change. Password and Google login keep
+  working.
+- Refused, and left to the login form: accounts with two-factor authentication,
+  an unconfirmed e-mail, or SSO management; service tokens (no `email` claim).
+  Every refusal returns the same `third_party_unauthorized`; the real reason is
+  only in the server log (`Cloudflare Access login refused: …`).
+- The endpoint must stay under `/api/public`. `/v2` and `/mcp` are bypassed in
+  Access for API-key clients, and a bypassed path carries no header.
+- Webapp: `LoginView` calls the endpoint on arrival when
+  `authMethods.cloudflareAccess.enabled` is set and shows the form only if it is
+  refused. An explicit logout sets a `sessionStorage` marker
+  (`useAuthService`) so the page does not log the user straight back in; an
+  expired session does not set it and recovers silently. The form has a
+  "Continue with company login" button for retrying by hand.
+
+**Deploy checks must run from the droplet.** From outside, `/` and
+`/api/public/configuration` now answer 302 to the Access login, which a naive
+health check reads as a failed release:
+
+```bash
+curl -sk --resolve localize.blubtools.com:443:127.0.0.1 -o /dev/null \
+  -w "%{http_code}" https://localize.blubtools.com/api/public/configuration
+```
+
+`/actuator/health` is bypassed in Access and still works from anywhere.
+
 ## MCP server covers assets
 
 To *drive* a Tolgee instance (rather than change the platform), use the

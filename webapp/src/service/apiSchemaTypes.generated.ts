@@ -45,6 +45,7 @@ export type BranchModel = components['schemas']['BranchModel'];
 export type BusinessEventReportRequest = components['schemas']['BusinessEventReportRequest'];
 export type CalculateScopeRequest = components['schemas']['CalculateScopeRequest'];
 export type ClearTranslationsRequest = components['schemas']['ClearTranslationsRequest'];
+export type CloudflareAccessPublicConfigDTO = components['schemas']['CloudflareAccessPublicConfigDTO'];
 export type CollectionModelAiPlaygroundResultModel = components['schemas']['CollectionModelAiPlaygroundResultModel'];
 export type CollectionModelAutoTranslationConfigModel = components['schemas']['CollectionModelAutoTranslationConfigModel'];
 export type CollectionModelBatchJobModel = components['schemas']['CollectionModelBatchJobModel'];

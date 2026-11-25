@@ -116,6 +116,9 @@ dependencies {
     implementation libs.springmockk
     implementation libs.jsonUnitAssert
     testImplementation libs.mockito
+    testImplementation libs.jjwtApi
+    testRuntimeOnly libs.jjwtImpl
+    testRuntimeOnly libs.jjwtJackson
     testImplementation group: 'org.springframework.batch', name: 'spring-batch-test', version: '4.3.5'
     testImplementation "org.springframework.boot:spring-boot-starter-websocket"
     testImplementation(libs.azureBlob)

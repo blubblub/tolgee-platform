@@ -1,4 +1,4 @@
-import { FunctionComponent, useRef, useState } from 'react';
+import { FunctionComponent, useEffect, useRef, useState } from 'react';
 import { T, useTranslate } from '@tolgee/react';
 import { Alert, useMediaQuery, Link as MuiLink } from '@mui/material';
 import { Link } from 'react-router-dom';
@@ -11,7 +11,12 @@ import {
   SPLIT_CONTENT_BREAK_POINT,
 } from 'tg.component/layout/CompactView';
 import { useReportOnce } from 'tg.hooks/useReportEvent';
-import { useGlobalContext } from 'tg.globalContext/GlobalContext';
+import {
+  useGlobalActions,
+  useGlobalContext,
+} from 'tg.globalContext/GlobalContext';
+import { isCloudflareAccessAutoLoginSuppressed } from 'tg.globalContext/useAuthService';
+import { FullPageLoading } from 'tg.component/common/FullPageLoading';
 
 import { LoginCredentialsForm } from './LoginCredentialsForm';
 import { LoginTotpForm } from './LoginTotpForm';
@@ -47,6 +52,33 @@ export const LoginView: FunctionComponent<
   );
 
   useReportOnce('LOGIN_PAGE_OPENED');
+
+  // Behind Cloudflare Access the user has already logged in once. Try to turn
+  // that into a Tolgee session before showing the form; any refusal (no
+  // matching account, two-factor account, ...) quietly falls back to it.
+  const cloudflareAccessEnabled = useGlobalContext(
+    (c) =>
+      c.initialData.serverConfiguration.authMethods?.cloudflareAccess
+        ?.enabled ?? false
+  );
+  const { loginWithCloudflareAccess } = useGlobalActions();
+  const [autoLoginPending, setAutoLoginPending] = useState(
+    () => cloudflareAccessEnabled && !isCloudflareAccessAutoLoginSuppressed()
+  );
+  const autoLoginStarted = useRef(false);
+
+  useEffect(() => {
+    if (!autoLoginPending || autoLoginStarted.current) {
+      return;
+    }
+    autoLoginStarted.current = true;
+    // on success the route redirects away, so only failure needs handling
+    loginWithCloudflareAccess().catch(() => setAutoLoginPending(false));
+  }, []);
+
+  if (autoLoginPending) {
+    return <FullPageLoading />;
+  }
 
   if (mfaRequired) {
     return (

@@ -182,4 +182,5 @@ class AuthenticationProperties(
   var oauth2: OAuth2AuthenticationProperties = OAuth2AuthenticationProperties(),
   var ssoGlobal: SsoGlobalProperties = SsoGlobalProperties(),
   var ssoOrganizations: SsoOrganizationsProperties = SsoOrganizationsProperties(),
+  var cloudflareAccess: CloudflareAccessProperties = CloudflareAccessProperties(),
 )
